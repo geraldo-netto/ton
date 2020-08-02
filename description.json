@@ -1,0 +1,64 @@
+{
+  "encoding": "UTF-8",
+  "rows": 10,
+  "format": "$year$-$month$-$date$ $hour$:$minute$:$second$;hg;$cpu_type$;$has_ht$;$cpu_model$;$cpu_usage$",
+  "types": {
+    "year": {
+      "type": "integer",
+      "minValue": 1100,
+      "maxValue": 2050,
+      "padWithZero": true
+    },
+    "month": {
+      "type": "integer",
+      "minValue": 1,
+      "maxValue": 12,
+      "padWithZero": true
+    },
+    "date": {
+      "type": "integer",
+      "minValue": 1,
+      "maxValue": 31,
+      "padWithZero": true
+    },
+    "hour": {
+      "type": "integer",
+      "minValue": 0,
+      "maxValue": 23,
+      "padWithZero": true
+    },
+    "minute": {
+      "type": "integer",
+      "minValue": 0,
+      "maxValue": 59,
+      "padWithZero": true
+    },
+    "second": {
+      "type": "integer",
+      "minValue": 0,
+      "maxValue": 59,
+      "padWithZero": true
+    },
+    "cpu_type": {
+      "type": "string",
+      "values": ["AMD", "Intel", "ARM"]
+    },
+    "cpu_model": {
+      "type": "char",
+      "values": ["A", "B", "C"],
+      "maxChar": 2
+    },
+    "has_ht": {
+      "type": "boolean",
+      "whenTrue": "Y",
+      "whenFalse": "N"
+    },
+    "cpu_usage": {
+      "type": "decimal",
+      "minValue": 0.0,
+      "maxValue": 100.0,
+      "decimals": 2,
+      "padWithZero": true
+    }
+  }
+}

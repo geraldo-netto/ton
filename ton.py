@@ -65,19 +65,19 @@ if os.path.isfile(sys.argv[1]):
 
 		for variable in variables:
 			if config['types'][variable]['type'] == 'boolean':
-				currRow = currRow.replace('$' + variable + '$', createBooleanValue(config['types'][variable]))
+				currRow = currRow.replace('$' + variable + '$', str(createBooleanValue(config['types'][variable])))
 
 			elif config['types'][variable]['type'] == 'integer':
-				currRow = currRow.replace('$' + variable + '$', createIntegerValue(config['types'][variable]))
+				currRow = currRow.replace('$' + variable + '$', str(createIntegerValue(config['types'][variable])))
 
 			elif config['types'][variable]['type'] == 'decimal':
-				currRow = currRow.replace('$' + variable + '$', createDecimalValue(config['types'][variable]))
+				currRow = currRow.replace('$' + variable + '$', str(createDecimalValue(config['types'][variable])))
 
 			elif config['types'][variable]['type'] == 'char':
-				currRow = currRow.replace('$' + variable + '$', createCharValue(config['types'][variable]))
+				currRow = currRow.replace('$' + variable + '$', str(createCharValue(config['types'][variable])))
 
 			elif config['types'][variable]['type'] == 'string':
-				currRow = currRow.replace('$' + variable + '$', createStringValue(config['types'][variable]))
+				currRow = currRow.replace('$' + variable + '$', str(createStringValue(config['types'][variable])))
 
 		print currRow
 

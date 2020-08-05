@@ -1,0 +1,28 @@
+{
+  "encoding": "UTF-8",
+  "rows": 10,
+  "format": "rs$id$\t$chromosome$\t$position$\t$genotype$",
+  "types": {
+    "id": {
+      "type": "integer",
+      "minValue": 100000000,
+      "maxValue": 12000000000,
+      "padWithZero": false
+    },
+    "chromosome": {
+      "type": "string",
+      "values": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y"]
+    },
+    "position": {
+      "type": "integer",
+      "minValue": 100000,
+      "maxValue": 120000000,
+      "padWithZero": false
+    },
+    "genotype": {
+      "type": "char",
+      "values": ["A", "C", "T", "G"],
+      "maxChar": 2
+    }
+  }
+}

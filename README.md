@@ -3,7 +3,7 @@ TON is a mass data generator script written in python
 
 ## Usage
 ```bash
-netto@bella:~/ton$ python ton.py description.json 
+netto@bella:~/ton$ python ton.py hwmetrics.json
 1881-09-27 14:52:36;hg;ARM;N;AC;38.98
 1373-08-13 23:43:56;hg;AMD;N;AB;30.18
 1100-12-19 18:54:41;hg;AMD;Y;AC;68.69
@@ -16,7 +16,7 @@ netto@bella:~/ton$ python ton.py description.json
 elapsed time:  0:00:00.000648
 ```
 
-description.json declares how data must be generated and it has the following format:
+hwmetrics.json declares how data must be generated and it has the following format:
 ```json
 {
   "encoding": "UTF-8",
@@ -57,6 +57,7 @@ description.json declares how data must be generated and it has the following fo
 
 ## TODO
 * refactoring
+* tests
 * add sequencial number generation
 * allow to change statistical data distribution (currently, it's all based on a normal curve)
 

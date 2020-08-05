@@ -1,0 +1,11 @@
+{
+    "encoding": "UTF-8",
+    "rows": 10,
+    "format": "$word[id]$ -> $word$",
+    "types": {
+      "word": {
+        "type": "lmhash",
+        "values": ["AMD", "Intel", "ARM"]
+      }
+    }
+  }

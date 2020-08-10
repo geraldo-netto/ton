@@ -16,7 +16,9 @@ netto@bella:~/ton$ python ton.py hwmetrics.json
 elapsed time:  0:00:00.000648
 ```
 
-hwmetrics.json declares how data must be generated and it has the following format:
+### Explaining [hwmetrics.json](examples/hwmetrics.json)
+
+[hwmetrics.json](examples/hwmetrics.json) declares how data must be created and it has the following format:
 ```json
 {
   "encoding": "UTF-8",
@@ -54,6 +56,76 @@ hwmetrics.json declares how data must be generated and it has the following form
 }
 
 ```
+
+"rows" is the number of rows TON will create, it must be an integer
+
+"format" is the output string that each row will have. All values enclosed by '$' is read as a variable.
+e.g.: $title$ will create a variable title that must be mapped inside the types block.
+
+"types" contains a list of variables previously declared on format
+
+The following data types are allowed inside types:
+* boolean
+"variableName": {
+  "type": "boolean",
+  "whenTrue": "Y",
+  "whenFalse": "N"
+}
+
+* char
+"variableName": {
+  "type": "char",
+  "values": ["A", "B", "C"],
+  // maximum number of characters to be created
+  "maxChar": 2
+}
+
+* string
+"variableName": {
+  "type": "string",
+  "values": ["AMD", "INTEL", "ARM"]
+}
+
+* integer
+"variableName": {
+  "type": "integer",
+  // defines the minimum value to be created
+  "minValue": 1100,
+  // defines the maximum value to be created
+  "maxValue": 2050,
+  // completes the created integer with zeros
+  "padWithZero": true
+}
+
+* decimal
+"variableName": {
+  "type": "decimal",
+  // defines the minimum value to be created
+  "minValue": 0.0,
+  // defines the maximum value to be created
+  "maxValue": 100.0,
+  // defines the maximum value to be created
+  "decimals": 2,
+  // completes the created float with zeros
+  "padWithZero": true
+}
+
+* lmhash
+"variableName": {
+  // creates windows 2000/xp hashes based on their literal value
+  // Also, lmhash has a special parameter called id that is used to extract field name.
+  // e.g.: Variable $word$ applied with lmhash will create an md4 hash;
+  //       Variable $word[id]$ applied with lmhash will display the current value
+  // So: "$word[id]$ => $word$" will generate this kind of output: "love => 85deeec2d12f917783b689ae94990716"
+  // Please, check full [winhash.json example](examples/winhash.json)
+  "type": "lmhash",
+  "values": ["AMD", "Intel", "ARM"]
+}
+
+Please, check the following example for other use cases:
+* [dna.json example - creating DNA sequences in the same format as 23andMe, tellmeGen, ...](examples/winhash.json)
+* [winhash.json example - creating rainbow table of Windows 2000/XP](examples/winhash.json)
+
 
 ## TODO
 * refactoring

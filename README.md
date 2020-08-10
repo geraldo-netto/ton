@@ -65,62 +65,73 @@ e.g.: $title$ will create a variable title that must be mapped inside the types 
 "types" contains a list of variables previously declared on format
 
 The following data types are allowed inside types:
-* boolean
+#### boolean creates boolean value
+```json
 "variableName": {
   "type": "boolean",
   "whenTrue": "Y",
   "whenFalse": "N"
 }
+```
 
-* char
+#### char creates single character value
+"maxChar": 2 => maximum number of characters to be created
+```json
 "variableName": {
   "type": "char",
   "values": ["A", "B", "C"],
-  // maximum number of characters to be created
   "maxChar": 2
 }
+```
 
-* string
+#### string creates string values
+```json
 "variableName": {
   "type": "string",
   "values": ["AMD", "INTEL", "ARM"]
 }
+```
 
-* integer
+#### integer creates integer values
+"minValue": 1100 => defines the minimum value to be created
+"maxValue": 2050 => defines the maximum value to be created
+"padWithZero": true => completes the created integer with zeros
+```json
 "variableName": {
   "type": "integer",
-  // defines the minimum value to be created
   "minValue": 1100,
-  // defines the maximum value to be created
   "maxValue": 2050,
-  // completes the created integer with zeros
   "padWithZero": true
 }
+```
 
-* decimal
+#### decimal creates decimal values
+"minValue": 0.0 => defines the minimum value to be created
+"maxValue": 100.0 => defines the maximum value to be created
+"decimals": 2 => defines the maximum value to be created
+"padWithZero": true => completes the created float with zeros
+```json
 "variableName": {
   "type": "decimal",
-  // defines the minimum value to be created
   "minValue": 0.0,
-  // defines the maximum value to be created
   "maxValue": 100.0,
-  // defines the maximum value to be created
   "decimals": 2,
-  // completes the created float with zeros
   "padWithZero": true
 }
+```
 
-* lmhash
+#### lmhash creates windows 2000/xp hashes based on their literal values
+Also, lmhash has a special parameter called id that is used to extract field name.
+e.g.: Variable $word$ applied with lmhash will create an md4 hash;
+      Variable $word[id]$ applied with lmhash will display the current value
+So: "$word[id]$ => $word$" will generate this kind of output: "love => 85deeec2d12f917783b689ae94990716"
+Please, check full [winhash.json example](examples/winhash.json)
+```json
 "variableName": {
-  // creates windows 2000/xp hashes based on their literal value
-  // Also, lmhash has a special parameter called id that is used to extract field name.
-  // e.g.: Variable $word$ applied with lmhash will create an md4 hash;
-  //       Variable $word[id]$ applied with lmhash will display the current value
-  // So: "$word[id]$ => $word$" will generate this kind of output: "love => 85deeec2d12f917783b689ae94990716"
-  // Please, check full [winhash.json example](examples/winhash.json)
   "type": "lmhash",
   "values": ["AMD", "Intel", "ARM"]
 }
+```
 
 Please, check the following example for other use cases:
 * [dna.json example - creating DNA sequences in the same format as 23andMe, tellmeGen, ...](examples/winhash.json)
@@ -130,7 +141,7 @@ Please, check the following example for other use cases:
 ## TODO
 * refactoring
 * tests
-* add sequencial number generation
+* add sequential number generation
 * allow to change statistical data distribution (currently, it's all based on a normal curve)
 
 ## License

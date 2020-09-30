@@ -134,7 +134,7 @@ Please, check full [winhash.json example](examples/winhash.json)
 ```
 
 Please, check the following example for other use cases:
-* [dna.json example - creating DNA sequences in the same format as 23andMe, tellmeGen, ...](examples/winhash.json)
+* [dna.json example - creating DNA sequences in the same format as 23andMe, tellmeGen, ...](examples/dna.json)
 * [winhash.json example - creating rainbow table of Windows 2000/XP](examples/winhash.json)
 
 

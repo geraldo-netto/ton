@@ -57,12 +57,10 @@ elapsed time:  0:00:00.000648
 
 ```
 
-"rows" is the number of rows TON will create, it must be an integer
-
-"format" is the output string that each row will have. All values enclosed by '$' is read as a variable.
-e.g.: $title$ will create a variable title that must be mapped inside the types block.
-
-"types" contains a list of variables previously declared on format
+"rows" is the number of rows TON will create, it must be an integer  
+"format" is the output string that each row will have. All values enclosed by '$' is read as a variable.  
+         e.g.: $title$ will create a variable title that must be mapped inside the types block.  
+"types" contains a list of variables previously declared on format  
 
 The following data types are allowed inside types:
 #### boolean creates boolean value
@@ -93,9 +91,9 @@ The following data types are allowed inside types:
 ```
 
 #### integer creates integer values
-"minValue": 1100 => defines the minimum value to be created
-"maxValue": 2050 => defines the maximum value to be created
-"padWithZero": true => completes the created integer with zeros
+"minValue": 1100 => defines the minimum value to be created  
+"maxValue": 2050 => defines the maximum value to be created  
+"padWithZero": true => completes the created integer with zeros  
 ```json
 "variableName": {
   "type": "integer",
@@ -106,10 +104,10 @@ The following data types are allowed inside types:
 ```
 
 #### decimal creates decimal values
-"minValue": 0.0 => defines the minimum value to be created
-"maxValue": 100.0 => defines the maximum value to be created
-"decimals": 2 => defines the maximum value to be created
-"padWithZero": true => completes the created float with zeros
+"minValue": 0.0 => defines the minimum value to be created  
+"maxValue": 100.0 => defines the maximum value to be created  
+"decimals": 2 => defines the maximum value to be created  
+"padWithZero": true => completes the created float with zeros  
 ```json
 "variableName": {
   "type": "decimal",
@@ -121,11 +119,11 @@ The following data types are allowed inside types:
 ```
 
 #### lmhash creates windows 2000/xp hashes based on their literal values
-Also, lmhash has a special parameter called id that is used to extract field name.
-e.g.: Variable $word$ applied with lmhash will create an md4 hash;
-      Variable $word[id]$ applied with lmhash will display the current value
-So: "$word[id]$ => $word$" will generate this kind of output: "love => 85deeec2d12f917783b689ae94990716"
-Please, check full [winhash.json example](examples/winhash.json)
+Also, lmhash has a special parameter called id that is used to extract field name.  
+e.g.: Variable $word$ applied with lmhash will create an md4 hash;  
+      Variable $word[id]$ applied with lmhash will display the current value  
+So: "$word[id]$ => $word$" will generate this kind of output: "love => 85deeec2d12f917783b689ae94990716"  
+Please, check full [winhash.json example](examples/winhash.json)  
 ```json
 "variableName": {
   "type": "lmhash",
@@ -133,9 +131,9 @@ Please, check full [winhash.json example](examples/winhash.json)
 }
 ```
 
-Please, check the following example for other use cases:
-* [dna.json example - creating DNA sequences in the same format as 23andMe, tellmeGen, ...](examples/dna.json)
-* [winhash.json example - creating rainbow table of Windows 2000/XP](examples/winhash.json)
+Please, check the following example for other use cases:  
+* [dna.json example - creating DNA sequences in the same format as 23andMe, tellmeGen, ...](examples/dna.json)  
+* [winhash.json example - creating rainbow table of Windows 2000/XP](examples/winhash.json)  
 
 
 ## TODO

@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import binascii
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, Callable
+from typing import Any
 
 from ._md4 import md4 as _pure_md4
 from .base import PairedGenerator, require_string_tuple

@@ -60,15 +60,15 @@ def md4(data: bytes) -> bytes:
         x = list(struct.unpack("<16I", bytes(msg[offset : offset + 64])))
         aa, bb, cc, dd = a, b, c, d
 
-        for k, s in zip(_R1_K, _R1_S):
+        for k, s in zip(_R1_K, _R1_S, strict=False):
             a = _rl(a + _f(b, c, d) + x[k], s)
             a, b, c, d = d, a, b, c
 
-        for k, s in zip(_R2_K, _R2_S):
+        for k, s in zip(_R2_K, _R2_S, strict=False):
             a = _rl(a + _g(b, c, d) + x[k] + 0x5A827999, s)
             a, b, c, d = d, a, b, c
 
-        for k, s in zip(_R3_K, _R3_S):
+        for k, s in zip(_R3_K, _R3_S, strict=False):
             a = _rl(a + _h(b, c, d) + x[k] + 0x6ED9EBA1, s)
             a, b, c, d = d, a, b, c
 

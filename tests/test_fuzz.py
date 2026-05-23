@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import re
 import string as string_module
+from collections.abc import Callable
 from random import Random
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 

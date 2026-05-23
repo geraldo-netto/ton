@@ -12,8 +12,11 @@ a separate line in this module's hand-maintained list).
 from __future__ import annotations
 
 import inspect
+from collections.abc import Iterator
 from importlib.metadata import entry_points
-from typing import Dict, Iterator, List, Tuple, Type
+from typing import Dict, List, Tuple, Type
+
+from ._logging import logger as _logger
 
 # Importing ``ton.generators`` imports every concrete-generator submodule,
 # which is what populates Generator.__subclasses__() below.
@@ -77,6 +80,15 @@ def default_registry() -> Dict[str, Generator]:
     global _DEFAULT_CLASSES
     if not _DEFAULT_CLASSES:
         _DEFAULT_CLASSES = tuple(discover_generator_classes())
+        _logger.info(
+            "registry_discovered generators=%d",
+            len(_DEFAULT_CLASSES),
+            extra={
+                "event": "registry_discovered",
+                "generators": len(_DEFAULT_CLASSES),
+                "names": sorted(cls.type_name for cls in _DEFAULT_CLASSES),
+            },
+        )
     return {cls.type_name: cls() for cls in _DEFAULT_CLASSES}
 
 
@@ -91,7 +103,25 @@ def registry_with_entry_points() -> Dict[str, Generator]:
     Entry-point names override built-ins with the same key.
     """
     registry = default_registry()
+    loaded = 0
     for ep in entry_points(group=ENTRY_POINT_GROUP):
         factory = ep.load()
         registry[ep.name] = factory()
+        loaded += 1
+        _logger.info(
+            "entry_point_loaded name=%s value=%s",
+            ep.name,
+            ep.value,
+            extra={
+                "event": "entry_point_loaded",
+                "name": ep.name,
+                "value": ep.value,
+            },
+        )
+    if loaded:
+        _logger.info(
+            "entry_points_summary loaded=%d",
+            loaded,
+            extra={"event": "entry_points_summary", "loaded": loaded},
+        )
     return registry

@@ -4,15 +4,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
 import time
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from random import Random
-from typing import Iterator, Optional, Sequence, TextIO
+from typing import Optional, TextIO
 
 from . import __version__
 from ._config import ConfigError, load
 from ._engine import Engine, TemplateError
+from ._logging import configure_stderr
+
+_LOG_LEVELS = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+    "critical": logging.CRITICAL,
+}
 
 #: Rows per write() syscall when streaming to a file. Picked to be big
 #: enough to amortize Python attribute / interpreter overhead but small
@@ -50,6 +61,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Emit a JSON progress line to stderr every EVERY rows (0 disables).",
     )
     parser.add_argument(
+        "--log-level",
+        choices=sorted(_LOG_LEVELS.keys()),
+        default=None,
+        help="Attach a stderr handler to the 'ton' logger at this level (OBS-003).",
+    )
+    parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {__version__}",
@@ -60,6 +77,8 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """CLI entry point. Returns a shell exit code."""
     args = _build_parser().parse_args(argv)
+    if args.log_level is not None:
+        configure_stderr(_LOG_LEVELS[args.log_level])
     return _run(args)
 
 
@@ -104,7 +123,10 @@ def _run_inner(args: argparse.Namespace) -> int:
 def _build_engine(args: argparse.Namespace) -> Engine:
     rng = Random(args.seed) if args.seed is not None else Random()
     config = load(args.config)
-    return Engine(config, rng=rng)
+    # --progress already prints JSON; reuse the same interval as the
+    # engine's logger milestone so structured handlers see the same
+    # boundaries.
+    return Engine(config, rng=rng, milestone_rows=args.progress)
 
 
 @contextmanager

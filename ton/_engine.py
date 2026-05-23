@@ -7,12 +7,14 @@ files, or anywhere else without buffering the full dataset in memory.
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 from random import Random
-from typing import Any, Dict, Iterator, Mapping, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-from .generators import Generator, PairedGenerator
+from ._logging import logger as _logger
 from ._registry import default_registry
 from ._template import Token, UndeclaredVariableError, parse, render, validate_against
+from .generators import Generator, PairedGenerator
 
 
 class TemplateError(ValueError):
@@ -27,6 +29,8 @@ class Engine:
         config: Mapping[str, Any],
         registry: Optional[Mapping[str, Generator]] = None,
         rng: Optional[Random] = None,
+        *,
+        milestone_rows: int = 0,
     ) -> None:
         self._template: str = config["format"]
         self._types: Mapping[str, Mapping[str, Any]] = config["types"]
@@ -41,6 +45,20 @@ class Engine:
         # Skip per-row paired_cache allocation when no referenced type is paired.
         self._has_paired = any(
             self._prepared[t.type_key][0].is_paired for t in self._tokens
+        )
+        self._milestone_rows = max(0, int(milestone_rows))
+        _logger.info(
+            "engine_constructed rows=%d types=%d paired=%s",
+            self._rows,
+            len(self._types),
+            self._has_paired,
+            extra={
+                "event": "engine_constructed",
+                "rows": self._rows,
+                "types": len(self._types),
+                "paired": self._has_paired,
+                "milestone_rows": self._milestone_rows,
+            },
         )
 
     def _validate(self) -> None:
@@ -75,8 +93,27 @@ class Engine:
         return prepared
 
     def __iter__(self) -> Iterator[str]:
+        milestone = self._milestone_rows
+        count = 0
         for _ in range(self._rows):
             yield self._render_row()
+            count += 1
+            if milestone and count % milestone == 0:
+                _logger.info(
+                    "engine_milestone rows=%d/%d",
+                    count,
+                    self._rows,
+                    extra={
+                        "event": "engine_milestone",
+                        "rows": count,
+                        "total": self._rows,
+                    },
+                )
+        _logger.info(
+            "engine_completed rows=%d",
+            count,
+            extra={"event": "engine_completed", "rows": count},
+        )
 
     def _render_row(self) -> str:
         paired_cache: Optional[dict[str, tuple[str, str]]] = {} if self._has_paired else None

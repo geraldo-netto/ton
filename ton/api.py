@@ -36,12 +36,14 @@ Typical use::
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 from random import Random
-from typing import Any, Dict, Iterator, Mapping, Optional
+from typing import Any, Dict, Optional
 
 from . import _config
 from ._config import ConfigError
 from ._engine import Engine, TemplateError
+from ._logging import configure_stderr, logger
 from ._registry import default_registry, registry_with_entry_points
 from ._template import UndeclaredVariableError
 from .generators import Generator, PairedGenerator
@@ -54,9 +56,11 @@ __all__ = [
     "TemplateError",
     "UndeclaredVariableError",
     "build_registry",
+    "configure_stderr",
     "generate",
     "generate_from_file",
     "load_config",
+    "logger",
 ]
 
 
@@ -82,10 +86,13 @@ def generate(
     *,
     seed: Optional[int] = None,
     registry: Optional[Mapping[str, Generator]] = None,
+    milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for an in-memory config mapping."""
     rng = Random(seed) if seed is not None else Random()
-    return iter(Engine(config, registry=registry, rng=rng))
+    return iter(
+        Engine(config, registry=registry, rng=rng, milestone_rows=milestone_rows)
+    )
 
 
 def generate_from_file(
@@ -93,6 +100,12 @@ def generate_from_file(
     *,
     seed: Optional[int] = None,
     registry: Optional[Mapping[str, Generator]] = None,
+    milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for a config loaded from ``path``."""
-    return generate(load_config(path), seed=seed, registry=registry)
+    return generate(
+        load_config(path),
+        seed=seed,
+        registry=registry,
+        milestone_rows=milestone_rows,
+    )

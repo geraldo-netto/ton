@@ -39,7 +39,7 @@ import hashlib
 import struct
 from collections.abc import Mapping
 from random import Random
-from typing import Any, Optional
+from typing import Any
 
 from ._engine import Engine
 
@@ -63,8 +63,8 @@ def fork_engine(
     *,
     parent_seed: int,
     worker_id: int,
-    rows: Optional[int] = None,
-    registry: Optional[Mapping[str, Any]] = None,
+    rows: int | None = None,
+    registry: Mapping[str, Any] | None = None,
     milestone_rows: int = 0,
 ) -> Engine:
     """Build an Engine with a per-worker RNG and an optional row override."""

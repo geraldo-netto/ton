@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from random import Random
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from ._logging import logger as _logger
 from ._registry import default_registry
@@ -27,8 +27,8 @@ class Engine:
     def __init__(
         self,
         config: Mapping[str, Any],
-        registry: Optional[Mapping[str, Generator]] = None,
-        rng: Optional[Random] = None,
+        registry: Mapping[str, Generator] | None = None,
+        rng: Random | None = None,
         *,
         milestone_rows: int = 0,
     ) -> None:
@@ -41,7 +41,7 @@ class Engine:
         self._validate()
         # Each referenced type spec is parsed once via Generator.prepare;
         # the per-row hot path just looks up the prepared spec by name.
-        self._prepared: Dict[str, Tuple[Generator, Any]] = self._build_prepared()
+        self._prepared: dict[str, tuple[Generator, Any]] = self._build_prepared()
         # Skip per-row paired_cache allocation when no referenced type is paired.
         self._has_paired = any(
             self._prepared[t.type_key][0].is_paired for t in self._tokens
@@ -73,8 +73,8 @@ class Engine:
                     f"Unknown type {type_name!r} for variable {token.type_key!r}"
                 )
 
-    def _build_prepared(self) -> Dict[str, Tuple[Generator, Any]]:
-        prepared: Dict[str, Tuple[Generator, Any]] = {}
+    def _build_prepared(self) -> dict[str, tuple[Generator, Any]]:
+        prepared: dict[str, tuple[Generator, Any]] = {}
         for token in self._tokens:
             if token.type_key in prepared:
                 continue
@@ -116,14 +116,14 @@ class Engine:
         )
 
     def _render_row(self) -> str:
-        paired_cache: Optional[dict[str, tuple[str, str]]] = {} if self._has_paired else None
+        paired_cache: dict[str, tuple[str, str]] | None = {} if self._has_paired else None
         values: dict[str, str] = {}
         for token in self._tokens:
             values[token.placeholder] = self._resolve(token, paired_cache)
         return render(self._template, values)
 
     def _resolve(
-        self, token: Token, paired_cache: Optional[dict[str, tuple[str, str]]]
+        self, token: Token, paired_cache: dict[str, tuple[str, str]] | None
     ) -> str:
         generator, prepared = self._prepared[token.type_key]
         if paired_cache is not None and isinstance(generator, PairedGenerator):

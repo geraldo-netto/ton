@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import inspect
 
-from ton.generators import Generator
 from ton._registry import (
     clear_default_registry_cache,
     default_registry,
     discover_generator_classes,
     registry_with_entry_points,
 )
+from ton.generators import Generator
 
 #: Every built-in type that ships with TON. If this list grows or
 #: shrinks, the registry should reflect it without anyone editing
@@ -93,7 +93,7 @@ def test_clear_cache_forces_rediscovery() -> None:
     clear_default_registry_cache()
     second_keys = set(default_registry().keys())
     assert first_keys == second_keys
-    assert EXPECTED_TYPES <= first_keys
+    assert first_keys >= EXPECTED_TYPES
 
 
 def test_registry_with_entry_points_includes_builtins() -> None:

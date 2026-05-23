@@ -59,5 +59,5 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "C90"]
 max-complexity = 10
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 strict = true

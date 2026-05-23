@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 from ._template import UndeclaredVariableError, validate_against
 
@@ -27,7 +27,7 @@ _REQUIRED_TOP_LEVEL = ("rows", "format", "types")
 MAX_ROWS = 1_000_000_000
 
 
-def load(path: str | Path) -> Dict[str, Any]:
+def load(path: str | Path) -> dict[str, Any]:
     """Read a JSON config from disk and validate its top-level shape.
 
     Raises:
@@ -49,7 +49,7 @@ def load(path: str | Path) -> Dict[str, Any]:
         data = json.load(fh)
 
     _validate(data)
-    return cast(Dict[str, Any], data)
+    return cast(dict[str, Any], data)
 
 
 def _validate(data: Any) -> None:
@@ -88,7 +88,7 @@ def _validate_types(types: Any) -> None:
             raise ConfigError(f"Type spec {name!r} must be an object with a 'type' field.")
 
 
-def _validate_template_references(template: str, types: Dict[str, Any]) -> None:
+def _validate_template_references(template: str, types: dict[str, Any]) -> None:
     """Delegate to :func:`ton.template.validate_against` (TODO DEC-002)."""
     try:
         validate_against(template, types.keys())

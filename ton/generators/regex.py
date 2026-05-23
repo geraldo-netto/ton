@@ -24,11 +24,11 @@ across Python versions but stable in practice (3.9-3.12 tested).
 from __future__ import annotations
 
 import string
+import warnings
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, Iterable, List, Mapping, Tuple
-
-import warnings
+from typing import Any, cast
 
 with warnings.catch_warnings():
     # sre_parse / sre_constants are deprecated on 3.12 but still present;
@@ -38,8 +38,8 @@ with warnings.catch_warnings():
         import sre_constants
         import sre_parse
     except ImportError:  # pragma: no cover - py 3.13+ moved them
-        from re import _constants as sre_constants  # type: ignore[no-redef]
-        from re import _parser as sre_parse  # type: ignore[no-redef]
+        from re import _constants as sre_constants  # type: ignore[attr-defined,no-redef]
+        from re import _parser as sre_parse  # type: ignore[attr-defined,no-redef]
 
 from .base import Generator
 
@@ -75,7 +75,7 @@ class RegexGenerator(Generator):
             parsed = sre_parse.parse(pattern)
         except sre_constants.error as exc:
             raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
-        _reject_oversized_repeats(parsed)
+        _reject_oversized_repeats(cast(Iterable[tuple[Any, Any]], parsed))
         return RegexSpec(parsed=parsed)
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:
@@ -87,7 +87,7 @@ class RegexGenerator(Generator):
 # ---------------------------------------------------------------------------
 
 
-def _reject_oversized_repeats(seq: Iterable[Tuple[Any, Any]]) -> None:
+def _reject_oversized_repeats(seq: Iterable[tuple[Any, Any]]) -> None:
     """Walk the AST and reject any literal ``{lo,hi}`` whose ``lo`` (or
     finite ``hi``) exceeds :data:`MAX_LITERAL_REPEAT` (TODO SCALE-002)."""
     for op, arg in seq:
@@ -107,42 +107,56 @@ def _reject_oversized_repeats(seq: Iterable[Tuple[Any, Any]]) -> None:
             _reject_oversized_repeats(arg[3])
 
 
-def _emit(seq: Iterable[Tuple[Any, Any]], rng: Random) -> str:
-    parts: List[str] = []
+def _emit(seq: Iterable[tuple[Any, Any]], rng: Random) -> str:
+    parts: list[str] = []
     for op, arg in seq:
         parts.append(_emit_node(op, arg, rng))
     return "".join(parts)
 
 
 def _emit_node(op: Any, arg: Any, rng: Random) -> str:
-    if op is sre_constants.LITERAL:
-        return chr(arg)
-    if op is sre_constants.NOT_LITERAL:
-        return _pick_excluding({chr(arg)}, rng)
-    if op is sre_constants.ANY:
-        return _pick_excluding({"\n"}, rng)
-    if op is sre_constants.IN:
-        return _pick_in(arg, rng)
-    if op in (sre_constants.MAX_REPEAT, sre_constants.MIN_REPEAT):
-        return _emit_repeat(arg, rng)
-    if op is sre_constants.BRANCH:
-        _, alternatives = arg
-        return _emit(rng.choice(alternatives), rng)
-    if op is sre_constants.SUBPATTERN:
-        # (group, add_flags, del_flags, sub)
-        sub = arg[3]
-        return _emit(sub, rng)
-    if op is sre_constants.CATEGORY:
-        return rng.choice(_category_pool(arg))
-    if op is sre_constants.AT:
-        return ""  # anchor, no output
-    if op is sre_constants.RANGE:
-        lo, hi = arg
-        return chr(rng.randint(lo, hi))
-    raise ValueError(f"regex generator: unsupported construct {op!r}")
+    handler = _EMIT_HANDLERS.get(op)
+    if handler is None:
+        raise ValueError(f"regex generator: unsupported construct {op!r}")
+    return handler(arg, rng)
 
 
-def _emit_repeat(arg: Tuple[int, int, Any], rng: Random) -> str:
+def _emit_literal(arg: Any, rng: Random) -> str:
+    return chr(arg)
+
+
+def _emit_not_literal(arg: Any, rng: Random) -> str:
+    return _pick_excluding({chr(arg)}, rng)
+
+
+def _emit_any(arg: Any, rng: Random) -> str:
+    return _pick_excluding({"\n"}, rng)
+
+
+def _emit_branch(arg: Any, rng: Random) -> str:
+    _, alternatives = arg
+    return _emit(rng.choice(alternatives), rng)
+
+
+def _emit_subpattern(arg: Any, rng: Random) -> str:
+    # (group, add_flags, del_flags, sub)
+    return _emit(arg[3], rng)
+
+
+def _emit_category(arg: Any, rng: Random) -> str:
+    return rng.choice(_category_pool(arg))
+
+
+def _emit_at(arg: Any, rng: Random) -> str:
+    return ""  # anchor, no output
+
+
+def _emit_range(arg: Any, rng: Random) -> str:
+    lo, hi = arg
+    return chr(rng.randint(lo, hi))
+
+
+def _emit_repeat(arg: tuple[int, int, Any], rng: Random) -> str:
     lo, hi, sub = arg
     if hi == sre_constants.MAXREPEAT:
         hi = lo + MAX_UNBOUNDED_REPEAT
@@ -150,7 +164,7 @@ def _emit_repeat(arg: Tuple[int, int, Any], rng: Random) -> str:
     return "".join(_emit(sub, rng) for _ in range(count))
 
 
-def _pick_in(items: Iterable[Tuple[Any, Any]], rng: Random) -> str:
+def _pick_in(items: Iterable[tuple[Any, Any]], rng: Random) -> str:
     item_list = list(items)
     negate = item_list and item_list[0][0] is sre_constants.NEGATE
     if negate:
@@ -163,8 +177,8 @@ def _pick_in(items: Iterable[Tuple[Any, Any]], rng: Random) -> str:
     return rng.choice(pool)
 
 
-def _flatten_in(items: Iterable[Tuple[Any, Any]]) -> List[str]:
-    pool: List[str] = []
+def _flatten_in(items: Iterable[tuple[Any, Any]]) -> list[str]:
+    pool: list[str] = []
     for op, arg in items:
         if op is sre_constants.LITERAL:
             pool.append(chr(arg))
@@ -178,14 +192,14 @@ def _flatten_in(items: Iterable[Tuple[Any, Any]]) -> List[str]:
     return pool
 
 
-def _pick_excluding(excluded: set, rng: Random) -> str:
+def _pick_excluding(excluded: set[str], rng: Random) -> str:
     pool = [c for c in _PRINTABLE_ASCII if c not in excluded]
     if not pool:
         raise ValueError("regex generator: cannot satisfy negated class")
     return rng.choice(pool)
 
 
-def _category_pool(category: Any) -> Tuple[str, ...]:
+def _category_pool(category: Any) -> tuple[str, ...]:
     if category is sre_constants.CATEGORY_DIGIT:
         return _DIGITS
     if category is sre_constants.CATEGORY_NOT_DIGIT:
@@ -199,3 +213,20 @@ def _category_pool(category: Any) -> Tuple[str, ...]:
     if category is sre_constants.CATEGORY_NOT_SPACE:
         return tuple(c for c in _PRINTABLE_ASCII if c not in _SPACE)
     raise ValueError(f"regex generator: unsupported category {category!r}")
+
+
+#: Dispatch table for _emit_node. Defined after every handler so the
+#: dict literal can reference the names directly.
+_EMIT_HANDLERS = {
+    sre_constants.LITERAL: _emit_literal,
+    sre_constants.NOT_LITERAL: _emit_not_literal,
+    sre_constants.ANY: _emit_any,
+    sre_constants.IN: _pick_in,
+    sre_constants.MAX_REPEAT: _emit_repeat,
+    sre_constants.MIN_REPEAT: _emit_repeat,
+    sre_constants.BRANCH: _emit_branch,
+    sre_constants.SUBPATTERN: _emit_subpattern,
+    sre_constants.CATEGORY: _emit_category,
+    sre_constants.AT: _emit_at,
+    sre_constants.RANGE: _emit_range,
+}

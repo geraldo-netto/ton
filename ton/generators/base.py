@@ -28,8 +28,9 @@ engine is constructed, plus the per-row ``generate`` call:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from random import Random
-from typing import Any, ClassVar, List, Mapping, Tuple
+from typing import Any, ClassVar
 
 
 class Generator(ABC):
@@ -84,7 +85,7 @@ class PairedGenerator(Generator):
     generate_returns_id: ClassVar[bool] = False
 
     @abstractmethod
-    def generate_pair(self, prepared: Any, rng: Random) -> Tuple[str, str]:
+    def generate_pair(self, prepared: Any, rng: Random) -> tuple[str, str]:
         """Return ``(id_value, primary_value)`` for the current row.
 
         ``id_value`` is what ``$name[id]$`` resolves to;
@@ -106,7 +107,7 @@ def pad_with_zero(value: str, width: int) -> str:
     return value.zfill(width)
 
 
-def require_non_empty_values(spec: Mapping[str, Any]) -> List[Any]:
+def require_non_empty_values(spec: Mapping[str, Any]) -> list[Any]:
     """Return ``spec['values']`` after asserting it is a non-empty list.
 
     Common validator for string-pool / char / lmhash generators.
@@ -123,7 +124,7 @@ def require_non_empty_values(spec: Mapping[str, Any]) -> List[Any]:
     return values
 
 
-def require_string_tuple(spec: Mapping[str, Any], key: str = "values") -> Tuple[str, ...]:
+def require_string_tuple(spec: Mapping[str, Any], key: str = "values") -> tuple[str, ...]:
     """Return ``spec[key]`` as a non-empty ``Tuple[str, ...]``.
 
     Combines the non-empty-list check with the ``tuple(str(v) for v in ...)``

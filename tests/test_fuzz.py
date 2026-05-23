@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 import string as string_module
 from random import Random
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable
 
 import pytest
 
@@ -31,11 +31,11 @@ from ton._template import (
 # ---------------------------------------------------------------------------
 
 
-def _spec_boolean(rng: Random) -> Dict[str, Any]:
+def _spec_boolean(rng: Random) -> dict[str, Any]:
     return {"type": "boolean", "whenTrue": "Y", "whenFalse": "N"}
 
 
-def _spec_integer(rng: Random) -> Dict[str, Any]:
+def _spec_integer(rng: Random) -> dict[str, Any]:
     lo = rng.randint(-10_000, 10_000)
     hi = lo + rng.randint(0, 10_000)
     return {
@@ -46,7 +46,7 @@ def _spec_integer(rng: Random) -> Dict[str, Any]:
     }
 
 
-def _spec_decimal(rng: Random) -> Dict[str, Any]:
+def _spec_decimal(rng: Random) -> dict[str, Any]:
     lo = rng.uniform(-1000, 1000)
     hi = lo + rng.uniform(0, 1000)
     return {
@@ -58,19 +58,19 @@ def _spec_decimal(rng: Random) -> Dict[str, Any]:
     }
 
 
-def _spec_char(rng: Random) -> Dict[str, Any]:
+def _spec_char(rng: Random) -> dict[str, Any]:
     pool = rng.sample(string_module.ascii_letters, k=rng.randint(1, 8))
     return {"type": "char", "values": pool, "maxChar": rng.randint(1, 10)}
 
 
-def _spec_string(rng: Random) -> Dict[str, Any]:
+def _spec_string(rng: Random) -> dict[str, Any]:
     return {
         "type": "string",
         "values": [f"v{i}" for i in range(rng.randint(1, 10))],
     }
 
 
-def _spec_uuid(rng: Random) -> Dict[str, Any]:
+def _spec_uuid(rng: Random) -> dict[str, Any]:
     return {
         "type": "uuid",
         "version": rng.choice([1, 4]),
@@ -78,7 +78,7 @@ def _spec_uuid(rng: Random) -> Dict[str, Any]:
     }
 
 
-def _spec_sequence(rng: Random) -> Dict[str, Any]:
+def _spec_sequence(rng: Random) -> dict[str, Any]:
     return {
         "type": "sequence",
         "start": rng.randint(-1_000, 1_000),
@@ -86,7 +86,7 @@ def _spec_sequence(rng: Random) -> Dict[str, Any]:
     }
 
 
-def _spec_weighted(rng: Random) -> Dict[str, Any]:
+def _spec_weighted(rng: Random) -> dict[str, Any]:
     n = rng.randint(2, 6)
     return {
         "type": "weighted",
@@ -95,7 +95,7 @@ def _spec_weighted(rng: Random) -> Dict[str, Any]:
     }
 
 
-def _spec_bytes(rng: Random) -> Dict[str, Any]:
+def _spec_bytes(rng: Random) -> dict[str, Any]:
     return {
         "type": "bytes",
         "length": rng.randint(1, 64),
@@ -103,7 +103,7 @@ def _spec_bytes(rng: Random) -> Dict[str, Any]:
     }
 
 
-def _spec_date(rng: Random) -> Dict[str, Any]:
+def _spec_date(rng: Random) -> dict[str, Any]:
     return {
         "type": "date",
         "minValue": "2000-01-01",
@@ -111,7 +111,7 @@ def _spec_date(rng: Random) -> Dict[str, Any]:
     }
 
 
-def _spec_timestamp_unix(rng: Random) -> Dict[str, Any]:
+def _spec_timestamp_unix(rng: Random) -> dict[str, Any]:
     return {
         "type": "timestamp_unix",
         "minValue": "2000-01-01",
@@ -120,16 +120,16 @@ def _spec_timestamp_unix(rng: Random) -> Dict[str, Any]:
     }
 
 
-def _spec_ipv4(rng: Random) -> Dict[str, Any]:
+def _spec_ipv4(rng: Random) -> dict[str, Any]:
     return {"type": "ipv4", "cidr": rng.choice(["0.0.0.0/0", "10.0.0.0/8", "192.168.0.0/16"])}
 
 
-def _spec_ipv6(rng: Random) -> Dict[str, Any]:
+def _spec_ipv6(rng: Random) -> dict[str, Any]:
     return {"type": "ipv6", "cidr": rng.choice(["::/0", "2001:db8::/32"])}
 
 
-def _spec_mac(rng: Random) -> Dict[str, Any]:
-    spec: Dict[str, Any] = {"type": "mac"}
+def _spec_mac(rng: Random) -> dict[str, Any]:
+    spec: dict[str, Any] = {"type": "mac"}
     if rng.random() < 0.5:
         spec["separator"] = rng.choice([":", "-"])
     if rng.random() < 0.5:
@@ -137,19 +137,19 @@ def _spec_mac(rng: Random) -> Dict[str, Any]:
     return spec
 
 
-def _spec_name(rng: Random) -> Dict[str, Any]:
+def _spec_name(rng: Random) -> dict[str, Any]:
     return {"type": "name", "style": rng.choice(["full", "given", "family"])}
 
 
-def _spec_email(rng: Random) -> Dict[str, Any]:
+def _spec_email(rng: Random) -> dict[str, Any]:
     return {"type": "email"}
 
 
-def _spec_phone(rng: Random) -> Dict[str, Any]:
+def _spec_phone(rng: Random) -> dict[str, Any]:
     return {"type": "phone", "format": rng.choice(["###-####", "+1 (###) ###-####"])}
 
 
-def _spec_text(rng: Random) -> Dict[str, Any]:
+def _spec_text(rng: Random) -> dict[str, Any]:
     return {
         "type": "text",
         "unit": rng.choice(["words", "sentences", "paragraphs"]),
@@ -157,7 +157,7 @@ def _spec_text(rng: Random) -> Dict[str, Any]:
     }
 
 
-def _spec_regex(rng: Random) -> Dict[str, Any]:
+def _spec_regex(rng: Random) -> dict[str, Any]:
     return {"type": "regex", "pattern": rng.choice([
         "[A-Z]{3}-\\d{4}",
         "[a-z]{5,10}",
@@ -166,11 +166,11 @@ def _spec_regex(rng: Random) -> Dict[str, Any]:
     ])}
 
 
-def _spec_lmhash(rng: Random) -> Dict[str, Any]:
+def _spec_lmhash(rng: Random) -> dict[str, Any]:
     return {"type": "lmhash", "values": [f"word{i}" for i in range(rng.randint(1, 5))]}
 
 
-_SPEC_FACTORIES: List[Tuple[str, Callable[[Random], Dict[str, Any]]]] = [
+_SPEC_FACTORIES: list[tuple[str, Callable[[Random], dict[str, Any]]]] = [
     ("boolean", _spec_boolean),
     ("integer", _spec_integer),
     ("decimal", _spec_decimal),
@@ -201,7 +201,7 @@ _SPEC_FACTORIES: List[Tuple[str, Callable[[Random], Dict[str, Any]]]] = [
 
 @pytest.mark.parametrize("type_name, factory", _SPEC_FACTORIES)
 def test_valid_random_specs_produce_string_rows(
-    type_name: str, factory: Callable[[Random], Dict[str, Any]]
+    type_name: str, factory: Callable[[Random], dict[str, Any]]
 ) -> None:
     for seed in range(30):
         rng = Random(seed)
@@ -221,7 +221,7 @@ def test_valid_random_specs_produce_string_rows(
 # ---------------------------------------------------------------------------
 
 
-_BAD_SPEC_MUTATIONS: List[Tuple[str, Dict[str, Any]]] = [
+_BAD_SPEC_MUTATIONS: list[tuple[str, dict[str, Any]]] = [
     ("integer", {"type": "integer", "minValue": 10, "maxValue": 1}),
     ("decimal", {"type": "decimal", "minValue": 1.0, "maxValue": 0.0, "decimals": 2}),
     ("decimal", {"type": "decimal", "minValue": 0.0, "maxValue": 1.0, "decimals": -1}),
@@ -254,7 +254,7 @@ _BAD_SPEC_MUTATIONS: List[Tuple[str, Dict[str, Any]]] = [
 
 @pytest.mark.parametrize("type_name, bad_spec", _BAD_SPEC_MUTATIONS)
 def test_bad_specs_rejected_at_engine_construction(
-    type_name: str, bad_spec: Dict[str, Any]
+    type_name: str, bad_spec: dict[str, Any]
 ) -> None:
     """Engine.prepare must raise TemplateError for each bad spec.
 
@@ -302,10 +302,10 @@ def test_regex_output_matches_original_pattern(pattern: str) -> None:
 _TEMPLATE_NAMES = ("alpha", "beta", "gamma", "delta")
 
 
-def _random_template(rng: Random) -> Tuple[str, List[str]]:
+def _random_template(rng: Random) -> tuple[str, list[str]]:
     """Build a random template and the names that need declaring."""
-    parts: List[str] = []
-    used: List[str] = []
+    parts: list[str] = []
+    used: list[str] = []
     for _ in range(rng.randint(1, 6)):
         if rng.random() < 0.3:
             parts.append("$$")  # escape -- not a placeholder

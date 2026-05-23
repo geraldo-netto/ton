@@ -17,9 +17,10 @@ fields and other line-oriented sinks.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, Mapping
+from typing import Any
 
 from .base import Generator
 

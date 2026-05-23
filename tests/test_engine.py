@@ -36,8 +36,8 @@ def test_engine_rejects_unknown_type(basic_config: dict) -> None:
 def test_engine_wraps_unexpected_prepare_error_as_template_error() -> None:
     """A buggy third-party generator that raises a non-ValueError must still
     surface as TemplateError so the CLI maps to exit 2 (REL-012)."""
-    from random import Random
-    from typing import Any, Mapping
+    from collections.abc import Mapping
+    from typing import Any
 
     from ton.generators import Generator
 

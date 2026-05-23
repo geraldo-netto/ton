@@ -22,7 +22,6 @@ caller has configured logging.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 LOGGER_NAME = "ton"
 
@@ -33,7 +32,7 @@ logger.addHandler(logging.NullHandler())
 def configure_stderr(
     level: int = logging.INFO,
     *,
-    fmt: Optional[str] = None,
+    fmt: str | None = None,
 ) -> logging.Handler:
     """Attach a stderr handler to the ``ton`` logger and return it.
 

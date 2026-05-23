@@ -14,7 +14,6 @@ from __future__ import annotations
 import inspect
 from collections.abc import Iterator
 from importlib.metadata import entry_points
-from typing import Dict, List, Tuple, Type
 
 from ._logging import logger as _logger
 
@@ -29,19 +28,22 @@ from .generators import Generator
 ENTRY_POINT_GROUP = "ton.generators"
 
 
-def discover_generator_classes() -> List[Type[Generator]]:
+def discover_generator_classes() -> list[type[Generator]]:
     """Return every concrete :class:`Generator` subclass with a ``type_name``.
 
     Walks the full subclass tree so future intermediate roles
     (e.g. ``PairedGenerator`` or third-party mixins) are followed.
     """
-    return [cls for cls in _walk_subclasses(Generator)
+    # ``Generator`` itself is abstract; mypy --strict flags passing it to a
+    # parameter typed ``type[Generator]``. The walk only ever yields
+    # subclasses, so the call site is safe.
+    return [cls for cls in _walk_subclasses(Generator)  # type: ignore[type-abstract]
             if not inspect.isabstract(cls) and cls.type_name]
 
 
-def _walk_subclasses(root: Type[Generator]) -> Iterator[Type[Generator]]:
-    seen: set[Type[Generator]] = set()
-    stack: List[Type[Generator]] = list(root.__subclasses__())
+def _walk_subclasses(root: type[Generator]) -> Iterator[type[Generator]]:
+    seen: set[type[Generator]] = set()
+    stack: list[type[Generator]] = list(root.__subclasses__())
     while stack:
         cls = stack.pop()
         if cls in seen:
@@ -55,7 +57,7 @@ def _walk_subclasses(root: Type[Generator]) -> Iterator[Type[Generator]]:
 #: lazily on first call to :func:`default_registry`. The subclass walk
 #: + ``inspect.isabstract`` filter runs once per process instead of on
 #: every Engine construction (TODO PERF-008).
-_DEFAULT_CLASSES: Tuple[Type[Generator], ...] = ()
+_DEFAULT_CLASSES: tuple[type[Generator], ...] = ()
 
 
 def clear_default_registry_cache() -> None:
@@ -69,7 +71,7 @@ def clear_default_registry_cache() -> None:
     _DEFAULT_CLASSES = ()
 
 
-def default_registry() -> Dict[str, Generator]:
+def default_registry() -> dict[str, Generator]:
     """Return a fresh registry containing all built-in generators.
 
     The discovered class list is cached at module scope, but each call
@@ -92,7 +94,7 @@ def default_registry() -> Dict[str, Generator]:
     return {cls.type_name: cls() for cls in _DEFAULT_CLASSES}
 
 
-def registry_with_entry_points() -> Dict[str, Generator]:
+def registry_with_entry_points() -> dict[str, Generator]:
     """Return the built-in registry merged with entry-point generators.
 
     Third-party packages can register additional generators by declaring::

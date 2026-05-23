@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from random import Random
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -23,7 +23,7 @@ def test_logger_has_null_handler_attached() -> None:
 
 
 def test_engine_construction_emits_info_event(
-    basic_config: Dict[str, Any], caplog: pytest.LogCaptureFixture
+    basic_config: dict[str, Any], caplog: pytest.LogCaptureFixture
 ) -> None:
     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
         Engine(basic_config, rng=Random(0))
@@ -36,7 +36,7 @@ def test_engine_construction_emits_info_event(
 
 
 def test_engine_iteration_emits_completion(
-    basic_config: Dict[str, Any], caplog: pytest.LogCaptureFixture
+    basic_config: dict[str, Any], caplog: pytest.LogCaptureFixture
 ) -> None:
     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
         list(Engine(basic_config, rng=Random(0)))
@@ -46,7 +46,7 @@ def test_engine_iteration_emits_completion(
 
 
 def test_engine_milestone_fires_at_configured_interval(
-    basic_config: Dict[str, Any], caplog: pytest.LogCaptureFixture
+    basic_config: dict[str, Any], caplog: pytest.LogCaptureFixture
 ) -> None:
     basic_config["rows"] = 10
     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
@@ -57,7 +57,7 @@ def test_engine_milestone_fires_at_configured_interval(
 
 
 def test_engine_milestone_zero_disables_logging(
-    basic_config: Dict[str, Any], caplog: pytest.LogCaptureFixture
+    basic_config: dict[str, Any], caplog: pytest.LogCaptureFixture
 ) -> None:
     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
         list(Engine(basic_config, rng=Random(0), milestone_rows=0))

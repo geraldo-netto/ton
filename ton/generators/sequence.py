@@ -18,10 +18,11 @@ should set ``start`` to ``worker_id * chunk_size``.
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from itertools import count
 from random import Random
-from typing import Any, Iterator, Mapping
+from typing import Any
 
 from .base import Generator, pad_with_zero
 

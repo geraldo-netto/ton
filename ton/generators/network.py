@@ -23,12 +23,12 @@ format them.
 from __future__ import annotations
 
 import ipaddress
+from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, Mapping, Optional
+from typing import Any
 
 from .base import Generator
-
 
 # ---------------------------------------------------------------------------
 # IPv4 / IPv6
@@ -95,7 +95,7 @@ class IPv6Generator(Generator):
 class MACSpec:
     separator: str
     uppercase: bool
-    oui_bytes: Optional[bytes]  # 3-byte prefix or None
+    oui_bytes: bytes | None  # 3-byte prefix or None
 
 
 class MACGenerator(Generator):

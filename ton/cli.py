@@ -10,7 +10,7 @@ import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from random import Random
-from typing import Optional, TextIO
+from typing import TextIO
 
 from . import __version__
 from ._config import ConfigError, load
@@ -74,7 +74,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a shell exit code."""
     args = _build_parser().parse_args(argv)
     if args.log_level is not None:
@@ -130,7 +130,7 @@ def _build_engine(args: argparse.Namespace) -> Engine:
 
 
 @contextmanager
-def _open_output(path: Optional[str]) -> Iterator[TextIO]:
+def _open_output(path: str | None) -> Iterator[TextIO]:
     if path is None:
         yield sys.stdout
         return

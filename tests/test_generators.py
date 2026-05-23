@@ -186,6 +186,7 @@ def test_paired_generator_default_returns_primary() -> None:
 def test_paired_generator_knob_flips_to_id() -> None:
     """generate_returns_id=True flips the shortcut to the id half (ARCH-005)."""
     from typing import Any
+
     from ton.generators.base import PairedGenerator
 
     class FlippedHash(PairedGenerator):

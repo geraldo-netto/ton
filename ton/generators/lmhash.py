@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import binascii
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, Callable, Mapping, Tuple
+from typing import Any, Callable
 
 from ._md4 import md4 as _pure_md4
 from .base import PairedGenerator, require_string_tuple
@@ -47,7 +48,7 @@ class LMHashSpec:
     long-running jobs with large word lists (TODO PERF-009).
     """
 
-    pairs: Tuple[Tuple[str, str], ...]
+    pairs: tuple[tuple[str, str], ...]
 
 
 class LMHashGenerator(PairedGenerator):
@@ -59,7 +60,7 @@ class LMHashGenerator(PairedGenerator):
         words = require_string_tuple(spec)
         return LMHashSpec(pairs=tuple((w, self._nt_hash(w)) for w in words))
 
-    def generate_pair(self, prepared: LMHashSpec, rng: Random) -> Tuple[str, str]:
+    def generate_pair(self, prepared: LMHashSpec, rng: Random) -> tuple[str, str]:
         """Return ``(plaintext, hash)`` drawn from the precomputed pool."""
         return rng.choice(prepared.pairs)
 

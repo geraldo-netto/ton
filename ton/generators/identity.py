@@ -28,13 +28,13 @@ register a custom generator via the ``ton.generators`` entry point.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, Mapping, Tuple
+from typing import Any
 
 from ._identity_data import EMAIL_DOMAINS, FAMILY_NAMES, GIVEN_NAMES
 from .base import Generator, require_string_tuple
-
 
 # ---------------------------------------------------------------------------
 # name
@@ -74,7 +74,7 @@ class NameGenerator(Generator):
 
 @dataclass(frozen=True)
 class EmailSpec:
-    domains: Tuple[str, ...]
+    domains: tuple[str, ...]
 
 
 class EmailGenerator(Generator):

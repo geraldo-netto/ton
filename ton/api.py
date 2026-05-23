@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from random import Random
-from typing import Any, Dict, Optional
+from typing import Any
 
 from . import _config
 from ._config import ConfigError
@@ -64,12 +64,12 @@ __all__ = [
 ]
 
 
-def load_config(path: str) -> Dict[str, Any]:
+def load_config(path: str) -> dict[str, Any]:
     """Read, parse, and validate a JSON config file."""
     return _config.load(path)
 
 
-def build_registry(include_entry_points: bool = True) -> Dict[str, Generator]:
+def build_registry(include_entry_points: bool = True) -> dict[str, Generator]:
     """Return a fresh registry of generator instances.
 
     When ``include_entry_points`` is True (default), generators
@@ -84,8 +84,8 @@ def build_registry(include_entry_points: bool = True) -> Dict[str, Generator]:
 def generate(
     config: Mapping[str, Any],
     *,
-    seed: Optional[int] = None,
-    registry: Optional[Mapping[str, Generator]] = None,
+    seed: int | None = None,
+    registry: Mapping[str, Generator] | None = None,
     milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for an in-memory config mapping."""
@@ -98,8 +98,8 @@ def generate(
 def generate_from_file(
     path: str,
     *,
-    seed: Optional[int] = None,
-    registry: Optional[Mapping[str, Generator]] = None,
+    seed: int | None = None,
+    registry: Mapping[str, Generator] | None = None,
     milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for a config loaded from ``path``."""

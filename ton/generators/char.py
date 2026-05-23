@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, Mapping, Tuple
+from typing import Any
 
 from .base import Generator, require_string_tuple
 
@@ -15,7 +16,7 @@ MAX_CHAR_LENGTH = 100_000
 
 @dataclass(frozen=True)
 class CharSpec:
-    values: Tuple[str, ...]
+    values: tuple[str, ...]
     max_char: int
 
 

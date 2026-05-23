@@ -24,17 +24,18 @@ accepted; pick whichever reads better in the config::
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from random import Random
-from typing import Any, Mapping, Sequence, Tuple
+from typing import Any
 
 from .base import Generator
 
 
 @dataclass(frozen=True)
 class WeightedSpec:
-    values: Tuple[str, ...]
-    weights: Tuple[float, ...]
+    values: tuple[str, ...]
+    weights: tuple[float, ...]
 
 
 class WeightedGenerator(Generator):
@@ -56,7 +57,7 @@ class WeightedGenerator(Generator):
         return rng.choices(prepared.values, weights=prepared.weights, k=1)[0]
 
 
-def _coerce(spec: Mapping[str, Any]) -> Tuple[Tuple[str, ...], Tuple[float, ...]]:
+def _coerce(spec: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[float, ...]]:
     raw_values = spec.get("values")
     if not isinstance(raw_values, list):
         raise ValueError("weighted 'values' must be a list")

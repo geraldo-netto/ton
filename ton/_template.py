@@ -17,9 +17,9 @@ sequence ``$$`` is consumed by the parser and rendered as a single
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Iterable, List, Mapping, Tuple
 
 #: One token = either the literal escape ``$$`` (group 0 only) or a
 #: placeholder ``$NAME$`` where ``NAME`` has no ``$`` in it (group 1).
@@ -47,7 +47,7 @@ class Token:
         return f"${self.type_key}{suffix}$"
 
 
-def parse(template: str) -> List[Token]:
+def parse(template: str) -> list[Token]:
     """Extract every placeholder token (``$NAME$`` / ``$NAME[id]$``).
 
     ``$$`` escapes are skipped; they are not placeholders. Result is
@@ -58,8 +58,8 @@ def parse(template: str) -> List[Token]:
 
 
 @lru_cache(maxsize=256)
-def _parse_cached(template: str) -> Tuple[Token, ...]:
-    tokens: List[Token] = []
+def _parse_cached(template: str) -> tuple[Token, ...]:
+    tokens: list[Token] = []
     for match in _TOKEN_RE.finditer(template):
         if match.group(0) == _LITERAL_DOLLAR:
             continue

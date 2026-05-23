@@ -14,9 +14,10 @@ Useful for opaque tokens, salts, fixture session ids.
 from __future__ import annotations
 
 import base64
+from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, Callable, Mapping
+from typing import Any, Callable
 
 from .base import Generator
 

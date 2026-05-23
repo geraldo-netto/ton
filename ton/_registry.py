@@ -1,0 +1,97 @@
+"""Registry mapping JSON ``type`` discriminators to Generator instances.
+
+The default registry is *auto-discovered* (TODO DUP-003): we walk the
+``Generator`` subclass tree after :mod:`ton.generators` has imported
+every submodule and instantiate each concrete leaf with a non-empty
+``type_name``. Adding a new built-in is now a two-touchpoint change
+(create the module, import it from ``ton.generators.__init__``)
+instead of the previous four (module, import, ``__all__`` entry, and
+a separate line in this module's hand-maintained list).
+"""
+
+from __future__ import annotations
+
+import inspect
+from importlib.metadata import entry_points
+from typing import Dict, Iterator, List, Tuple, Type
+
+# Importing ``ton.generators`` imports every concrete-generator submodule,
+# which is what populates Generator.__subclasses__() below.
+from .generators import Generator
+
+#: Entry-point group third-party packages publish to expose a Generator
+#: class. The entry-point *name* becomes the JSON ``type`` discriminator;
+#: the loaded object must be a callable returning a Generator (typically
+#: the Generator subclass itself).
+ENTRY_POINT_GROUP = "ton.generators"
+
+
+def discover_generator_classes() -> List[Type[Generator]]:
+    """Return every concrete :class:`Generator` subclass with a ``type_name``.
+
+    Walks the full subclass tree so future intermediate roles
+    (e.g. ``PairedGenerator`` or third-party mixins) are followed.
+    """
+    return [cls for cls in _walk_subclasses(Generator)
+            if not inspect.isabstract(cls) and cls.type_name]
+
+
+def _walk_subclasses(root: Type[Generator]) -> Iterator[Type[Generator]]:
+    seen: set[Type[Generator]] = set()
+    stack: List[Type[Generator]] = list(root.__subclasses__())
+    while stack:
+        cls = stack.pop()
+        if cls in seen:
+            continue
+        seen.add(cls)
+        yield cls
+        stack.extend(cls.__subclasses__())
+
+
+#: Process-wide cache of the discovered generator classes. Populated
+#: lazily on first call to :func:`default_registry`. The subclass walk
+#: + ``inspect.isabstract`` filter runs once per process instead of on
+#: every Engine construction (TODO PERF-008).
+_DEFAULT_CLASSES: Tuple[Type[Generator], ...] = ()
+
+
+def clear_default_registry_cache() -> None:
+    """Force the next :func:`default_registry` call to re-discover classes.
+
+    Useful after a test or third-party plugin has registered a new
+    ``Generator`` subclass and wants it picked up by the default
+    registry.
+    """
+    global _DEFAULT_CLASSES
+    _DEFAULT_CLASSES = ()
+
+
+def default_registry() -> Dict[str, Generator]:
+    """Return a fresh registry containing all built-in generators.
+
+    The discovered class list is cached at module scope, but each call
+    still constructs a new dict of fresh instances so per-spec state
+    (e.g. :class:`ton.generators.sequence.SequenceGenerator` counters)
+    stays Engine-scoped.
+    """
+    global _DEFAULT_CLASSES
+    if not _DEFAULT_CLASSES:
+        _DEFAULT_CLASSES = tuple(discover_generator_classes())
+    return {cls.type_name: cls() for cls in _DEFAULT_CLASSES}
+
+
+def registry_with_entry_points() -> Dict[str, Generator]:
+    """Return the built-in registry merged with entry-point generators.
+
+    Third-party packages can register additional generators by declaring::
+
+        [project.entry-points."ton.generators"]
+        uuid = "my_pkg.generators:UuidGenerator"
+
+    Entry-point names override built-ins with the same key.
+    """
+    registry = default_registry()
+    for ep in entry_points(group=ENTRY_POINT_GROUP):
+        factory = ep.load()
+        registry[ep.name] = factory()
+    return registry

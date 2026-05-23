@@ -1,0 +1,34 @@
+{
+  "encoding": "UTF-8",
+  "rows": 10,
+  "format": "$timestamp$;hg;$cpu_type$;$has_ht$;$cpu_model$;$cpu_usage$",
+  "types": {
+    "timestamp": {
+      "type": "date",
+      "minValue": "1100-01-01T00:00:00",
+      "maxValue": "2050-12-31T23:59:59",
+      "format": "%Y-%m-%d %H:%M:%S"
+    },
+    "cpu_type": {
+      "type": "string",
+      "values": ["AMD", "Intel", "ARM"]
+    },
+    "cpu_model": {
+      "type": "char",
+      "values": ["A", "B", "C"],
+      "maxChar": 2
+    },
+    "has_ht": {
+      "type": "boolean",
+      "whenTrue": "Y",
+      "whenFalse": "N"
+    },
+    "cpu_usage": {
+      "type": "decimal",
+      "minValue": 0.0,
+      "maxValue": 100.0,
+      "decimals": 2,
+      "padWithZero": false
+    }
+  }
+}

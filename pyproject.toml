@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ton"
+version = "2.0.0"
+description = "Mass data generator: synthesize structured test data from a JSON template."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Geraldo Netto", email = "geraldonetto@gmail.com" }]
+requires-python = ">=3.9"
+keywords = ["data", "generator", "fake-data", "test-data", "synthetic"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Utilities",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov>=4",
+    "ruff>=0.4",
+    "mypy>=1.8",
+]
+
+[project.scripts]
+ton = "ton.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/geraldo-netto/ton"
+Issues = "https://github.com/geraldo-netto/ton/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ton"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "C90"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.mypy]
+python_version = "3.9"
+strict = true

@@ -31,8 +31,10 @@ from .identity import EmailGenerator, NameGenerator, PhoneGenerator
 from .integer import IntegerGenerator
 from .lmhash import LMHashGenerator
 from .network import IPv4Generator, IPv6Generator, MACGenerator
+from .one_of import OneOfGenerator
 from .regex import RegexGenerator
 from .sequence import SequenceGenerator
+from .sequence_of import SequenceOfGenerator
 from .string import StringGenerator
 from .text import TextGenerator
 from .timestamp_unix import TimestampUnixGenerator
@@ -57,9 +59,11 @@ BUILTIN_GENERATOR_CLASSES: tuple[type[Generator], ...] = (
     LMHashGenerator,
     MACGenerator,
     NameGenerator,
+    OneOfGenerator,
     PhoneGenerator,
     RegexGenerator,
     SequenceGenerator,
+    SequenceOfGenerator,
     StringGenerator,
     TextGenerator,
     TimestampUnixGenerator,
@@ -82,10 +86,12 @@ __all__ = [
     "LMHashGenerator",
     "MACGenerator",
     "NameGenerator",
+    "OneOfGenerator",
     "PairedGenerator",
     "PhoneGenerator",
     "RegexGenerator",
     "SequenceGenerator",
+    "SequenceOfGenerator",
     "StringGenerator",
     "TextGenerator",
     "TimestampUnixGenerator",

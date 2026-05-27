@@ -42,7 +42,7 @@ from typing import Any
 from . import _config
 from ._config import ConfigError
 from ._engine import Engine, TemplateError
-from ._logging import configure_stderr, logger
+from ._logging import LogEvent, configure_stderr, logger
 from ._registry import default_registry, registry_with_entry_points
 from ._template import UndeclaredVariableError
 from .generators import Generator, PairedGenerator
@@ -51,6 +51,7 @@ __all__ = [
     "ConfigError",
     "Engine",
     "Generator",
+    "LogEvent",
     "PairedGenerator",
     "TemplateError",
     "UndeclaredVariableError",

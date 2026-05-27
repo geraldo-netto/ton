@@ -20,6 +20,7 @@ import threading
 from collections.abc import Iterable, Iterator
 from importlib.metadata import entry_points
 
+from ._logging import LogEvent
 from ._logging import logger as _logger
 
 # Importing ``ton.generators`` imports every concrete-generator submodule,
@@ -103,7 +104,7 @@ def _ensure_default_classes() -> dict[str, type[Generator]]:
             "registry_discovered generators=%d",
             len(_DEFAULT_CLASSES),
             extra={
-                "event": "registry_discovered",
+                "event": LogEvent.REGISTRY_DISCOVERED.value,
                 "generators": len(_DEFAULT_CLASSES),
                 "names": sorted(_DEFAULT_CLASSES),
             },
@@ -152,32 +153,77 @@ def registry_with_entry_points() -> dict[str, Generator]:
     """
     registry = default_registry()
     loaded = 0
+    failed = 0
     for ep in entry_points(group=ENTRY_POINT_GROUP):
-        factory = ep.load()
-        registry[ep.name] = factory()
-        loaded += 1
+        safe_name = _sanitize_for_log(ep.name)
+        safe_value = _sanitize_for_log(ep.value)
         dist_name, dist_version = _entry_point_dist(ep)
+        try:
+            factory = ep.load()
+            instance = factory()
+        except Exception as exc:  # noqa: BLE001 - per-entry sandbox
+            # SEC-004: one broken third-party plugin must not abort the
+            # whole registry build. Log a WARNING with attribution and
+            # skip the entry instead of letting ImportError/etc. bubble
+            # up to every Engine construction.
+            failed += 1
+            _logger.warning(
+                "entry_point_failed name=%s value=%s error=%s",
+                safe_name,
+                safe_value,
+                exc,
+                extra={
+                    "event": LogEvent.ENTRY_POINT_FAILED.value,
+                    "ep_name": safe_name,
+                    "value": safe_value,
+                    "dist_name": dist_name,
+                    "dist_version": dist_version,
+                    "error": f"{type(exc).__name__}: {exc}",
+                },
+            )
+            continue
+        registry[ep.name] = instance
+        loaded += 1
         _logger.info(
             "entry_point_loaded name=%s value=%s dist=%s version=%s",
-            ep.name,
-            ep.value,
+            safe_name,
+            safe_value,
             dist_name,
             dist_version,
             extra={
-                "event": "entry_point_loaded",
-                "ep_name": ep.name,
-                "value": ep.value,
+                "event": LogEvent.ENTRY_POINT_LOADED.value,
+                "ep_name": safe_name,
+                "value": safe_value,
                 "dist_name": dist_name,
                 "dist_version": dist_version,
             },
         )
-    if loaded:
+    if loaded or failed:
         _logger.info(
-            "entry_points_summary loaded=%d",
+            "entry_points_summary loaded=%d failed=%d",
             loaded,
-            extra={"event": "entry_points_summary", "loaded": loaded},
+            failed,
+            extra={
+                "event": LogEvent.ENTRY_POINTS_SUMMARY.value,
+                "loaded": loaded,
+                "failed": failed,
+            },
         )
     return registry
+
+
+def _sanitize_for_log(value: object) -> str:
+    """Strip non-printable / non-ASCII chars from logged plugin metadata.
+
+    A malicious or typo-squatted entry point can plant control codes or
+    unicode lookalikes inside ``ep.name`` / ``ep.value``. Logs feed
+    operators directly, so SEC-006 requires that we coerce to ASCII
+    printable text before emitting. Non-conforming bytes are replaced
+    with ``?`` so the original payload is still attributable but cannot
+    poison terminals or downstream log parsers.
+    """
+    raw = str(value)
+    return "".join(ch if 0x20 <= ord(ch) < 0x7F else "?" for ch in raw)
 
 
 def _entry_point_dist(ep: object) -> tuple[str | None, str | None]:

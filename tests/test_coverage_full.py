@@ -349,6 +349,115 @@ def test_generator_default_prepare_composite_delegates_to_prepare() -> None:
 
 
 # ---------------------------------------------------------------------------
+# SEC-004: broken entry point logs WARNING and is skipped, not fatal
+# ---------------------------------------------------------------------------
+
+
+def test_registry_skips_broken_entry_point(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import logging as logging_mod
+
+    from ton._logging import LogEvent as _LE
+    from ton._registry import registry_with_entry_points
+
+    bad = mock.Mock()
+    bad.name = "bad_plugin"
+    bad.value = "broken.module:Thing"
+    bad.load.side_effect = ImportError("missing dep")
+
+    with (
+        mock.patch("ton._registry.entry_points", return_value=[bad]),
+        caplog.at_level(logging_mod.WARNING, logger="ton"),
+    ):
+        registry = registry_with_entry_points()
+    assert "bad_plugin" not in registry
+    events = [r for r in caplog.records
+              if getattr(r, "event", None) == _LE.ENTRY_POINT_FAILED.value]
+    assert events and events[0].error.startswith("ImportError")
+
+
+# ---------------------------------------------------------------------------
+# SEC-005: refuse writes to special files (e.g. /dev/null)
+# ---------------------------------------------------------------------------
+
+
+def test_cli_refuses_write_to_special_file(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``/dev/null`` is a character device; the CLI must reject it."""
+    if not Path("/dev/null").exists():
+        pytest.skip("/dev/null not present")
+    config = write_config()
+    code = cli_main([str(config), "-o", "/dev/null"])
+    assert code == 1
+    assert "special file" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# SEC-006: sanitize unicode / control codes from logged ep metadata
+# ---------------------------------------------------------------------------
+
+
+def test_sanitize_for_log_strips_non_printable() -> None:
+    from ton._registry import _sanitize_for_log
+
+    assert _sanitize_for_log("ok") == "ok"
+    assert _sanitize_for_log("a\x00b\x1bc") == "a?b?c"
+    # Unicode lookalikes (e.g. fullwidth letters) replaced.
+    assert _sanitize_for_log("Aレ") == "A?"
+
+
+def test_entry_point_load_logs_sanitized_name(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import logging as logging_mod
+
+    from ton._logging import LogEvent as _LE
+    from ton._registry import registry_with_entry_points
+    from ton.generators import Generator as _Gen
+
+    class _Fake(_Gen):
+        type_name = "fake_sanitized"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "ok"
+
+    ep = mock.Mock()
+    ep.name = "fake_sanitized\x1b[31m"
+    ep.value = "mal:Thing\x00"
+    ep.load.return_value = _Fake
+
+    with (
+        mock.patch("ton._registry.entry_points", return_value=[ep]),
+        caplog.at_level(logging_mod.INFO, logger="ton"),
+    ):
+        registry_with_entry_points()
+    record = next(r for r in caplog.records
+                  if getattr(r, "event", None) == _LE.ENTRY_POINT_LOADED.value)
+    assert "\x1b" not in record.ep_name
+    assert "\x00" not in record.value
+
+
+# ---------------------------------------------------------------------------
+# REL-018: --resume-from past the end warns and produces empty output
+# ---------------------------------------------------------------------------
+
+
+def test_cli_resume_overshoot_warns_and_empties(
+    write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    config = write_config({"rows": 4})
+    out = tmp_path / "out.txt"
+    code = cli_main([str(config), "--seed", "0", "-o", str(out),
+                     "--resume-from", "999"])
+    assert code == 0
+    assert out.read_text() == ""
+    err = capsys.readouterr().err
+    assert "999" in err and "total rows" in err
+
+
+# ---------------------------------------------------------------------------
 # lmhash._select_md4_backend: stdlib MD4 available path
 # ---------------------------------------------------------------------------
 

@@ -42,6 +42,7 @@ from random import Random
 from typing import Any
 
 from ._engine import Engine
+from ._logging import LogEvent
 from ._logging import logger as _logger
 
 
@@ -81,7 +82,7 @@ def fork_engine(
         parent_seed,
         int(config["rows"]),
         extra={
-            "event": "engine_forked",
+            "event": LogEvent.ENGINE_FORKED.value,
             "worker_id": worker_id,
             "parent_seed": parent_seed,
             "rows": int(config["rows"]),

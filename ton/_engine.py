@@ -12,6 +12,7 @@ from random import Random
 from typing import Any
 
 from . import _config
+from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._registry import make_registry
 from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
@@ -61,7 +62,7 @@ class Engine:
             len(self._types),
             self._has_paired,
             extra={
-                "event": "engine_constructed",
+                "event": LogEvent.ENGINE_CONSTRUCTED.value,
                 "rows": self._rows,
                 "types": len(self._types),
                 "paired": self._has_paired,
@@ -127,6 +128,11 @@ class Engine:
         """
         return self._rows_emitted
 
+    @property
+    def total_rows(self) -> int:
+        """Total rows the engine will yield when iterated to completion."""
+        return self._rows
+
     def _resolve_registry(
         self, registry: Mapping[str, Generator] | None
     ) -> Mapping[str, Generator]:
@@ -184,7 +190,7 @@ class Engine:
                     type(generator).__name__,
                     exc,
                     extra={
-                        "event": "prepare_failed",
+                        "event": LogEvent.PREPARE_FAILED.value,
                         "type_key": token.type_key,
                         "generator_type": type(generator).__name__,
                         "error": f"{type(exc).__name__}: {exc}",
@@ -208,7 +214,7 @@ class Engine:
                     self._rows_emitted,
                     self._rows,
                     extra={
-                        "event": "engine_milestone",
+                        "event": LogEvent.ENGINE_MILESTONE.value,
                         "rows": self._rows_emitted,
                         "total": self._rows,
                     },
@@ -216,7 +222,7 @@ class Engine:
         _logger.info(
             "engine_completed rows=%d",
             self._rows_emitted,
-            extra={"event": "engine_completed", "rows": self._rows_emitted},
+            extra={"event": LogEvent.ENGINE_COMPLETED.value, "rows": self._rows_emitted},
         )
 
     def _render_row(self) -> str:
@@ -255,7 +261,7 @@ class Engine:
                 self._rows_emitted + 1,
                 exc,
                 extra={
-                    "event": "generate_failed",
+                    "event": LogEvent.GENERATE_FAILED.value,
                     "type_key": token.type_key,
                     "generator_type": type(generator).__name__,
                     "row": self._rows_emitted + 1,

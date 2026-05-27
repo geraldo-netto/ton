@@ -213,3 +213,41 @@ def assert_below_cap(type_name: str, field: str, value: int, cap: int, cap_name:
         raise ValueError(
             f"{type_name} {field!r} exceeds {cap_name} ({cap})"
         )
+
+
+def prepare_child_spec(
+    parent_type: str,
+    location: str,
+    nested_spec: Any,
+    registry: Mapping[str, Generator],
+) -> tuple[Generator, Any]:
+    """Resolve a nested type spec through ``registry`` for composite parents.
+
+    Shared by every :class:`Generator` whose prepared form embeds another
+    generator (``weighted``, ``oneOf``, ``sequence_of`` -- PAT-011).
+    Returns the ``(generator, prepared)`` pair so the parent can call
+    ``generator.generate(prepared, rng)`` at row time.
+
+    Raises ``ValueError`` if ``nested_spec`` is malformed, references an
+    unknown type, or names a paired generator (which would silently
+    lose its ``[id]`` half once nested -- REL-019).
+    """
+    if not isinstance(nested_spec, Mapping) or "type" not in nested_spec:
+        raise ValueError(
+            f"{parent_type} {location} must be an object with a 'type' field"
+        )
+    nested_type = nested_spec["type"]
+    if nested_type not in registry:
+        raise ValueError(
+            f"{parent_type} {location} references unknown type {nested_type!r}"
+        )
+    child = registry[nested_type]
+    if child.is_paired:
+        raise ValueError(
+            f"{parent_type} {location} uses paired type {nested_type!r}; "
+            "paired generators cannot be nested inside a composite generator "
+            "(the [id] half would be unreachable)"
+        )
+    if child.is_composite:
+        return child, child.prepare_composite(nested_spec, registry)
+    return child, child.prepare(nested_spec)

@@ -49,7 +49,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar
 
-from .base import Generator
+from .base import Generator, prepare_child_spec
 
 
 @dataclass(frozen=True)
@@ -137,24 +137,13 @@ class WeightedGenerator(Generator):
             raise ValueError(
                 f"weighted 'choices[{index}]' missing numeric 'weight'"
             ) from exc
-        nested_spec = choice.get("spec")
-        if not isinstance(nested_spec, Mapping) or "type" not in nested_spec:
-            raise ValueError(
-                f"weighted 'choices[{index}].spec' must be an object with "
-                "a 'type' field"
-            )
-        nested_type = nested_spec["type"]
-        if nested_type not in registry:
-            raise ValueError(
-                f"weighted 'choices[{index}].spec' references unknown "
-                f"type {nested_type!r}"
-            )
-        child_generator = registry[nested_type]
-        if child_generator.is_composite:
-            child_prepared = child_generator.prepare_composite(nested_spec, registry)
-        else:
-            child_prepared = child_generator.prepare(nested_spec)
-        return weight, (child_generator, child_prepared)
+        child = prepare_child_spec(
+            "weighted",
+            f"'choices[{index}].spec'",
+            choice.get("spec"),
+            registry,
+        )
+        return weight, child
 
     @staticmethod
     def _validate_weights(weights: Sequence[float]) -> None:

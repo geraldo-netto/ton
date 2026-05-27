@@ -22,11 +22,44 @@ caller has configured logging.
 from __future__ import annotations
 
 import logging
+from enum import Enum
 
 LOGGER_NAME = "ton"
 
 logger = logging.getLogger(LOGGER_NAME)
 logger.addHandler(logging.NullHandler())
+
+
+class LogEvent(str, Enum):
+    """Canonical ``event=...`` discriminator for the ``ton`` logger.
+
+    Promotes the previously stringly-typed event values into a typed
+    enum so consumers can ``match LogEvent(record.event)`` instead of
+    string-comparing (TODO PAT-010). The enum subclasses ``str`` so the
+    serialised value in log handlers / JSON sinks stays the same
+    canonical string ("engine_constructed", "engine_milestone", ...).
+
+    Callers that emit events should write ``LogEvent.<NAME>.value`` into
+    the ``extra`` dict so the on-the-wire representation is the bare
+    string regardless of Python version (``str(Enum.X)`` was changed in
+    3.11).
+    """
+
+    ENGINE_CONSTRUCTED = "engine_constructed"
+    ENGINE_MILESTONE = "engine_milestone"
+    ENGINE_COMPLETED = "engine_completed"
+    ENGINE_PROGRESS = "engine_progress"
+    ENGINE_FORKED = "engine_forked"
+    PREPARE_FAILED = "prepare_failed"
+    GENERATE_FAILED = "generate_failed"
+    REGISTRY_DISCOVERED = "registry_discovered"
+    ENTRY_POINT_LOADED = "entry_point_loaded"
+    ENTRY_POINT_FAILED = "entry_point_failed"
+    ENTRY_POINTS_SUMMARY = "entry_points_summary"
+    OUTPUT_OVERWRITE = "output_overwrite"
+    OUTPUT_SPECIAL_FILE_REJECTED = "output_special_file_rejected"
+    RESUME_OVERSHOOT = "resume_overshoot"
+    CLI_UNEXPECTED_ERROR = "cli_unexpected_error"
 
 
 def configure_stderr(

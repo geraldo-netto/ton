@@ -6,6 +6,7 @@ import argparse
 import json
 import logging
 import os
+import stat
 import sys
 import time
 from collections.abc import Iterator, Sequence
@@ -14,7 +15,7 @@ from random import Random
 from typing import TextIO
 
 from . import __version__, api
-from .api import ConfigError, Engine, TemplateError, configure_stderr
+from .api import ConfigError, Engine, LogEvent, TemplateError, configure_stderr
 from .api import logger as _logger
 
 _LOG_LEVELS = {
@@ -139,7 +140,7 @@ def _run(args: argparse.Namespace) -> int:
         _logger.exception(
             "cli_unexpected_error type=%s",
             type(exc).__name__,
-            extra={"event": "cli_unexpected_error", "error_type": type(exc).__name__},
+            extra={"event": LogEvent.CLI_UNEXPECTED_ERROR.value, "error_type": type(exc).__name__},
         )
         print(f"ton: unexpected error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 3
@@ -166,6 +167,25 @@ def _prepare_engine(args: argparse.Namespace) -> Engine | int:
 
 
 def _execute(engine: Engine, args: argparse.Namespace) -> int:
+    if args.resume_from >= engine.total_rows and engine.total_rows > 0:
+        # REL-018: a value that skips past every row produces a silent
+        # empty file. Surface this through both stderr and the logger
+        # so the user actually notices.
+        _logger.warning(
+            "resume_overshoot resume_from=%d total_rows=%d",
+            args.resume_from,
+            engine.total_rows,
+            extra={
+                "event": LogEvent.RESUME_OVERSHOOT.value,
+                "resume_from": args.resume_from,
+                "total_rows": engine.total_rows,
+            },
+        )
+        print(
+            f"ton: --resume-from={args.resume_from} >= total rows "
+            f"({engine.total_rows}); output will be empty",
+            file=sys.stderr,
+        )
     started = time.perf_counter()
     try:
         with _open_output(args.output, no_clobber=args.no_clobber) as stream:
@@ -199,13 +219,32 @@ def _open_output(path: str | None, *, no_clobber: bool = False) -> Iterator[Text
         yield sys.stdout
         return
     exists = os.path.exists(path)
-    if exists and no_clobber:
-        raise OSError(f"refusing to overwrite existing file: {path}")
     if exists:
+        # SEC-005: ``open(path, 'w')`` will happily redirect output into
+        # ``/dev/sda`` or any other block / character device the user
+        # can write to. Refuse explicitly so a stray ``-o`` argument
+        # cannot scribble over hardware nodes or named pipes.
+        st = os.stat(path)
+        if not (stat.S_ISREG(st.st_mode) or stat.S_ISFIFO(st.st_mode)):
+            _logger.error(
+                "output_special_file_rejected path=%s mode=%o",
+                path,
+                st.st_mode,
+                extra={
+                    "event": LogEvent.OUTPUT_SPECIAL_FILE_REJECTED.value,
+                    "path": path,
+                    "mode": st.st_mode,
+                },
+            )
+            raise OSError(
+                f"refusing to write to special file (not a regular file): {path}"
+            )
+        if no_clobber:
+            raise OSError(f"refusing to overwrite existing file: {path}")
         _logger.warning(
             "output_overwrite path=%s",
             path,
-            extra={"event": "output_overwrite", "path": path},
+            extra={"event": LogEvent.OUTPUT_OVERWRITE.value, "path": path},
         )
     with open(path, "w", encoding="utf-8") as fh:
         yield fh
@@ -262,7 +301,7 @@ def _emit_progress(rows: int, elapsed: float) -> None:
         rows,
         elapsed,
         extra={
-            "event": "engine_progress",
+            "event": LogEvent.ENGINE_PROGRESS.value,
             "rows": rows,
             "elapsed_seconds": round(elapsed, 3),
             "rows_per_second": rate,

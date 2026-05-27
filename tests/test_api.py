@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from pathlib import Path
 from random import Random
 from typing import Any
@@ -42,8 +41,8 @@ def test_custom_registry_can_override_or_add_types() -> None:
     class TagGenerator(Generator):
         type_name = "tag"
 
-        def generate(self, spec: Mapping[str, Any], rng: Random) -> str:
-            return spec["tag"]
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return prepared["tag"]
 
     registry = api.build_registry(include_entry_points=False)
     registry["tag"] = TagGenerator()

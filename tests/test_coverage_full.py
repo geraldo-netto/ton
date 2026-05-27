@@ -206,7 +206,7 @@ def test_engine_logs_generate_failed_and_wraps_in_template_error(
     with caplog.at_level(logging.ERROR, logger="ton"), pytest.raises(TemplateError):
         list(engine)
     events = [r for r in caplog.records if getattr(r, "event", None) == "generate_failed"]
-    assert events and events[0].generator_type == "_RaisingGenerator"
+    assert events and getattr(events[0], "generator_type", "") == "_RaisingGenerator"
 
 
 # ---------------------------------------------------------------------------
@@ -374,7 +374,7 @@ def test_registry_skips_broken_entry_point(
     assert "bad_plugin" not in registry
     events = [r for r in caplog.records
               if getattr(r, "event", None) == _LE.ENTRY_POINT_FAILED.value]
-    assert events and events[0].error.startswith("ImportError")
+    assert events and getattr(events[0], "error", "").startswith("ImportError")
 
 
 # ---------------------------------------------------------------------------
@@ -435,8 +435,8 @@ def test_entry_point_load_logs_sanitized_name(
         registry_with_entry_points()
     record = next(r for r in caplog.records
                   if getattr(r, "event", None) == _LE.ENTRY_POINT_LOADED.value)
-    assert "\x1b" not in record.ep_name
-    assert "\x00" not in record.value
+    assert "\x1b" not in getattr(record, "ep_name", "")
+    assert "\x00" not in getattr(record, "value", "")
 
 
 # ---------------------------------------------------------------------------
@@ -475,7 +475,7 @@ def test_lmhash_uses_stdlib_md4_when_available(monkeypatch) -> None:
         def digest(self) -> bytes:
             return b"\x00" * 16
 
-    def _fake_new(name: str, data: bytes = b"") -> _FakeHasher:
+    def _fake_new(name: str, data: bytes = b"") -> Any:
         if name != "md4":
             return hashlib_mod.new(name, data)
         return _FakeHasher(data)

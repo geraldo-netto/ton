@@ -44,7 +44,7 @@ _All previously-open decoupling items closed in this round._
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PAT-008 | open  | M      | `hash` generator with `algorithm: md5\|sha1\|sha256\|sha512\|bcrypt`: modern replacement for `lmhash`. Optional `id` paired form already supported by `PairedGenerator`. |
+| PAT-008 | open  | M      | Add a generic `hash` generator with `algorithm: md5\|sha1\|sha256\|sha512\|bcrypt` (later: argon2, scrypt). Keep `lmhash` as-is -- it stays the Windows NT-hash specialty. New `hash` should reuse `PairedGenerator` so `$word[id]$` returns the plaintext like `lmhash` already does. |
 
 ## reliability / correctness
 

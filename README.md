@@ -2,10 +2,7 @@
 
 > Mass data generator: synthesize structured test data from a JSON template.
 
-TON renders rows of structured text from a small JSON description. It is
-useful when you need a few million lines of plausible-looking CSV, TSV,
-log records, or fixtures and you do not want to glue together a
-one-off Python script every time.
+TON renders rows of structured text from a small JSON description. It is useful when you need a few million lines of plausible-looking CSV, TSV, log records, or fixtures and you do not want to glue together a one-off Python script every time.
 
 ## Install
 
@@ -17,17 +14,14 @@ Python 3.10 or newer. TON has zero runtime dependencies.
 
 ## Run without installing
 
-TON has no third-party runtime requirements, so from a checkout you
-can invoke it straight from the repo root:
+TON has no third-party runtime requirements, so from a checkout you can invoke it straight from the repo root:
 
 ```bash
 # from the repo root, no pip install needed
 python -m ton examples/hwmetrics.json
 ```
 
-The current directory is on `sys.path` automatically, so Python finds
-the `ton/` package without `pip install`. Run from somewhere else by
-pointing `PYTHONPATH` at the checkout:
+The current directory is on `sys.path` automatically, so Python finds the `ton/` package without `pip install`. Run from somewhere else by pointing `PYTHONPATH` at the checkout:
 
 ```bash
 PYTHONPATH=/path/to/ton python -m ton /path/to/config.json
@@ -67,10 +61,7 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 | `--log-level LEVEL`    | Attach a stderr handler to the `ton` logger (`debug`/`info`/`warning`/`error`/`critical`). |
 | `--version`            | Print the package version.                                                           |
 
-Everything observability-related goes to stderr; stdout stays clean for
-piping. Exit codes: `0` success, `1` missing config / output error /
-refused special-file target, `2` invalid config or unknown variable,
-`3` unexpected error, `130` interrupted (Ctrl-C).
+Everything observability-related goes to stderr; stdout stays clean for piping. Exit codes: `0` success, `1` missing config / output error / refused special-file target, `2` invalid config or unknown variable, `3` unexpected error, `130` interrupted (Ctrl-C).
 
 ### Resume / partition a long run
 
@@ -80,9 +71,7 @@ ton huge.json --seed 1 --resume-from 500000  -o chunk-1.txt --batch-rows 4096
 ton huge.json --seed 1 --resume-from 1000000 -o chunk-2.txt --batch-rows 4096
 ```
 
-Each shard sees the same seeded RNG; later shards just throw away the
-prefix they don't want. Combined with `concurrency.fork_engine` (below)
-this gives deterministic parallel output without coordinating writers.
+Each shard sees the same seeded RNG; later shards just throw away the prefix they don't want. Combined with `concurrency.fork_engine` (below) this gives deterministic parallel output without coordinating writers.
 
 ## Architecture
 
@@ -104,9 +93,9 @@ flowchart TB
 
   CLI --> API
   LIB --> API
-  ENG --> CON
+  CON --> ENG
 
-  ENG --> API
+  API --> ENG
   API --> CFG
 
   ENG --> CFG
@@ -152,21 +141,10 @@ sequenceDiagram
 
 Key pieces:
 
-- **`ton.api`** is the only stable public surface. Everything with a
-  single leading underscore (`ton._engine`, `ton._template`,
-  `ton._registry`, `ton._config`, `ton._logging`) is private and may
-  change between releases.
-- **`Engine`** owns the row hot path. Template tokens are precomputed
-  into literal segments at construction time, so each row is a
-  string-join with no per-row regex work.
-- **`Registry`** instantiates only the generator classes the template
-  actually references (composite specs are walked recursively to pick
-  up nested types). The set of built-ins is fixed by an explicit
-  allowlist; third parties extend via the `ton.generators` entry-point
-  group.
-- **`LogEvent`** is a typed enum (`engine_constructed`,
-  `engine_progress`, `entry_point_failed`, …) so downstream consumers
-  can `match LogEvent(record.event)` instead of string-comparing.
+- **`ton.api`** is the only stable public surface. Everything with a single leading underscore (`ton._engine`, `ton._template`, `ton._registry`, `ton._config`, `ton._logging`) is private and may change between releases.
+- **`Engine`** owns the row hot path. Template tokens are precomputed into literal segments at construction time, so each row is a string-join with no per-row regex work.
+- **`Registry`** instantiates only the generator classes the template actually references (composite specs are walked recursively to pick up nested types). The set of built-ins is fixed by an explicit allowlist; third parties extend via the `ton.generators` entry-point group.
+- **`LogEvent`** is a typed enum (`engine_constructed`, `engine_progress`, `entry_point_failed`, …) so downstream consumers can `match LogEvent(record.event)` instead of string-comparing.
 
 ## Library use
 
@@ -206,17 +184,14 @@ engine = api.Engine.from_config(
 )
 ```
 
-Custom generators register via the `ton.generators` entry-point group
-in any installed package:
+Custom generators register via the `ton.generators` entry-point group in any installed package:
 
 ```toml
 [project.entry-points."ton.generators"]
 my_type = "my_pkg.generators:MyGenerator"
 ```
 
-A broken plugin is isolated: `entry_points()` failures are logged as
-`entry_point_failed` and skipped; one bad package never aborts the
-whole registry build.
+A broken plugin is isolated: `entry_points()` failures are logged as `entry_point_failed` and skipped; one bad package never aborts the whole registry build.
 
 Parallel runs use `ton.concurrency`:
 
@@ -231,10 +206,7 @@ for row in eng:
     ...
 ```
 
-Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so
-adjacent workers do not see correlated streams. An `engine_forked`
-log event is emitted with `worker_id` / `parent_seed` so multi-process
-runs stay distinguishable in the structured log stream.
+Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so adjacent workers do not see correlated streams. An `engine_forked` log event is emitted with `worker_id` / `parent_seed` so multi-process runs stay distinguishable in the structured log stream.
 
 ## Config format
 
@@ -252,19 +224,12 @@ runs stay distinguishable in the structured log stream.
 ```
 
 - `rows` — how many rows to emit (non-negative integer).
-- `format` — the template; any `$name$` segment is a variable that
-  must be declared in `types`. `$$` renders a literal `$`. A trailing
-  `[id]` (e.g. `$word[id]$`) requests the paired-id facet of a paired
-  generator — see [Paired references](#paired-references-nameid)
-  below.
+- `format` — the template; any `$name$` segment is a variable that must be declared in `types`. `$$` renders a literal `$`. A trailing `[id]` (e.g. `$word[id]$`) requests the paired-id facet of a paired generator — see [Paired references](#paired-references-nameid) below.
 - `types` — a map of variable name to type spec.
 
 ### Type reference
 
-Twenty-two built-in types. Every output below was produced with
-`--seed 1` on a 4-row config of the form
-`{"rows": 4, "format": "$x$", "types": {"x": <spec>}}` so the
-examples are byte-reproducible.
+Twenty-two built-in types. Every output below was produced with `--seed 1` on a 4-row config of the form `{"rows": 4, "format": "$x$", "types": {"x": <spec>}}` so the examples are byte-reproducible.
 
 #### `boolean`
 
@@ -288,9 +253,7 @@ Y
 
 #### `integer`
 
-Uniform integer in `[minValue, maxValue]`, optionally zero-padded.
-Padding width spans the wider of the min/max rendering (so negative
-values line up with positives).
+Uniform integer in `[minValue, maxValue]`, optionally zero-padded. Padding width spans the wider of the min/max rendering (so negative values line up with positives).
 
 | field         | type    | description                           |
 |---------------|---------|---------------------------------------|
@@ -324,8 +287,7 @@ Unpadded with negatives:
 
 #### `decimal`
 
-Uniform float in `[minValue, maxValue]`, rounded and formatted to
-exactly `decimals` digits after the decimal point.
+Uniform float in `[minValue, maxValue]`, rounded and formatted to exactly `decimals` digits after the decimal point.
 
 | field         | type    | description                                  |
 |---------------|---------|----------------------------------------------|
@@ -386,8 +348,7 @@ AMD
 
 #### `weighted`
 
-Pick one alternative with probability proportional to its weight.
-Three shapes are accepted:
+Pick one alternative with probability proportional to its weight. Three shapes are accepted:
 
 **Parallel arrays** (string values, legacy):
 
@@ -409,11 +370,9 @@ Intel
 
 (Skew toward `Intel` matches the 90/8/2 weighting.)
 
-**Record form** — `values: [{"value": "...", "weight": N}, ...]` is the
-same thing with a less error-prone layout.
+**Record form** — `values: [{"value": "...", "weight": N}, ...]` is the same thing with a less error-prone layout.
 
-**Composite form** — any registered generator can be weighted, not just
-literal strings:
+**Composite form** — any registered generator can be weighted, not just literal strings:
 
 | field     | type     | description                                                       |
 |-----------|----------|-------------------------------------------------------------------|
@@ -435,15 +394,11 @@ common
 common
 ```
 
-Composite `choices` may themselves nest `weighted` / `oneOf` /
-`sequence_of`. Paired generators (`lmhash`) cannot be used as a
-composite child — the `[id]` half would be unreachable from outside
-the wrapper, so the engine rejects such configs at construction time.
+Composite `choices` may themselves nest `weighted` / `oneOf` / `sequence_of`. Paired generators (`lmhash`) cannot be used as a composite child — the `[id]` half would be unreachable from outside the wrapper, so the engine rejects such configs at construction time.
 
 #### `oneOf`
 
-Pick uniformly between several nested type specs. Same as `weighted`
-with equal weights, just less typing.
+Pick uniformly between several nested type specs. Same as `weighted` with equal weights, just less typing.
 
 | field     | type     | description                                |
 |-----------|----------|--------------------------------------------|
@@ -467,9 +422,7 @@ beta
 
 #### `sequence_of`
 
-Concatenate `count` independent draws from a single child spec, joined
-by an optional separator. Handy for compound identifiers that don't
-fit cleanly into the `regex` quantifier surface.
+Concatenate `count` independent draws from a single child spec, joined by an optional separator. Handy for compound identifiers that don't fit cleanly into the `regex` quantifier surface.
 
 | field       | type   | description                                              |
 |-------------|--------|----------------------------------------------------------|
@@ -493,8 +446,7 @@ fit cleanly into the `regex` quantifier surface.
 
 #### `date`
 
-Uniform calendar datetime between ISO-8601 bounds, formatted with
-`strftime`.
+Uniform calendar datetime between ISO-8601 bounds, formatted with `strftime`.
 
 | field       | type   | description                                       |
 |-------------|--------|---------------------------------------------------|
@@ -503,8 +455,7 @@ Uniform calendar datetime between ISO-8601 bounds, formatted with
 | `format`    | string | `strftime` format (default `%Y-%m-%d %H:%M:%S`)   |
 
 ```json
-{"type": "date", "minValue": "2024-01-01", "maxValue": "2024-12-31",
- "format": "%Y-%m-%d %H:%M:%S"}
+{"type": "date", "minValue": "2024-01-01", "maxValue": "2024-12-31", "format": "%Y-%m-%d %H:%M:%S"}
 ```
 
 ```
@@ -525,8 +476,7 @@ Same bounds semantics as `date` but emits epoch seconds (or millis).
 | `unit`      | string | `seconds` (default) or `millis`              |
 
 ```json
-{"type": "timestamp_unix", "minValue": "2024-01-01", "maxValue": "2024-12-31",
- "unit": "seconds"}
+{"type": "timestamp_unix", "minValue": "2024-01-01", "maxValue": "2024-12-31", "unit": "seconds"}
 ```
 
 ```
@@ -538,9 +488,7 @@ Same bounds semantics as `date` but emits epoch seconds (or millis).
 
 #### `uuid`
 
-UUID4 (default) or UUID1. UUID4 is built from the seeded RNG, so it
-is reproducible; UUID1 uses the host clock + node id and ignores
-the seed.
+UUID4 (default) or UUID1. UUID4 is built from the seeded RNG, so it is reproducible; UUID1 uses the host clock + node id and ignores the seed.
 
 | field        | type | description                          |
 |--------------|------|--------------------------------------|
@@ -560,10 +508,7 @@ c4bb86c3-d1c4-4710-bc34-4c4189eb2f1e
 
 #### `sequence`
 
-Monotonic counter, useful for primary keys / row ids. State lives on
-the prepared spec, so each Engine instance has its own counter. Not
-thread-safe: construct one Engine per worker / thread (see
-`ton.concurrency.fork_engine`).
+Monotonic counter, useful for primary keys / row ids. State lives on the prepared spec, so each Engine instance has its own counter. Not thread-safe: construct one Engine per worker / thread (see `ton.concurrency.fork_engine`).
 
 | field      | type | description                       |
 |------------|------|-----------------------------------|
@@ -687,8 +632,8 @@ Omar Patel
 
 `<given>.<family>@<domain>`, lowercased.
 
-| field     | type     | description                                                    |
-|-----------|----------|----------------------------------------------------------------|
+| field     | type     | description                                                              |
+|-----------|----------|--------------------------------------------------------------------------|
 | `domains` | string[] | optional override; default is `example.com / .org / .net / test.invalid` |
 
 ```json
@@ -706,8 +651,8 @@ felix.davila@test.invalid
 
 Replace every `#` in `format` with a random decimal digit.
 
-| field    | type   | description                                  |
-|----------|--------|----------------------------------------------|
+| field    | type   | description                                               |
+|----------|--------|-----------------------------------------------------------|
 | `format` | string | pattern with `#` placeholders (must include at least one) |
 
 ```json
@@ -723,8 +668,7 @@ Replace every `#` in `format` with a random decimal digit.
 
 #### `text`
 
-Lorem-style words, sentences, or paragraphs (single-line output, safe
-inside CSV).
+Lorem-style words, sentences, or paragraphs (single-line output, safe inside CSV).
 
 | field   | type   | description                                          |
 |---------|--------|------------------------------------------------------|
@@ -744,11 +688,7 @@ ipsum mollit culpa nostrud laboris reprehenderit
 
 #### `regex`
 
-Produce strings matching a user-supplied regex. Supports literals,
-character classes, escapes (`\d \w \s` and their negations),
-quantifiers, alternation, and groups. Unbounded `*` / `+` are capped
-at `MAX_UNBOUNDED_REPEAT` extra repeats; literal `{N}` quantifiers
-are capped at `MAX_LITERAL_REPEAT`.
+Produce strings matching a user-supplied regex. Supports literals, character classes, escapes (`\d \w \s` and their negations), quantifiers, alternation, and groups. Unbounded `*` / `+` are capped at `MAX_UNBOUNDED_REPEAT` extra repeats; literal `{N}` quantifiers are capped at `MAX_LITERAL_REPEAT`.
 
 | field     | type   | description                       |
 |-----------|--------|-----------------------------------|
@@ -767,10 +707,7 @@ KAA-8063
 
 #### `lmhash` (paired)
 
-Canonical Windows NT hash (MD4 of UTF-16LE plaintext) drawn from a
-fixed word list. **Paired**: a single row may reference both the
-hash (`$word$`) and the plaintext that produced it (`$word[id]$`).
-Intentionally insecure — use only for synthetic credential fixtures.
+Canonical Windows NT hash (MD4 of UTF-16LE plaintext) drawn from a fixed word list. **Paired**: a single row may reference both the hash (`$word$`) and the plaintext that produced it (`$word[id]$`). Intentionally insecure — use only for synthetic credential fixtures.
 
 | field    | type     | description                |
 |----------|----------|----------------------------|
@@ -793,57 +730,40 @@ secret -> 878d8014606cda29677a44efa1353fc7
 
 ### Paired references (`$name[id]$`)
 
-Any **paired** generator (currently `lmhash`; third parties can opt in
-via `PairedGenerator`) returns a `(id_value, primary_value)` tuple per
-row. The template engine routes:
+Any **paired** generator (currently `lmhash`; third parties can opt in via `PairedGenerator`) returns a `(id_value, primary_value)` tuple per row. The template engine routes:
 
 - `$name$` → `primary_value`
 - `$name[id]$` → `id_value`
 
-The two facets stay consistent within a single row, so a single
-plaintext is shown alongside its own hash. Paired generators cannot be
-used as children of a composite generator (`weighted`, `oneOf`,
-`sequence_of`) — the `[id]` half would be unreachable from outside the
-wrapper, so the engine rejects such configs at construction time.
+The two facets stay consistent within a single row, so a single plaintext is shown alongside its own hash. Paired generators cannot be used as children of a composite generator (`weighted`, `oneOf`, `sequence_of`) — the `[id]` half would be unreachable from outside the wrapper, so the engine rejects such configs at construction time.
 
 ## Observability
 
-Library code emits structured INFO events on a single logger named
-`ton`. Attach a handler the usual way (`logging.getLogger("ton")`) or
-pass `--log-level` on the CLI to get a stderr handler for free. The
-event identifier lives in `record.event` and matches a value from the
-`api.LogEvent` enum:
+Library code emits structured INFO events on a single logger named `ton`. Attach a handler the usual way (`logging.getLogger("ton")`) or pass `--log-level` on the CLI to get a stderr handler for free. The event identifier lives in `record.event` and matches a value from the `api.LogEvent` enum:
 
-| event                            | when                                                |
-|----------------------------------|-----------------------------------------------------|
-| `engine_constructed`             | Engine built, rows/types/paired-flag known          |
-| `engine_milestone`               | every `milestone_rows` rows during iteration        |
-| `engine_progress`                | CLI progress tick (also emitted as JSON on stderr)  |
-| `engine_completed`               | iterator exhausted                                  |
-| `engine_forked`                  | `fork_engine` produced a worker Engine              |
-| `prepare_failed` / `generate_failed` | a Generator raised during prepare / generate    |
-| `registry_discovered`            | built-in registry built (once per process)          |
-| `entry_point_loaded`             | third-party plugin instantiated                     |
-| `entry_point_failed`             | third-party plugin raised on load — entry skipped   |
-| `entry_points_summary`           | per-process summary of loaded / failed entries      |
-| `output_overwrite`               | `-o` file existed and was truncated                 |
-| `output_special_file_rejected`   | `-o` target was not a regular file or FIFO          |
-| `resume_overshoot`               | `--resume-from` exceeded `total_rows`               |
-| `cli_unexpected_error`           | CLI top-level catch-all (traceback in handler)      |
+| event                                 | when                                                |
+|---------------------------------------|-----------------------------------------------------|
+| `engine_constructed`                  | Engine built, rows/types/paired-flag known          |
+| `engine_milestone`                    | every `milestone_rows` rows during iteration        |
+| `engine_progress`                     | CLI progress tick (also emitted as JSON on stderr)  |
+| `engine_completed`                    | iterator exhausted                                  |
+| `engine_forked`                       | `fork_engine` produced a worker Engine              |
+| `prepare_failed` / `generate_failed`  | a Generator raised during prepare / generate        |
+| `registry_discovered`                 | built-in registry built (once per process)          |
+| `entry_point_loaded`                  | third-party plugin instantiated                     |
+| `entry_point_failed`                  | third-party plugin raised on load — entry skipped   |
+| `entry_points_summary`                | per-process summary of loaded / failed entries      |
+| `output_overwrite`                    | `-o` file existed and was truncated                 |
+| `output_special_file_rejected`        | `-o` target was not a regular file or FIFO          |
+| `resume_overshoot`                    | `--resume-from` exceeded `total_rows`               |
+| `cli_unexpected_error`                | CLI top-level catch-all (traceback in handler)      |
 
 ## Safety notes
 
-- `-o PATH` refuses to open a target that is not a regular file or
-  FIFO. A stray `--output /dev/sda` aborts with exit code `1` and an
-  `output_special_file_rejected` log event.
+- `-o PATH` refuses to open a target that is not a regular file or FIFO. A stray `--output /dev/sda` aborts with exit code `1` and an `output_special_file_rejected` log event.
 - `--no-clobber` upgrades the silent overwrite to a hard refusal.
-- Third-party generators from the `ton.generators` entry-point group
-  are sandboxed per-entry: `ImportError` / construction failures are
-  logged and skipped instead of aborting the registry build. Entry
-  point names and values are sanitized to printable ASCII before being
-  logged (control codes / unicode lookalikes become `?`).
-- `lmhash` uses MD4 by design (it is the canonical NT-hash). Treat its
-  output as fixture data, never as a credential.
+- Third-party generators from the `ton.generators` entry-point group are sandboxed per-entry: `ImportError` / construction failures are logged and skipped instead of aborting the registry build. Entry point names and values are sanitized to printable ASCII before being logged (control codes / unicode lookalikes become `?`).
+- `lmhash` uses MD4 by design (it is the canonical NT-hash). Treat its output as fixture data, never as a credential.
 
 ## Bundled example configs
 
@@ -862,8 +782,7 @@ ruff check ton tests
 mypy ton                            # strict mode is on
 ```
 
-Behavior guidelines for AI agents live in [`AGENTS.md`](AGENTS.md);
-open review findings are tracked in [`TODO.md`](TODO.md).
+Behavior guidelines for AI agents live in [`AGENTS.md`](AGENTS.md); open review findings are tracked in [`TODO.md`](TODO.md).
 
 ## License
 

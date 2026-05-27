@@ -1,0 +1,3 @@
+{"rows": 4000, "format": "$v$",
+ "types": {"v": {"type": "weighted",
+                  "values": ["A", "B", "C", "D"]}}}

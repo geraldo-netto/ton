@@ -1,0 +1,4 @@
+{"rows": 100, "format": "$v$",
+ "types": {"v": {"type": "timestamp_unix",
+                  "minValue": "2024-01-01", "maxValue": "2024-12-31",
+                  "unit": "seconds"}}}

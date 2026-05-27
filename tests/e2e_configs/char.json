@@ -1,0 +1,3 @@
+{"rows": 100, "format": "$v$",
+ "types": {"v": {"type": "char", "values": ["A", "C", "G", "T"],
+                  "maxChar": 8}}}

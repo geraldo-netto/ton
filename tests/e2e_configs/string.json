@@ -1,0 +1,2 @@
+{"rows": 200, "format": "$v$",
+ "types": {"v": {"type": "string", "values": ["Intel", "AMD", "ARM"]}}}

@@ -1,0 +1,2 @@
+{"rows": 100, "format": "$v$",
+ "types": {"v": {"type": "ipv6", "cidr": "2001:db8::/32"}}}

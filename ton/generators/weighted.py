@@ -1,7 +1,8 @@
 """Weighted-choice value generator.
 
-Picks one of several alternatives with non-uniform probability. Three
-spec shapes are accepted; pick whichever reads best:
+Picks one of several alternatives. Weights are optional in every shape;
+when omitted the generator falls back to uniform sampling (1/N per
+entry). Three spec shapes are accepted; pick whichever reads best:
 
 * **Parallel arrays** -- legacy form, string-only::
 
@@ -131,12 +132,17 @@ class WeightedGenerator(Generator):
                 f"weighted 'choices[{index}]' must be an object with "
                 "'weight' and 'spec' keys"
             )
-        try:
-            weight = float(choice["weight"])
-        except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError(
-                f"weighted 'choices[{index}]' missing numeric 'weight'"
-            ) from exc
+        if "weight" in choice:
+            try:
+                weight = float(choice["weight"])
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"weighted 'choices[{index}].weight' must be numeric"
+                ) from exc
+        else:
+            # Default: uniform weighting. Caller didn't supply a number,
+            # so every choice contributes the same probability mass.
+            weight = 1.0
         child = prepare_child_spec(
             "weighted",
             f"'choices[{index}].spec'",
@@ -158,13 +164,22 @@ def _coerce(spec: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[float, ...]
     if not isinstance(raw_values, list):
         raise ValueError("weighted 'values' must be a list")
     if raw_values and isinstance(raw_values[0], dict):
-        # Record form: [{value, weight}, ...]
+        # Record form: [{value, weight}, ...]. ``weight`` defaults to 1.0
+        # so a list of bare ``{"value": ...}`` records still works -- the
+        # generator falls back to uniform weighting.
         return (
             tuple(str(item["value"]) for item in raw_values),
-            tuple(float(item["weight"]) for item in raw_values),
+            tuple(float(item.get("weight", 1.0)) for item in raw_values),
         )
-    # Parallel-array form
-    weights: Sequence[Any] = spec.get("weights", [])
+    # Parallel-array form. Missing ``weights`` defaults to uniform so
+    # ``{"values": [...]}`` is equivalent to picking with equal
+    # probability (1/N per entry).
+    if "weights" not in spec:
+        return (
+            tuple(str(v) for v in raw_values),
+            tuple(1.0 for _ in raw_values),
+        )
+    weights: Sequence[Any] = spec["weights"]
     if not isinstance(weights, list) or len(weights) != len(raw_values):
         raise ValueError(
             "weighted 'weights' must be a list the same length as 'values'"

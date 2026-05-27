@@ -1,0 +1,6 @@
+{"rows": 4000, "format": "$v$",
+ "types": {"v": {"type": "weighted",
+                  "choices": [
+                    {"weight": 80, "spec": {"type": "string", "values": ["common"]}},
+                    {"weight": 20, "spec": {"type": "string", "values": ["rare"]}}
+                  ]}}}

@@ -152,7 +152,33 @@ def test_weighted_composite_rejects_empty_choices() -> None:
         list(api.generate(config))
 
 
-def test_weighted_composite_rejects_choice_missing_weight() -> None:
+def test_weighted_composite_defaults_to_uniform_when_weight_omitted() -> None:
+    """A choice without a ``weight`` field contributes 1.0 (uniform fallback)."""
+    from collections import Counter
+
+    from ton import api
+
+    config = {
+        "rows": 300,
+        "format": "$v$",
+        "types": {"v": {
+            "type": "weighted",
+            "choices": [
+                {"spec": {"type": "string", "values": ["A"]}},
+                {"spec": {"type": "string", "values": ["B"]}},
+                {"spec": {"type": "string", "values": ["C"]}},
+            ],
+        }},
+    }
+    counts = Counter(api.generate(config, seed=0))
+    # Uniform over 3 choices: each ~100 +/- generous slack.
+    assert set(counts) == {"A", "B", "C"}
+    for label in "ABC":
+        assert 50 < counts[label] < 200
+
+
+def test_weighted_composite_rejects_non_numeric_weight() -> None:
+    """Explicit but malformed ``weight`` is still rejected."""
     from ton import api
     from ton._engine import TemplateError
 
@@ -161,10 +187,11 @@ def test_weighted_composite_rejects_choice_missing_weight() -> None:
         "format": "$v$",
         "types": {"v": {
             "type": "weighted",
-            "choices": [{"spec": {"type": "string", "values": ["x"]}}],
+            "choices": [{"weight": "abc",
+                         "spec": {"type": "string", "values": ["x"]}}],
         }},
     }
-    with pytest.raises(TemplateError, match="weight"):
+    with pytest.raises(TemplateError, match="numeric"):
         list(api.generate(config))
 
 

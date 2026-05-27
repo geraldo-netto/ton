@@ -1,0 +1,2 @@
+{"rows": 100, "format": "$v$",
+ "types": {"v": {"type": "email", "domains": ["example.com", "example.org"]}}}

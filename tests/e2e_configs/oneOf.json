@@ -1,0 +1,7 @@
+{"rows": 2000, "format": "$v$",
+ "types": {"v": {"type": "oneOf",
+                  "choices": [
+                    {"type": "string", "values": ["A"]},
+                    {"type": "string", "values": ["B"]},
+                    {"type": "string", "values": ["C"]}
+                  ]}}}

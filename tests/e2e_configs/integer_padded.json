@@ -1,0 +1,3 @@
+{"rows": 100, "format": "$v$",
+ "types": {"v": {"type": "integer", "minValue": 0, "maxValue": 9999,
+                  "padWithZero": true}}}

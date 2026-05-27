@@ -1,0 +1,2 @@
+{"rows": 100, "format": "$v$",
+ "types": {"v": {"type": "regex", "pattern": "[A-Z]{3}-\\d{4}"}}}

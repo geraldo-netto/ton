@@ -1,0 +1,2 @@
+{"rows": 200, "format": "$v$",
+ "types": {"v": {"type": "boolean", "whenTrue": "Y", "whenFalse": "N"}}}

@@ -104,9 +104,9 @@ flowchart TB
 
   CLI --> API
   LIB --> API
-  CON --> ENG
+  ENG --> CON
 
-  API --> ENG
+  ENG --> API
   API --> CFG
 
   ENG --> CFG

@@ -13,7 +13,7 @@ one-off Python script every time.
 pip install -e .
 ```
 
-Python 3.9 or newer. TON has zero runtime dependencies.
+Python 3.10 or newer. TON has zero runtime dependencies.
 
 ## Run without installing
 
@@ -33,8 +33,7 @@ pointing `PYTHONPATH` at the checkout:
 PYTHONPATH=/path/to/ton python -m ton /path/to/config.json
 ```
 
-The same flags described below (`--seed`, `--output`, `--verbose`,
-`--progress`) work in this mode.
+Every flag described below works the same way in module form.
 
 ## Usage
 
@@ -54,44 +53,157 @@ Stream to a file (avoids buffering in your shell):
 ton examples/hwmetrics.json -o hwmetrics.csv
 ```
 
-Observability flags (everything goes to stderr; stdout stays clean
-for piping):
+### Flags
+
+| flag                   | description                                                                          |
+|------------------------|--------------------------------------------------------------------------------------|
+| `--seed <int>`         | Seed the RNG for reproducible output.                                                |
+| `-o`, `--output PATH`  | Write rows to a file instead of stdout. Refuses non-regular targets (`/dev/*`, …).   |
+| `--no-clobber`         | Fail instead of overwriting an existing `--output` file.                             |
+| `--resume-from N`      | Skip the first `N` generated rows before writing any output (paired with `--seed`).  |
+| `--batch-rows N`       | Rows buffered per `write()` syscall (default `1024`).                                |
+| `--progress N`         | Emit a JSON progress line on stderr every `N` rows (also surfaces a logger event).   |
+| `--verbose`            | Print final row count, elapsed time, and rows/sec to stderr.                         |
+| `--log-level LEVEL`    | Attach a stderr handler to the `ton` logger (`debug`/`info`/`warning`/`error`/`critical`). |
+| `--version`            | Print the package version.                                                           |
+
+Everything observability-related goes to stderr; stdout stays clean for
+piping. Exit codes: `0` success, `1` missing config / output error /
+refused special-file target, `2` invalid config or unknown variable,
+`3` unexpected error, `130` interrupted (Ctrl-C).
+
+### Resume / partition a long run
 
 ```bash
-ton examples/dna.json --verbose                  # final rows/s summary
-ton examples/dna.json --progress 100000          # JSON progress every N rows
+ton huge.json --seed 1 --resume-from 0       -o chunk-0.txt --batch-rows 4096
+ton huge.json --seed 1 --resume-from 500000  -o chunk-1.txt --batch-rows 4096
+ton huge.json --seed 1 --resume-from 1000000 -o chunk-2.txt --batch-rows 4096
 ```
 
-`ton` only ever writes generated rows to stdout. Errors go to stderr
-with a `ton:` prefix. Exit codes: `0` success, `1` missing config or
-output error, `2` invalid config / unknown variable, `3` unexpected
-error, `130` interrupted (Ctrl-C).
+Each shard sees the same seeded RNG; later shards just throw away the
+prefix they don't want. Combined with `concurrency.fork_engine` (below)
+this gives deterministic parallel output without coordinating writers.
 
-You can also run via the module form:
+## Architecture
 
-```bash
-python -m ton examples/hwmetrics.json
+```mermaid
+flowchart TB
+  subgraph callers["Callers"]
+    CLI["ton CLI<br/>ton.cli"]
+    LIB["Library code<br/>(via ton.api)"]
+    CON["ton.concurrency.fork_engine"]
+  end
+
+  API["ton.api<br/>(public facade)"]
+  ENG["Engine<br/>ton._engine"]
+  CFG["Config loader<br/>ton._config"]
+  TPL["Template parser<br/>ton._template"]
+  REG["Lazy registry<br/>ton._registry"]
+  GEN["Generators<br/>ton.generators.*"]
+  LOG["Structured logger<br/>+ LogEvent enum<br/>ton._logging"]
+
+  CLI --> API
+  LIB --> API
+  CON --> ENG
+
+  API --> ENG
+  API --> CFG
+
+  ENG --> CFG
+  ENG --> TPL
+  ENG --> REG
+  ENG --> LOG
+  REG --> GEN
+
+  classDef public fill:#d4edda,stroke:#155724,color:#155724;
+  classDef private fill:#f1f3f5,stroke:#495057,color:#495057;
+  class API,CLI,LIB,CON,LOG public
+  class ENG,CFG,TPL,REG,GEN private
 ```
+
+Row-generation request flow:
+
+```mermaid
+sequenceDiagram
+  participant Caller
+  participant Engine
+  participant Registry as Registry (lazy)
+  participant G as Generator(s)
+  Caller->>Engine: Engine.from_config(config, seed=...)
+  Engine->>Engine: parse(template) → tokens
+  Engine->>Registry: make_registry(referenced_type_names)
+  Registry-->>Engine: {type → Generator}
+  loop for each declared type used by the template
+    alt generator.is_composite
+      Engine->>G: prepare_composite(spec, registry)
+    else
+      Engine->>G: prepare(spec)
+    end
+    G-->>Engine: prepared spec (typed dataclass)
+  end
+  Caller->>Engine: iter(engine)
+  loop per row
+    Engine->>G: generate(prepared, rng)
+    G-->>Engine: rendered chunk
+    Engine-->>Caller: row string
+  end
+  Engine-->>Caller: rows_emitted == total_rows
+```
+
+Key pieces:
+
+- **`ton.api`** is the only stable public surface. Everything with a
+  single leading underscore (`ton._engine`, `ton._template`,
+  `ton._registry`, `ton._config`, `ton._logging`) is private and may
+  change between releases.
+- **`Engine`** owns the row hot path. Template tokens are precomputed
+  into literal segments at construction time, so each row is a
+  string-join with no per-row regex work.
+- **`Registry`** instantiates only the generator classes the template
+  actually references (composite specs are walked recursively to pick
+  up nested types). The set of built-ins is fixed by an explicit
+  allowlist; third parties extend via the `ton.generators` entry-point
+  group.
+- **`LogEvent`** is a typed enum (`engine_constructed`,
+  `engine_progress`, `entry_point_failed`, …) so downstream consumers
+  can `match LogEvent(record.event)` instead of string-comparing.
 
 ## Library use
-
-`ton.api` is the only stable public surface. Everything under
-`ton._engine`, `ton._template`, `ton._registry`, `ton._config` is
-private (single leading underscore) and may change between releases.
 
 ```python
 from ton import api
 
+# One-shot, deterministic:
 rows = list(api.generate_from_file("examples/dna.json", seed=42))
 
+# Streaming form for large outputs:
 for row in api.generate(config_dict, seed=42):
     sink.write(row)
 
-# Exceptions and Engine are re-exported from ton.api too:
+# Exceptions, Engine, and the LogEvent enum are all re-exported:
 try:
     rows = list(api.generate(bad_config))
 except (api.ConfigError, api.TemplateError) as exc:
     ...
+```
+
+For finer control, construct an `Engine` directly:
+
+```python
+from ton import api
+
+engine = api.Engine.from_file("examples/dna.json", seed=42)
+print(engine.total_rows, engine.rows_emitted)   # 10, 0
+for row in engine:
+    ...
+print(engine.rows_emitted)                       # 10
+
+# Or with an in-memory config + custom registry / milestone:
+engine = api.Engine.from_config(
+    config_dict,
+    seed=42,
+    milestone_rows=100_000,   # emits engine_milestone log events
+)
 ```
 
 Custom generators register via the `ton.generators` entry-point group
@@ -99,18 +211,30 @@ in any installed package:
 
 ```toml
 [project.entry-points."ton.generators"]
-uuid = "my_pkg.generators:UuidGenerator"
+my_type = "my_pkg.generators:MyGenerator"
 ```
+
+A broken plugin is isolated: `entry_points()` failures are logged as
+`entry_point_failed` and skipped; one bad package never aborts the
+whole registry build.
 
 Parallel runs use `ton.concurrency`:
 
 ```python
 from ton import api, concurrency
+
 config = api.load_config("examples/dna.json")
-eng = concurrency.fork_engine(config, parent_seed=42, worker_id=0, rows=1_000_000)
+eng = concurrency.fork_engine(
+    config, parent_seed=42, worker_id=0, rows=1_000_000
+)
 for row in eng:
     ...
 ```
+
+Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so
+adjacent workers do not see correlated streams. An `engine_forked`
+log event is emitted with `worker_id` / `parent_seed` so multi-process
+runs stay distinguishable in the structured log stream.
 
 ## Config format
 
@@ -129,12 +253,15 @@ for row in eng:
 
 - `rows` — how many rows to emit (non-negative integer).
 - `format` — the template; any `$name$` segment is a variable that
-  must be declared in `types`. `$$` renders a literal `$`.
+  must be declared in `types`. `$$` renders a literal `$`. A trailing
+  `[id]` (e.g. `$word[id]$`) requests the paired-id facet of a paired
+  generator — see [Paired references](#paired-references-nameid)
+  below.
 - `types` — a map of variable name to type spec.
 
 ### Type reference
 
-Twenty built-in types. Every output below was produced with
+Twenty-two built-in types. Every output below was produced with
 `--seed 1` on a 4-row config of the form
 `{"rows": 4, "format": "$x$", "types": {"x": <spec>}}` so the
 examples are byte-reproducible.
@@ -259,9 +386,10 @@ AMD
 
 #### `weighted`
 
-Like `string`, but the per-value probability is proportional to its
-weight. Two shapes accepted (parallel arrays or `[{value, weight}]`
-records).
+Pick one alternative with probability proportional to its weight.
+Three shapes are accepted:
+
+**Parallel arrays** (string values, legacy):
 
 | field     | type           | description                                |
 |-----------|----------------|--------------------------------------------|
@@ -280,6 +408,88 @@ Intel
 ```
 
 (Skew toward `Intel` matches the 90/8/2 weighting.)
+
+**Record form** — `values: [{"value": "...", "weight": N}, ...]` is the
+same thing with a less error-prone layout.
+
+**Composite form** — any registered generator can be weighted, not just
+literal strings:
+
+| field     | type     | description                                                       |
+|-----------|----------|-------------------------------------------------------------------|
+| `choices` | object[] | each entry is `{"weight": number, "spec": <type spec>}`           |
+
+```json
+{"type": "weighted",
+ "choices": [
+   {"weight": 70, "spec": {"type": "string", "values": ["common"]}},
+   {"weight": 30, "spec": {"type": "integer", "minValue": 0,
+                            "maxValue": 99, "padWithZero": false}}
+ ]}
+```
+
+```
+common
+common
+60
+common
+```
+
+Composite `choices` may themselves nest `weighted` / `oneOf` /
+`sequence_of`. Paired generators (`lmhash`) cannot be used as a
+composite child — the `[id]` half would be unreachable from outside
+the wrapper, so the engine rejects such configs at construction time.
+
+#### `oneOf`
+
+Pick uniformly between several nested type specs. Same as `weighted`
+with equal weights, just less typing.
+
+| field     | type     | description                                |
+|-----------|----------|--------------------------------------------|
+| `choices` | object[] | each entry is itself a full type spec      |
+
+```json
+{"type": "oneOf",
+ "choices": [
+   {"type": "string", "values": ["alpha"]},
+   {"type": "string", "values": ["beta"]},
+   {"type": "integer", "minValue": 0, "maxValue": 9, "padWithZero": false}
+ ]}
+```
+
+```
+alpha
+beta
+beta
+beta
+```
+
+#### `sequence_of`
+
+Concatenate `count` independent draws from a single child spec, joined
+by an optional separator. Handy for compound identifiers that don't
+fit cleanly into the `regex` quantifier surface.
+
+| field       | type   | description                                              |
+|-------------|--------|----------------------------------------------------------|
+| `count`     | int    | draws per row (1 ≤ N ≤ `MAX_SEQUENCE_OF_COUNT`)          |
+| `separator` | string | inserted between draws (default empty)                   |
+| `spec`      | object | child type spec                                          |
+
+```json
+{"type": "sequence_of",
+ "count": 4,
+ "separator": "-",
+ "spec": {"type": "integer", "minValue": 0, "maxValue": 9, "padWithZero": false}}
+```
+
+```
+2-9-1-4
+1-7-7-7
+6-3-1-7
+0-6-6-9
+```
 
 #### `date`
 
@@ -351,7 +561,9 @@ c4bb86c3-d1c4-4710-bc34-4c4189eb2f1e
 #### `sequence`
 
 Monotonic counter, useful for primary keys / row ids. State lives on
-the prepared spec, so each Engine instance has its own counter.
+the prepared spec, so each Engine instance has its own counter. Not
+thread-safe: construct one Engine per worker / thread (see
+`ton.concurrency.fork_engine`).
 
 | field      | type | description                       |
 |------------|------|-----------------------------------|
@@ -589,7 +801,49 @@ row. The template engine routes:
 - `$name[id]$` → `id_value`
 
 The two facets stay consistent within a single row, so a single
-plaintext is shown alongside its own hash.
+plaintext is shown alongside its own hash. Paired generators cannot be
+used as children of a composite generator (`weighted`, `oneOf`,
+`sequence_of`) — the `[id]` half would be unreachable from outside the
+wrapper, so the engine rejects such configs at construction time.
+
+## Observability
+
+Library code emits structured INFO events on a single logger named
+`ton`. Attach a handler the usual way (`logging.getLogger("ton")`) or
+pass `--log-level` on the CLI to get a stderr handler for free. The
+event identifier lives in `record.event` and matches a value from the
+`api.LogEvent` enum:
+
+| event                            | when                                                |
+|----------------------------------|-----------------------------------------------------|
+| `engine_constructed`             | Engine built, rows/types/paired-flag known          |
+| `engine_milestone`               | every `milestone_rows` rows during iteration        |
+| `engine_progress`                | CLI progress tick (also emitted as JSON on stderr)  |
+| `engine_completed`               | iterator exhausted                                  |
+| `engine_forked`                  | `fork_engine` produced a worker Engine              |
+| `prepare_failed` / `generate_failed` | a Generator raised during prepare / generate    |
+| `registry_discovered`            | built-in registry built (once per process)          |
+| `entry_point_loaded`             | third-party plugin instantiated                     |
+| `entry_point_failed`             | third-party plugin raised on load — entry skipped   |
+| `entry_points_summary`           | per-process summary of loaded / failed entries      |
+| `output_overwrite`               | `-o` file existed and was truncated                 |
+| `output_special_file_rejected`   | `-o` target was not a regular file or FIFO          |
+| `resume_overshoot`               | `--resume-from` exceeded `total_rows`               |
+| `cli_unexpected_error`           | CLI top-level catch-all (traceback in handler)      |
+
+## Safety notes
+
+- `-o PATH` refuses to open a target that is not a regular file or
+  FIFO. A stray `--output /dev/sda` aborts with exit code `1` and an
+  `output_special_file_rejected` log event.
+- `--no-clobber` upgrades the silent overwrite to a hard refusal.
+- Third-party generators from the `ton.generators` entry-point group
+  are sandboxed per-entry: `ImportError` / construction failures are
+  logged and skipped instead of aborting the registry build. Entry
+  point names and values are sanitized to printable ASCII before being
+  logged (control codes / unicode lookalikes become `?`).
+- `lmhash` uses MD4 by design (it is the canonical NT-hash). Treat its
+  output as fixture data, never as a credential.
 
 ## Bundled example configs
 
@@ -602,13 +856,14 @@ plaintext is shown alongside its own hash.
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest
+pytest                              # 460+ tests, including fuzz/property suites
+pytest --cov=ton --cov-report=term  # 100% line coverage is the contract
 ruff check ton tests
-mypy ton
+mypy ton                            # strict mode is on
 ```
 
 Behavior guidelines for AI agents live in [`AGENTS.md`](AGENTS.md);
-review findings are tracked in [`TODO.md`](TODO.md).
+open review findings are tracked in [`TODO.md`](TODO.md).
 
 ## License
 

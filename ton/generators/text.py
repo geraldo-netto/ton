@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator
+from .base import Generator, assert_below_cap, coerce_int
 
 _WORDS: tuple[str, ...] = (
     "lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing",
@@ -58,13 +58,10 @@ class TextGenerator(Generator):
         unit = str(spec.get("unit", "words"))
         if unit not in _UNITS:
             raise ValueError(f"text 'unit' must be one of {_UNITS} (got {unit!r})")
-        count = int(spec.get("count", 5))
+        count = coerce_int(spec, "count", type_name="text", default=5)
         if count < 1:
             raise ValueError("text 'count' must be >= 1")
-        if count > MAX_TEXT_COUNT:
-            raise ValueError(
-                f"text 'count' exceeds MAX_TEXT_COUNT ({MAX_TEXT_COUNT})"
-            )
+        assert_below_cap("text", "count", count, MAX_TEXT_COUNT, "MAX_TEXT_COUNT")
         return TextSpec(unit=unit, count=count)
 
     def generate(self, prepared: TextSpec, rng: Random) -> str:

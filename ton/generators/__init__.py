@@ -39,7 +39,36 @@ from .timestamp_unix import TimestampUnixGenerator
 from .uuid import UUIDGenerator
 from .weighted import WeightedGenerator
 
+#: Canonical built-in generator classes. Used as the allowlist for
+#: ``ton._registry.default_registry`` so in-process test fixtures or
+#: third-party subclasses (which still appear in
+#: ``Generator.__subclasses__()``) do not leak into the default registry
+#: (TODO ARCH-005).
+BUILTIN_GENERATOR_CLASSES: tuple[type[Generator], ...] = (
+    BooleanGenerator,
+    BytesGenerator,
+    CharGenerator,
+    DateGenerator,
+    DecimalGenerator,
+    EmailGenerator,
+    IPv4Generator,
+    IPv6Generator,
+    IntegerGenerator,
+    LMHashGenerator,
+    MACGenerator,
+    NameGenerator,
+    PhoneGenerator,
+    RegexGenerator,
+    SequenceGenerator,
+    StringGenerator,
+    TextGenerator,
+    TimestampUnixGenerator,
+    UUIDGenerator,
+    WeightedGenerator,
+)
+
 __all__ = [
+    "BUILTIN_GENERATOR_CLASSES",
     "BooleanGenerator",
     "BytesGenerator",
     "CharGenerator",

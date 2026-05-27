@@ -14,6 +14,15 @@ instance). When the engine is replicated across worker processes via
 :func:`ton.concurrency.fork_engine`, each worker starts its own
 counter -- callers that need globally-unique ids across workers
 should set ``start`` to ``worker_id * chunk_size``.
+
+Thread-safety (TODO CONC-003)
+-----------------------------
+``itertools.count`` is **not** thread-safe; reading the counter from
+multiple Python threads against the same prepared spec can hand out
+duplicate or skipped ids. The TON engine is single-threaded by
+contract -- construct one :class:`ton.api.Engine` (or call
+:func:`ton.concurrency.fork_engine`) per worker / thread so each owns
+its own ``SequenceSpec.counter``.
 """
 
 from __future__ import annotations
@@ -24,7 +33,7 @@ from itertools import count
 from random import Random
 from typing import Any
 
-from .base import Generator, pad_with_zero
+from .base import Generator, coerce_int, pad_with_zero
 
 
 @dataclass(frozen=True)
@@ -39,13 +48,13 @@ class SequenceGenerator(Generator):
     type_name = "sequence"
 
     def prepare(self, spec: Mapping[str, Any]) -> SequenceSpec:
-        start = int(spec.get("start", 0))
-        step = int(spec.get("step", 1))
+        start = coerce_int(spec, "start", type_name="sequence", default=0)
+        step = coerce_int(spec, "step", type_name="sequence", default=1)
         if step == 0:
             raise ValueError("sequence 'step' must be non-zero")
         return SequenceSpec(
             counter=count(start, step),
-            pad_width=int(spec.get("padWidth", 0)),
+            pad_width=coerce_int(spec, "padWidth", type_name="sequence", default=0),
         )
 
     def generate(self, prepared: SequenceSpec, rng: Random) -> str:

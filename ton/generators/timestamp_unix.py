@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from random import Random
 from typing import Any
 
-from .base import Generator
+from .base import Generator, require_min_le_max
 
 _UNIT_MULTIPLIERS = {"seconds": 1, "millis": 1000}
 
@@ -42,8 +42,7 @@ class TimestampUnixGenerator(Generator):
     def prepare(self, spec: Mapping[str, Any]) -> TimestampUnixSpec:
         lo = _to_utc(datetime.fromisoformat(spec["minValue"]))
         hi = _to_utc(datetime.fromisoformat(spec["maxValue"]))
-        if hi < lo:
-            raise ValueError("timestamp_unix 'maxValue' must be >= 'minValue'")
+        require_min_le_max("timestamp_unix", lo, hi)
         unit = str(spec.get("unit", "seconds"))
         if unit not in _UNIT_MULTIPLIERS:
             raise ValueError(

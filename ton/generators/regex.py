@@ -79,7 +79,9 @@ class RegexGenerator(Generator):
         return RegexSpec(parsed=parsed)
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:
-        return _emit(prepared.parsed, rng)
+        parts: list[str] = []
+        _emit_into(prepared.parsed, rng, parts)
+        return "".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -107,88 +109,98 @@ def _reject_oversized_repeats(seq: Iterable[tuple[Any, Any]]) -> None:
             _reject_oversized_repeats(arg[3])
 
 
-def _emit(seq: Iterable[tuple[Any, Any]], rng: Random) -> str:
-    parts: list[str] = []
+def _emit_into(seq: Iterable[tuple[Any, Any]], rng: Random, out: list[str]) -> None:
+    """Append each node's rendering directly to ``out``.
+
+    Caller-supplied accumulator so nested calls (notably
+    :func:`_emit_repeat` and :func:`_emit_branch`) reuse the same list
+    instead of allocating a fresh list per AST node (TODO PERF-010).
+    """
     for op, arg in seq:
-        parts.append(_emit_node(op, arg, rng))
-    return "".join(parts)
+        handler = _EMIT_HANDLERS.get(op)
+        if handler is None:
+            raise ValueError(f"regex generator: unsupported construct {op!r}")
+        handler(arg, rng, out)
 
 
-def _emit_node(op: Any, arg: Any, rng: Random) -> str:
-    handler = _EMIT_HANDLERS.get(op)
-    if handler is None:
-        raise ValueError(f"regex generator: unsupported construct {op!r}")
-    return handler(arg, rng)
+def _emit_literal(arg: Any, rng: Random, out: list[str]) -> None:
+    out.append(chr(arg))
 
 
-def _emit_literal(arg: Any, rng: Random) -> str:
-    return chr(arg)
+def _emit_not_literal(arg: Any, rng: Random, out: list[str]) -> None:
+    out.append(_pick_excluding({chr(arg)}, rng))
 
 
-def _emit_not_literal(arg: Any, rng: Random) -> str:
-    return _pick_excluding({chr(arg)}, rng)
+def _emit_any(arg: Any, rng: Random, out: list[str]) -> None:
+    out.append(_pick_excluding({"\n"}, rng))
 
 
-def _emit_any(arg: Any, rng: Random) -> str:
-    return _pick_excluding({"\n"}, rng)
-
-
-def _emit_branch(arg: Any, rng: Random) -> str:
+def _emit_branch(arg: Any, rng: Random, out: list[str]) -> None:
     _, alternatives = arg
-    return _emit(rng.choice(alternatives), rng)
+    _emit_into(rng.choice(alternatives), rng, out)
 
 
-def _emit_subpattern(arg: Any, rng: Random) -> str:
+def _emit_subpattern(arg: Any, rng: Random, out: list[str]) -> None:
     # (group, add_flags, del_flags, sub)
-    return _emit(arg[3], rng)
+    _emit_into(arg[3], rng, out)
 
 
-def _emit_category(arg: Any, rng: Random) -> str:
-    return rng.choice(_category_pool(arg))
+def _emit_category(arg: Any, rng: Random, out: list[str]) -> None:
+    out.append(rng.choice(_category_pool(arg)))
 
 
-def _emit_at(arg: Any, rng: Random) -> str:
-    return ""  # anchor, no output
+def _emit_at(arg: Any, rng: Random, out: list[str]) -> None:
+    pass  # anchor, no output
 
 
-def _emit_range(arg: Any, rng: Random) -> str:
+def _emit_range(arg: Any, rng: Random, out: list[str]) -> None:
     lo, hi = arg
-    return chr(rng.randint(lo, hi))
+    out.append(chr(rng.randint(lo, hi)))
 
 
-def _emit_repeat(arg: tuple[int, int, Any], rng: Random) -> str:
+def _emit_repeat(arg: tuple[int, int, Any], rng: Random, out: list[str]) -> None:
     lo, hi, sub = arg
     if hi == sre_constants.MAXREPEAT:
         hi = lo + MAX_UNBOUNDED_REPEAT
     count = rng.randint(lo, hi)
-    return "".join(_emit(sub, rng) for _ in range(count))
+    for _ in range(count):
+        _emit_into(sub, rng, out)
 
 
-def _pick_in(items: Iterable[tuple[Any, Any]], rng: Random) -> str:
+def _pick_in(items: Iterable[tuple[Any, Any]], rng: Random, out: list[str]) -> None:
     item_list = list(items)
     negate = item_list and item_list[0][0] is sre_constants.NEGATE
     if negate:
         item_list = item_list[1:]
     pool = _flatten_in(item_list)
     if negate:
-        return _pick_excluding(set(pool), rng)
+        out.append(_pick_excluding(set(pool), rng))
+        return
     if not pool:
         raise ValueError("regex generator: empty character class")
-    return rng.choice(pool)
+    out.append(rng.choice(pool))
+
+
+def _flatten_literal(arg: Any) -> list[str]:
+    return [chr(arg)]
+
+
+def _flatten_range(arg: Any) -> list[str]:
+    lo, hi = arg
+    return [chr(c) for c in range(lo, hi + 1)]
+
+
+def _flatten_category(arg: Any) -> list[str]:
+    return list(_category_pool(arg))
 
 
 def _flatten_in(items: Iterable[tuple[Any, Any]]) -> list[str]:
     pool: list[str] = []
     for op, arg in items:
-        if op is sre_constants.LITERAL:
-            pool.append(chr(arg))
-        elif op is sre_constants.RANGE:
-            lo, hi = arg
-            pool.extend(chr(c) for c in range(lo, hi + 1))
-        elif op is sre_constants.CATEGORY:
-            pool.extend(_category_pool(arg))
-        else:
+        handler = _FLATTEN_HANDLERS.get(op)
+        if handler is None:
             raise ValueError(f"regex generator: unsupported class element {op!r}")
+        pool.extend(handler(arg))
     return pool
 
 
@@ -229,4 +241,10 @@ _EMIT_HANDLERS = {
     sre_constants.CATEGORY: _emit_category,
     sre_constants.AT: _emit_at,
     sre_constants.RANGE: _emit_range,
+}
+
+_FLATTEN_HANDLERS = {
+    sre_constants.LITERAL: _flatten_literal,
+    sre_constants.RANGE: _flatten_range,
+    sre_constants.CATEGORY: _flatten_category,
 }

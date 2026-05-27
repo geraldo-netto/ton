@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from random import Random
 from typing import Any
 
-from .base import Generator
+from .base import Generator, require_min_le_max
 
 _DEFAULT_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -45,8 +45,7 @@ class DateGenerator(Generator):
     def prepare(self, spec: Mapping[str, Any]) -> DateSpec:
         lo = datetime.fromisoformat(spec["minValue"])
         hi = datetime.fromisoformat(spec["maxValue"])
-        if hi < lo:
-            raise ValueError("date generator: maxValue must be >= minValue")
+        require_min_le_max("date", lo, hi)
         return DateSpec(
             lo=lo,
             span_seconds=int((hi - lo).total_seconds()),

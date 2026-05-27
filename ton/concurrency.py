@@ -42,6 +42,7 @@ from random import Random
 from typing import Any
 
 from ._engine import Engine
+from ._logging import logger as _logger
 
 
 def derive_rng(parent_seed: int, worker_id: int) -> Random:
@@ -71,4 +72,19 @@ def fork_engine(
     rng = derive_rng(parent_seed, worker_id)
     if rows is not None:
         config = {**config, "rows": rows}
-    return Engine(config, registry=registry, rng=rng, milestone_rows=milestone_rows)
+    engine = Engine.from_config(
+        config, registry=registry, rng=rng, milestone_rows=milestone_rows
+    )
+    _logger.info(
+        "engine_forked worker_id=%d parent_seed=%d rows=%d",
+        worker_id,
+        parent_seed,
+        int(config["rows"]),
+        extra={
+            "event": "engine_forked",
+            "worker_id": worker_id,
+            "parent_seed": parent_seed,
+            "rows": int(config["rows"]),
+        },
+    )
+    return engine

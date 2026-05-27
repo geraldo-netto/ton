@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, pad_with_zero
+from .base import Generator, coerce_int, pad_with_zero, require_min_le_max
 
 
 @dataclass(frozen=True)
@@ -23,12 +23,9 @@ class IntegerGenerator(Generator):
     type_name = "integer"
 
     def prepare(self, spec: Mapping[str, Any]) -> IntegerSpec:
-        min_value = int(spec["minValue"])
-        max_value = int(spec["maxValue"])
-        if max_value < min_value:
-            raise ValueError(
-                f"integer 'maxValue' ({max_value}) must be >= 'minValue' ({min_value})"
-            )
+        min_value = coerce_int(spec, "minValue", type_name="integer")
+        max_value = coerce_int(spec, "maxValue", type_name="integer")
+        require_min_le_max("integer", min_value, max_value)
         pad_width = 0
         if spec.get("padWithZero", False):
             # Width must cover the widest possible rendering so a positive

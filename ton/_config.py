@@ -26,6 +26,20 @@ _REQUIRED_TOP_LEVEL = ("rows", "format", "types")
 #: belong to the relevant generator's ``prepare`` method.
 MAX_ROWS = 1_000_000_000
 
+#: Documented worst-case rendered row width when every type is set to
+#: its own per-field cap (TODO SCALE-002). Worst-case contributions:
+#:
+#: * ``regex``           -> MAX_LITERAL_REPEAT     (10_000 chars)
+#: * ``char``            -> MAX_CHAR_LENGTH        (100_000 chars)
+#: * ``bytes`` (hex)     -> 2 x MAX_BYTES_LENGTH   (2_000_000 chars)
+#: * ``text`` paragraphs -> MAX_TEXT_COUNT x ~80   (~800_000 chars)
+#:
+#: A single placeholder can therefore push a row past 2 MB before any
+#: global cap fires. Callers that need a hard ceiling should validate
+#: against this constant *or* lower the per-field caps in the relevant
+#: generator module.
+MAX_ROW_WIDTH_GUIDANCE = 2_000_000
+
 
 def load(path: str | Path) -> dict[str, Any]:
     """Read a JSON config from disk and validate its top-level shape.

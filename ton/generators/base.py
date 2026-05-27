@@ -139,3 +139,54 @@ def require_string_tuple(spec: Mapping[str, Any], key: str = "values") -> tuple[
             f"{type(raw).__name__ if raw is not None else 'missing'})"
         )
     return tuple(str(v) for v in raw)
+
+
+_MISSING = object()
+
+
+def coerce_int(
+    spec: Mapping[str, Any],
+    key: str,
+    *,
+    type_name: str,
+    default: Any = _MISSING,
+) -> int:
+    """Read ``spec[key]`` and coerce to ``int`` with a uniform error message.
+
+    When ``default`` is omitted the key is required; passing any value
+    (including ``None``) treats it as optional. Used by integer / decimal
+    / char / bytes / text / sequence / uuid generators so their per-field
+    coercion + validation surface stays centralized (TODO DUP-006).
+    """
+    if default is _MISSING:
+        if key not in spec:
+            raise ValueError(f"{type_name} {key!r} is required")
+        raw = spec[key]
+    else:
+        raw = spec.get(key, default)
+    try:
+        return int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"{type_name} {key!r} must be an integer (got {raw!r})"
+        ) from exc
+
+
+def require_min_le_max(type_name: str, lo: Any, hi: Any) -> None:
+    """Raise when ``hi < lo``. Centralizes the bounds check used by the
+    integer / decimal / date / timestamp_unix generators (TODO DUP-004).
+    """
+    if hi < lo:
+        raise ValueError(
+            f"{type_name} 'maxValue' ({hi}) must be >= 'minValue' ({lo})"
+        )
+
+
+def assert_below_cap(type_name: str, field: str, value: int, cap: int, cap_name: str) -> None:
+    """Raise when ``value > cap``. Used by the char / bytes / text generators
+    to keep their "X exceeds MAX_X" rejections in one place (TODO DUP-005).
+    """
+    if value > cap:
+        raise ValueError(
+            f"{type_name} {field!r} exceeds {cap_name} ({cap})"
+        )

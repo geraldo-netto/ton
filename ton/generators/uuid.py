@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator
+from .base import Generator, coerce_int
 
 _SUPPORTED_VERSIONS = (1, 4)
 
@@ -40,7 +40,7 @@ class UUIDGenerator(Generator):
     type_name = "uuid"
 
     def prepare(self, spec: Mapping[str, Any]) -> UUIDSpec:
-        version = int(spec.get("version", 4))
+        version = coerce_int(spec, "version", type_name="uuid", default=4)
         if version not in _SUPPORTED_VERSIONS:
             raise ValueError(f"uuid 'version' must be 1 or 4, got {version}")
         return UUIDSpec(version=version, uppercase=bool(spec.get("uppercase", False)))

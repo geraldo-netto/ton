@@ -90,6 +90,30 @@ def validate_against(template: str, declared: Iterable[str]) -> None:
             )
 
 
+def split_segments(template: str) -> tuple[list[str], list[Token]]:
+    """Split ``template`` into literal segments interleaved with tokens.
+
+    Returns ``(literals, tokens)`` where ``len(literals) == len(tokens) + 1``.
+    Each literal has already had ``$$`` escapes decoded to ``$`` so the
+    caller can ``"".join`` literals and rendered values directly without
+    running the regex per row (TODO PERF-009).
+    """
+    literals: list[str] = []
+    tokens: list[Token] = []
+    last_end = 0
+    for match in _TOKEN_RE.finditer(template):
+        if match.group(0) == _LITERAL_DOLLAR:
+            continue
+        literals.append(template[last_end:match.start()].replace(_LITERAL_DOLLAR, "$"))
+        raw = match.group(1)
+        wants_id = raw.endswith(_ID_SUFFIX)
+        key = raw[: -len(_ID_SUFFIX)] if wants_id else raw
+        tokens.append(Token(type_key=key, wants_id=wants_id))
+        last_end = match.end()
+    literals.append(template[last_end:].replace(_LITERAL_DOLLAR, "$"))
+    return literals, tokens
+
+
 def render(template: str, values: Mapping[str, str]) -> str:
     """Substitute placeholders in ``template`` using a single regex pass.
 

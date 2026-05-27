@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator
+from .base import Generator, assert_below_cap, coerce_int
 
 _ENCODERS: dict[str, Callable[[bytes], str]] = {
     "hex": lambda raw: raw.hex(),
@@ -43,13 +43,10 @@ class BytesGenerator(Generator):
     type_name = "bytes"
 
     def prepare(self, spec: Mapping[str, Any]) -> BytesSpec:
-        length = int(spec.get("length", 16))
+        length = coerce_int(spec, "length", type_name="bytes", default=16)
         if length < 1:
             raise ValueError("bytes 'length' must be >= 1")
-        if length > MAX_BYTES_LENGTH:
-            raise ValueError(
-                f"bytes 'length' exceeds MAX_BYTES_LENGTH ({MAX_BYTES_LENGTH})"
-            )
+        assert_below_cap("bytes", "length", length, MAX_BYTES_LENGTH, "MAX_BYTES_LENGTH")
         encoding = str(spec.get("encoding", "hex"))
         if encoding not in _ENCODERS:
             raise ValueError(

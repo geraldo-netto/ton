@@ -37,7 +37,6 @@ Typical use::
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from random import Random
 from typing import Any
 
 from . import _config
@@ -89,9 +88,13 @@ def generate(
     milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for an in-memory config mapping."""
-    rng = Random(seed) if seed is not None else Random()
     return iter(
-        Engine(config, registry=registry, rng=rng, milestone_rows=milestone_rows)
+        Engine.from_config(
+            config,
+            seed=seed,
+            registry=registry,
+            milestone_rows=milestone_rows,
+        )
     )
 
 

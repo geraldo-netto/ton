@@ -46,3 +46,155 @@ def test_weighted_rejects_negative_weight() -> None:
 def test_weighted_rejects_zero_total() -> None:
     with pytest.raises(ValueError):
         WeightedGenerator().prepare({"values": ["A", "B"], "weights": [0, 0]})
+
+
+# ---------------------------------------------------------------------------
+# Composite form: 'choices' with nested type specs (any registered type).
+# ---------------------------------------------------------------------------
+
+
+def test_weighted_composite_mixes_types_via_engine() -> None:
+    """A weighted 'choices' spec routes draws through nested generators."""
+    from ton import api
+
+    config = {
+        "rows": 200,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "weighted",
+                "choices": [
+                    {"weight": 70,
+                     "spec": {"type": "string", "values": ["STR"]}},
+                    {"weight": 30,
+                     "spec": {"type": "integer",
+                              "minValue": 0, "maxValue": 9,
+                              "padWithZero": False}},
+                ],
+            }
+        },
+    }
+    rows = list(api.generate(config, seed=0))
+    str_hits = sum(1 for r in rows if r == "STR")
+    int_hits = sum(1 for r in rows if r.isdigit())
+    assert str_hits + int_hits == 200
+    # 70/30 split; allow wide slack.
+    assert str_hits > int_hits
+
+
+def test_weighted_composite_can_nest_inside_weighted() -> None:
+    from ton import api
+
+    config = {
+        "rows": 50,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "weighted",
+                "choices": [
+                    {"weight": 1, "spec": {
+                        "type": "weighted",
+                        "choices": [
+                            {"weight": 1, "spec": {"type": "string",
+                                                    "values": ["inner-a"]}},
+                            {"weight": 1, "spec": {"type": "string",
+                                                    "values": ["inner-b"]}},
+                        ],
+                    }},
+                    {"weight": 0, "spec": {"type": "string", "values": ["zzz"]}},
+                ],
+            }
+        },
+    }
+    rows = list(api.generate(config, seed=0))
+    assert all(r in {"inner-a", "inner-b"} for r in rows)
+
+
+def test_weighted_composite_rejects_direct_prepare_call() -> None:
+    """``WeightedGenerator.prepare`` cannot resolve nested specs without
+    the engine's registry; calling it on a composite spec is an error."""
+    with pytest.raises(ValueError, match="composite"):
+        WeightedGenerator().prepare({
+            "choices": [
+                {"weight": 1, "spec": {"type": "string", "values": ["x"]}},
+            ],
+        })
+
+
+def test_weighted_composite_rejects_unknown_nested_type() -> None:
+    from ton import api
+    from ton._engine import TemplateError
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {"v": {
+            "type": "weighted",
+            "choices": [
+                {"weight": 1, "spec": {"type": "no_such_type"}},
+            ],
+        }},
+    }
+    with pytest.raises(TemplateError, match="no_such_type"):
+        list(api.generate(config))
+
+
+def test_weighted_composite_rejects_empty_choices() -> None:
+    from ton import api
+    from ton._engine import TemplateError
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {"v": {"type": "weighted", "choices": []}},
+    }
+    with pytest.raises(TemplateError, match="non-empty"):
+        list(api.generate(config))
+
+
+def test_weighted_composite_rejects_choice_missing_weight() -> None:
+    from ton import api
+    from ton._engine import TemplateError
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {"v": {
+            "type": "weighted",
+            "choices": [{"spec": {"type": "string", "values": ["x"]}}],
+        }},
+    }
+    with pytest.raises(TemplateError, match="weight"):
+        list(api.generate(config))
+
+
+def test_weighted_composite_rejects_choice_missing_spec() -> None:
+    from ton import api
+    from ton._engine import TemplateError
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {"v": {
+            "type": "weighted",
+            "choices": [{"weight": 1, "spec": {"values": ["x"]}}],
+        }},
+    }
+    with pytest.raises(TemplateError, match="type"):
+        list(api.generate(config))
+
+
+def test_weighted_composite_rejects_non_mapping_choice() -> None:
+    from ton import api
+    from ton._engine import TemplateError
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {"v": {
+            "type": "weighted",
+            "choices": ["not-an-object"],
+        }},
+    }
+    with pytest.raises(TemplateError, match="weight"):
+        list(api.generate(config))

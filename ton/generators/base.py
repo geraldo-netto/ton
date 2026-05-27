@@ -44,6 +44,13 @@ class Generator(ABC):
     #: third-party generators can opt in without subclassing a concrete type.
     is_paired: ClassVar[bool] = False
 
+    #: True when the generator's prepared spec contains nested generators
+    #: that need access to the same registry the engine uses. Composite
+    #: generators override :meth:`prepare_composite` instead of (or in
+    #: addition to) :meth:`prepare`; the engine routes them through the
+    #: composite path so they can resolve nested type specs.
+    is_composite: ClassVar[bool] = False
+
     def prepare(self, spec: Mapping[str, Any]) -> Any:
         """Validate and pre-parse ``spec`` once per Engine construction.
 
@@ -53,6 +60,22 @@ class Generator(ABC):
         contract for third-party generators that take a raw dict.
         """
         return spec
+
+    def prepare_composite(
+        self,
+        spec: Mapping[str, Any],
+        registry: Mapping[str, Generator],
+    ) -> Any:
+        """Composite hook: prepare ``spec`` with access to ``registry``.
+
+        Default implementation delegates to :meth:`prepare` so non-
+        composite generators stay unaffected. Set
+        :attr:`is_composite` ``= True`` and override this method when
+        the prepared spec needs to resolve nested type specs against
+        the engine's registry (e.g. ``weighted`` composing other types).
+        """
+        del registry
+        return self.prepare(spec)
 
     @abstractmethod
     def generate(self, prepared: Any, rng: Random) -> str:

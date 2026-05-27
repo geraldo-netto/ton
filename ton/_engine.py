@@ -136,12 +136,14 @@ class Engine:
         # constructing an Engine for a one-type config does not allocate
         # the other 19 built-ins (TODO PERF-012). Tokens referencing
         # undeclared variables are tolerated here so the real diagnostic
-        # comes from :meth:`_validate` instead of a ``KeyError``.
+        # comes from :meth:`_validate` instead of a ``KeyError``. The
+        # walk recurses into composite specs (e.g. ``weighted``'s
+        # ``choices``) so nested types are present at prepare time.
         needed: set[str] = set()
         for token in self._tokens:
             spec = self._types.get(token.type_key)
             if isinstance(spec, Mapping) and "type" in spec:
-                needed.add(spec["type"])
+                _collect_nested_types(spec, needed)
         return make_registry(needed)
 
     def _validate(self) -> None:
@@ -164,6 +166,12 @@ class Engine:
             spec = self._types[token.type_key]
             generator = self._registry[spec["type"]]
             try:
+                if generator.is_composite:
+                    prepared[token.type_key] = (
+                        generator,
+                        generator.prepare_composite(spec, self._registry),
+                    )
+                    continue
                 prepared[token.type_key] = (generator, generator.prepare(spec))
             except Exception as exc:  # noqa: BLE001 - boundary; re-raised below
                 # Surface the failing spec to log handlers before
@@ -260,3 +268,29 @@ class Engine:
             ) from exc
 
 
+def _collect_nested_types(spec: Mapping[str, Any], needed: set[str]) -> None:
+    """Walk ``spec`` collecting every ``type`` referenced inside it.
+
+    Composite specs (e.g. ``weighted`` with ``choices``) embed nested
+    type specs the engine's lazy registry would otherwise miss. The
+    walk recurses through any list/dict value, picking up ``type``
+    keys at every level.
+    """
+    type_name = spec.get("type")
+    if isinstance(type_name, str):
+        needed.add(type_name)
+    for value in spec.values():
+        _walk_value_for_types(value, needed)
+
+
+def _walk_value_for_types(value: Any, needed: set[str]) -> None:
+    if isinstance(value, Mapping):
+        if "type" in value and isinstance(value["type"], str):
+            _collect_nested_types(value, needed)
+            return
+        for inner in value.values():
+            _walk_value_for_types(inner, needed)
+        return
+    if isinstance(value, list):
+        for item in value:
+            _walk_value_for_types(item, needed)

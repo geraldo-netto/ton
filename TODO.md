@@ -49,10 +49,14 @@ _All previously-open decoupling items closed in this round._
 |---------|--------|--------|-------------|
 | PAT-008 | open  | M      | `hash` generator with `algorithm: md5\|sha1\|sha256\|sha512\|bcrypt`: modern replacement for `lmhash`. Optional `id` paired form already supported by `PairedGenerator`. |
 | PAT-010 | open  | M      | Logger events use stringly-typed `event=` values in `extra` (e.g. `"engine_constructed"`, `"engine_milestone"`). Promote to a `LogEvent` enum or a typed dataclass per event so consumers can `match` instead of string-comparing. |
+| PAT-011 | open  | M      | `Generator.is_composite` + `prepare_composite` is the Composite pattern entry point. Today only `weighted` uses it. A `oneOf` / `union` generator (any spec wrapped, no weights) and a `sequence_of` generator (fixed N draws from a child type joined by a separator) would round out the composition surface using the same hook. |
 
 ## reliability / correctness
 
-_All previously-open reliability items closed in this round._
+| id      | status | effort | description |
+|---------|--------|--------|-------------|
+| REL-018 | open | S | `cli._stream` (ton/cli.py:_stream) accepts `--resume-from` values >= the total row count and silently produces an empty output file. Validate against `engine._rows` (or log a WARNING) so users notice the run produced nothing. |
+| REL-019 | open | S | `Weighted` composite generator returns `child.generate(prepared, rng)` for paired child generators (ton/generators/weighted.py:_prepare_choice). The paired contract (`$name[id]$`) is silently lost when a paired type is nested inside `weighted`. Document the restriction or reject paired nested specs explicitly. |
 
 ## observability
 

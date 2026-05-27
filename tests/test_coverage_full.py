@@ -337,6 +337,17 @@ def test_coerce_int_rejects_non_integer_value() -> None:
         coerce_int({"minValue": "not-a-number"}, "minValue", type_name="integer")
 
 
+def test_generator_default_prepare_composite_delegates_to_prepare() -> None:
+    """Non-composite generators must transparently route through the base hook."""
+    from ton.generators.integer import IntegerGenerator
+
+    gen = IntegerGenerator()
+    spec = {"minValue": 0, "maxValue": 9, "padWithZero": False}
+    via_default = gen.prepare_composite(spec, registry={})
+    via_direct = gen.prepare(spec)
+    assert via_default == via_direct
+
+
 # ---------------------------------------------------------------------------
 # lmhash._select_md4_backend: stdlib MD4 available path
 # ---------------------------------------------------------------------------

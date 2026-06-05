@@ -27,7 +27,7 @@ Typical use::
     for row in api.generate(config_dict, seed=42):
         sink.write(row)
 
-    # Inject a custom registry (or extend the default one):
+    # Opt into third-party entry points when you trust the installed packages:
     registry = api.build_registry(include_entry_points=True)
     registry["uuid"] = MyUuidGenerator()
     for row in api.generate(config_dict, registry=registry):
@@ -36,7 +36,7 @@ Typical use::
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Container, Iterator, Mapping
 from typing import Any
 
 from . import _config
@@ -69,15 +69,20 @@ def load_config(path: str) -> dict[str, Any]:
     return _config.load(path)
 
 
-def build_registry(include_entry_points: bool = True) -> dict[str, Generator]:
+def build_registry(
+    include_entry_points: bool = False,
+    *,
+    allowed_entry_points: Container[str] | None = None,
+) -> dict[str, Generator]:
     """Return a fresh registry of generator instances.
 
-    When ``include_entry_points`` is True (default), generators
-    advertised by other packages via the ``ton.generators`` entry-point
-    group are merged in on top of the built-ins.
+    When ``include_entry_points`` is True, generators advertised by
+    other packages via the ``ton.generators`` entry-point group are
+    merged in on top of the built-ins. Entry points execute package
+    code while loading, so this path is opt-in.
     """
     if include_entry_points:
-        return registry_with_entry_points()
+        return registry_with_entry_points(allowed_names=allowed_entry_points)
     return default_registry()
 
 

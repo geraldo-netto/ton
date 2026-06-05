@@ -8,11 +8,12 @@ import logging
 import os
 import stat
 import sys
+import tempfile
 import time
 from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from random import Random
-from typing import TextIO
+from typing import TextIO, cast
 
 from . import __version__, api
 from .api import ConfigError, Engine, LogEvent, TemplateError, configure_stderr
@@ -29,7 +30,7 @@ _LOG_LEVELS = {
 #: Default rows per write() syscall when streaming to a file. Picked to
 #: be big enough to amortize Python attribute / interpreter overhead but
 #: small enough to keep peak memory bounded for wide rows. Overridable
-#: via ``--batch-rows`` (TODO SCALE-001).
+#: via ``--batch-rows``.
 _DEFAULT_BATCH_ROWS = 1024
 
 
@@ -83,13 +84,34 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_non_negative_int,
         metavar="ROW",
         default=0,
-        help="Skip the first ROW generated rows before writing any output.",
+        help=(
+            "Skip the first ROW generated rows before writing any output. "
+            "Skipped rows are still generated to preserve deterministic state."
+        ),
+    )
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Validate the config and exit without generating rows.",
+    )
+    parser.add_argument(
+        "--entry-points",
+        action="store_true",
+        help="Load trusted third-party generators from the ton.generators entry-point group.",
+    )
+    parser.add_argument(
+        "--entry-point",
+        action="append",
+        metavar="NAME",
+        dest="entry_point_allowlist",
+        default=[],
+        help="Allow only this entry-point name. May be passed more than once.",
     )
     parser.add_argument(
         "--log-level",
         choices=sorted(_LOG_LEVELS.keys()),
         default=None,
-        help="Attach a stderr handler to the 'ton' logger at this level (OBS-003).",
+        help="Attach a stderr handler to the 'ton' logger at this level.",
     )
     parser.add_argument(
         "--version",
@@ -150,6 +172,9 @@ def _run_inner(args: argparse.Namespace) -> int:
     built = _prepare_engine(args)
     if isinstance(built, int):
         return built
+    if args.validate:
+        print("ton: config valid", file=sys.stderr)
+        return 0
     engine = built
     return _execute(engine, args)
 
@@ -207,10 +232,22 @@ def _execute(engine: Engine, args: argparse.Namespace) -> int:
 def _build_engine(args: argparse.Namespace) -> Engine:
     rng = Random(args.seed) if args.seed is not None else Random()
     config = api.load_config(args.config)
+    registry = None
+    if args.entry_points or args.entry_point_allowlist:
+        allowed = set(args.entry_point_allowlist) or None
+        registry = api.build_registry(
+            include_entry_points=True,
+            allowed_entry_points=allowed,
+        )
     # --progress already prints JSON; reuse the same interval as the
     # engine's logger milestone so structured handlers see the same
     # boundaries.
-    return Engine.from_config(config, rng=rng, milestone_rows=args.progress)
+    return Engine.from_config(
+        config,
+        registry=registry,
+        rng=rng,
+        milestone_rows=args.progress,
+    )
 
 
 @contextmanager
@@ -246,8 +283,38 @@ def _open_output(path: str | None, *, no_clobber: bool = False) -> Iterator[Text
             path,
             extra={"event": LogEvent.OUTPUT_OVERWRITE.value, "path": path},
         )
-    with open(path, "w", encoding="utf-8") as fh:
-        yield fh
+    if exists and stat.S_ISFIFO(os.stat(path).st_mode):
+        with open(path, "w", encoding="utf-8") as fh:
+            yield fh
+        return
+    with _open_atomic_output(path) as stream:
+        yield stream
+
+
+@contextmanager
+def _open_atomic_output(path: str) -> Iterator[TextIO]:
+    directory = os.path.dirname(os.path.abspath(path)) or "."
+    basename = os.path.basename(path)
+    tmp_name = ""
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=directory,
+            prefix=f".{basename}.",
+            suffix=".tmp",
+            delete=False,
+        ) as fh:
+            tmp_name = fh.name
+            yield cast(TextIO, fh)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_name, path)
+        tmp_name = ""
+    finally:
+        if tmp_name:
+            with suppress(FileNotFoundError):
+                os.unlink(tmp_name)
 
 
 def _stream(

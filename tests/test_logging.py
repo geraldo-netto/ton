@@ -83,3 +83,38 @@ def test_configure_stderr_attaches_stream_handler() -> None:
         assert logger.level <= logging.DEBUG
     finally:
         logger.removeHandler(handler)
+
+
+def test_configure_stderr_is_idempotent() -> None:
+    first = configure_stderr(logging.INFO, fmt="%(message)s")
+    second = configure_stderr(logging.ERROR, fmt="%(levelname)s:%(message)s")
+    try:
+        assert first is second
+        assert logger.handlers.count(first) == 1
+        assert first.level == logging.ERROR
+    finally:
+        logger.removeHandler(first)
+
+
+def test_configure_stderr_can_lower_logger_level() -> None:
+    original_level = logger.level
+    logger.setLevel(logging.ERROR)
+    handler = configure_stderr(logging.DEBUG)
+    try:
+        assert logger.level == logging.DEBUG
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(original_level)
+
+
+def test_configure_stderr_existing_handler_can_lower_logger_level() -> None:
+    original_level = logger.level
+    handler = configure_stderr(logging.INFO)
+    logger.setLevel(logging.ERROR)
+    try:
+        same = configure_stderr(logging.DEBUG)
+        assert same is handler
+        assert logger.level == logging.DEBUG
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(original_level)

@@ -30,7 +30,7 @@ A multi-process generator can then do::
                 print(row)
 
 The output is *deterministic* for a given (parent_seed, workers,
-worker_id) tuple, which is the property TODO CONC-001 asked for.
+worker_id) tuple.
 """
 
 from __future__ import annotations

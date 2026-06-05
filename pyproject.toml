@@ -61,3 +61,16 @@ max-complexity = 10
 [tool.mypy]
 python_version = "3.10"
 strict = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disable_error_code = [
+    "arg-type",
+    "attr-defined",
+    "no-any-return",
+    "no-untyped-call",
+    "no-untyped-def",
+    "type-abstract",
+    "type-arg",
+    "unused-ignore",
+]

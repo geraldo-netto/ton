@@ -37,6 +37,22 @@ def test_build_registry_includes_builtins() -> None:
     assert "lmhash" in registry
 
 
+def test_build_registry_can_opt_into_entry_points(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    def _fake_registry(*, allowed_names=None):
+        seen["allowed_names"] = allowed_names
+        return {}
+
+    monkeypatch.setattr(api, "registry_with_entry_points", _fake_registry)
+    registry = api.build_registry(
+        include_entry_points=True,
+        allowed_entry_points={"custom"},
+    )
+    assert registry == {}
+    assert seen["allowed_names"] == {"custom"}
+
+
 def test_custom_registry_can_override_or_add_types() -> None:
     class TagGenerator(Generator):
         type_name = "tag"

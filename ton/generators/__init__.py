@@ -15,7 +15,7 @@ mapping that the engine uses to dispatch. To add a new built-in type:
 1. Create ``<type>.py`` with a ``<Type>Generator(Generator)`` subclass
    (or ``PairedGenerator`` if you need the paired contract).
 2. Export it from this ``__init__``.
-3. Add it to ``default_registry()`` in :mod:`ton.registry`.
+3. Add it to ``BUILTIN_GENERATOR_CLASSES`` below.
 
 Third-party generators do not need to live here -- they can be registered
 via the ``ton.generators`` entry-point group.

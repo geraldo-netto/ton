@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import inspect
+from random import Random
+from typing import Any
+from unittest import mock
 
 from ton._registry import (
     clear_default_registry_cache,
@@ -100,3 +103,37 @@ def test_registry_with_entry_points_includes_builtins() -> None:
     # Without any third-party entry points installed this is identical
     # to default_registry().
     assert set(registry_with_entry_points()) >= EXPECTED_TYPES
+
+
+def test_registry_with_entry_points_honors_allowlist() -> None:
+    class CustomGenerator(Generator):
+        type_name = "custom"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "custom"
+
+    allowed = mock.Mock()
+    allowed.name = "allowed"
+    allowed.value = "pkg:Allowed"
+    allowed.load.return_value = CustomGenerator
+    skipped = mock.Mock()
+    skipped.name = "skipped"
+    skipped.value = "pkg:Skipped"
+
+    with mock.patch("ton._registry.entry_points", return_value=[allowed, skipped]):
+        registry = registry_with_entry_points(allowed_names={"allowed"})
+
+    assert registry["allowed"].generate({}, Random(0)) == "custom"
+    skipped.load.assert_not_called()
+
+
+def test_registry_skips_entry_point_that_returns_non_generator() -> None:
+    bad = mock.Mock()
+    bad.name = "bad"
+    bad.value = "pkg:Bad"
+    bad.load.return_value = lambda: object()
+
+    with mock.patch("ton._registry.entry_points", return_value=[bad]):
+        registry = registry_with_entry_points()
+
+    assert "bad" not in registry

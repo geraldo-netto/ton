@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import inspect
 import threading
-from collections.abc import Iterable, Iterator
+from collections.abc import Container, Iterable, Iterator
 from importlib.metadata import entry_points
 
 from ._logging import LogEvent
@@ -141,7 +141,10 @@ def default_registry() -> dict[str, Generator]:
     return make_registry()
 
 
-def registry_with_entry_points() -> dict[str, Generator]:
+def registry_with_entry_points(
+    *,
+    allowed_names: Container[str] | None = None,
+) -> dict[str, Generator]:
     """Return the built-in registry merged with entry-point generators.
 
     Third-party packages can register additional generators by declaring::
@@ -149,18 +152,27 @@ def registry_with_entry_points() -> dict[str, Generator]:
         [project.entry-points."ton.generators"]
         uuid = "my_pkg.generators:UuidGenerator"
 
-    Entry-point names override built-ins with the same key.
+    Entry-point names override built-ins with the same key. When
+    ``allowed_names`` is provided, only matching entry-point names are
+    loaded; all others are ignored without importing their target.
     """
     registry = default_registry()
     loaded = 0
     failed = 0
     for ep in entry_points(group=ENTRY_POINT_GROUP):
+        if allowed_names is not None and ep.name not in allowed_names:
+            continue
         safe_name = _sanitize_for_log(ep.name)
         safe_value = _sanitize_for_log(ep.value)
         dist_name, dist_version = _entry_point_dist(ep)
         try:
             factory = ep.load()
             instance = factory()
+            if not isinstance(instance, Generator):
+                raise TypeError(
+                    "entry point factory must return a ton.generators.Generator "
+                    f"instance, got {type(instance).__name__}"
+                )
         except Exception as exc:  # noqa: BLE001 - per-entry sandbox
             # SEC-004: one broken third-party plugin must not abort the
             # whole registry build. Log a WARNING with attribution and

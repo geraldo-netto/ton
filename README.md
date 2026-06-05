@@ -54,11 +54,14 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 | `--seed <int>`         | Seed the RNG for reproducible output.                                                |
 | `-o`, `--output PATH`  | Write rows to a file instead of stdout. Refuses non-regular targets (`/dev/*`, …).   |
 | `--no-clobber`         | Fail instead of overwriting an existing `--output` file.                             |
-| `--resume-from N`      | Skip the first `N` generated rows before writing any output (paired with `--seed`).  |
+| `--resume-from N`      | Generate and discard the first `N` rows before writing output (paired with `--seed`). |
+| `--validate`           | Validate the config and exit without generating rows.                                |
 | `--batch-rows N`       | Rows buffered per `write()` syscall (default `1024`).                                |
 | `--progress N`         | Emit a JSON progress line on stderr every `N` rows (also surfaces a logger event).   |
 | `--verbose`            | Print final row count, elapsed time, and rows/sec to stderr.                         |
 | `--log-level LEVEL`    | Attach a stderr handler to the `ton` logger (`debug`/`info`/`warning`/`error`/`critical`). |
+| `--entry-points`       | Load trusted third-party generators from the `ton.generators` entry-point group.     |
+| `--entry-point NAME`   | Allow only this trusted entry-point name; repeat for multiple names.                 |
 | `--version`            | Print the package version.                                                           |
 
 Everything observability-related goes to stderr; stdout stays clean for piping. Exit codes: `0` success, `1` missing config / output error / refused special-file target, `2` invalid config or unknown variable, `3` unexpected error, `130` interrupted (Ctrl-C).
@@ -72,6 +75,7 @@ ton huge.json --seed 1 --resume-from 1000000 -o chunk-2.txt --batch-rows 4096
 ```
 
 Each shard sees the same seeded RNG; later shards just throw away the prefix they don't want. Combined with `concurrency.fork_engine` (below) this gives deterministic parallel output without coordinating writers.
+For large offsets, `--resume-from` still pays the cost of generating skipped rows so every generator reaches the same deterministic state. Prefer explicit worker partitioning with `ton.concurrency.fork_engine` when startup time matters.
 
 ## Architecture
 
@@ -184,7 +188,7 @@ engine = api.Engine.from_config(
 )
 ```
 
-Custom generators register via the `ton.generators` entry-point group in any installed package:
+Custom generators can register via the `ton.generators` entry-point group in any installed package:
 
 ```toml
 [project.entry-points."ton.generators"]
@@ -192,6 +196,7 @@ my_type = "my_pkg.generators:MyGenerator"
 ```
 
 A broken plugin is isolated: `entry_points()` failures are logged as `entry_point_failed` and skipped; one bad package never aborts the whole registry build.
+Entry points execute installed package code while loading, so TON loads them only when explicitly requested, either through `api.build_registry(include_entry_points=True)` or the CLI `--entry-points` / `--entry-point NAME` flags.
 
 Parallel runs use `ton.concurrency`:
 
@@ -762,7 +767,8 @@ Library code emits structured INFO events on a single logger named `ton`. Attach
 
 - `-o PATH` refuses to open a target that is not a regular file or FIFO. A stray `--output /dev/sda` aborts with exit code `1` and an `output_special_file_rejected` log event.
 - `--no-clobber` upgrades the silent overwrite to a hard refusal.
-- Third-party generators from the `ton.generators` entry-point group are sandboxed per-entry: `ImportError` / construction failures are logged and skipped instead of aborting the registry build. Entry point names and values are sanitized to printable ASCII before being logged (control codes / unicode lookalikes become `?`).
+- Regular `-o PATH` writes are staged through a same-directory temp file and atomically replace the final path only after generation succeeds. FIFO targets remain direct streams.
+- Third-party generators from the `ton.generators` entry-point group are opt-in and sandboxed per-entry: `ImportError`, construction failures, and non-`Generator` factories are logged and skipped instead of aborting the registry build. Entry point names and values are sanitized to printable ASCII before being logged (control codes / unicode lookalikes become `?`).
 - `lmhash` uses MD4 by design (it is the canonical NT-hash). Treat its output as fixture data, never as a credential.
 
 ## Bundled example configs

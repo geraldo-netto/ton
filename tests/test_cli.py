@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+from threading import Thread
 
 import pytest
 
@@ -131,3 +133,74 @@ def test_cli_progress_emits_json_lines_to_stderr(
     payload = json.loads(progress_lines[-1])
     assert payload["rows"] == 4
     assert "elapsed_seconds" in payload
+
+
+def test_cli_validate_checks_config_without_generating_rows(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = write_config()
+    exit_code = main([str(config), "--validate"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.out == ""
+    assert "config valid" in captured.err
+
+
+def test_cli_help_does_not_expose_internal_todo_ids(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main(["--help"])
+    captured = capsys.readouterr()
+    assert exc.value.code == 0
+    assert "OBS-003" not in captured.out
+
+
+def test_cli_atomic_output_keeps_existing_file_on_failure(
+    monkeypatch, write_config, tmp_path: Path
+) -> None:
+    from ton import cli
+
+    config = write_config()
+    out_file = tmp_path / "out.txt"
+    out_file.write_text("old\n", encoding="utf-8")
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("stream failed")
+
+    monkeypatch.setattr(cli, "_stream", _boom)
+    assert main([str(config), "-o", str(out_file)]) == 3
+    assert out_file.read_text(encoding="utf-8") == "old\n"
+    assert list(tmp_path.glob(".out.txt.*.tmp")) == []
+
+
+def test_cli_entry_point_allowlist_option_still_generates_rows(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = write_config()
+    exit_code = main([str(config), "--entry-point", "trusted", "--seed", "0"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert len(captured.out.strip().splitlines()) == 4
+
+
+def test_open_output_streams_existing_fifo(tmp_path: Path) -> None:
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("mkfifo is not available on this platform")
+    from ton.cli import _open_output
+
+    fifo = tmp_path / "rows.fifo"
+    os.mkfifo(fifo)
+    received: list[str] = []
+
+    def _read_fifo() -> None:
+        with open(fifo, encoding="utf-8") as reader:
+            received.append(reader.read())
+
+    reader_thread = Thread(target=_read_fifo)
+    reader_thread.start()
+    with _open_output(str(fifo)) as writer:
+        writer.write("row\n")
+    reader_thread.join(timeout=2)
+
+    assert received == ["row\n"]

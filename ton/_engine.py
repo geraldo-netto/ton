@@ -7,6 +7,7 @@ files, or anywhere else without buffering the full dataset in memory.
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterator, Mapping
 from random import Random
 from typing import Any
@@ -56,6 +57,7 @@ class Engine:
         self._plan_tokens: list[Token] = plan_tokens
         self._milestone_rows = max(0, int(milestone_rows))
         self._rows_emitted = 0
+        self._iteration_lock = threading.Lock()
         _logger.info(
             "engine_constructed rows=%d types=%d paired=%s",
             self._rows,
@@ -203,27 +205,35 @@ class Engine:
         return prepared
 
     def __iter__(self) -> Iterator[str]:
-        milestone = self._milestone_rows
-        self._rows_emitted = 0
-        for _ in range(self._rows):
-            yield self._render_row()
-            self._rows_emitted += 1
-            if milestone and self._rows_emitted % milestone == 0:
-                _logger.info(
-                    "engine_milestone rows=%d/%d",
-                    self._rows_emitted,
-                    self._rows,
-                    extra={
-                        "event": LogEvent.ENGINE_MILESTONE.value,
-                        "rows": self._rows_emitted,
-                        "total": self._rows,
-                    },
-                )
-        _logger.info(
-            "engine_completed rows=%d",
-            self._rows_emitted,
-            extra={"event": LogEvent.ENGINE_COMPLETED.value, "rows": self._rows_emitted},
-        )
+        if not self._iteration_lock.acquire(blocking=False):
+            raise RuntimeError("Engine instances cannot be iterated concurrently")
+        try:
+            milestone = self._milestone_rows
+            self._rows_emitted = 0
+            for _ in range(self._rows):
+                yield self._render_row()
+                self._rows_emitted += 1
+                if milestone and self._rows_emitted % milestone == 0:
+                    _logger.info(
+                        "engine_milestone rows=%d/%d",
+                        self._rows_emitted,
+                        self._rows,
+                        extra={
+                            "event": LogEvent.ENGINE_MILESTONE.value,
+                            "rows": self._rows_emitted,
+                            "total": self._rows,
+                        },
+                    )
+            _logger.info(
+                "engine_completed rows=%d",
+                self._rows_emitted,
+                extra={
+                    "event": LogEvent.ENGINE_COMPLETED.value,
+                    "rows": self._rows_emitted,
+                },
+            )
+        finally:
+            self._iteration_lock.release()
 
     def _render_row(self) -> str:
         paired_cache: dict[str, tuple[str, str]] | None = {} if self._has_paired else None

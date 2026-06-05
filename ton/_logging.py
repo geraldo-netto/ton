@@ -73,11 +73,21 @@ def configure_stderr(
     generally prefer to wire their own handler instead of using this
     helper so the formatter and destination stay under their control.
     """
+    formatter = logging.Formatter(fmt or "ton: %(levelname)s %(message)s")
+    for existing in logger.handlers:
+        if getattr(existing, "_ton_configure_stderr", False):
+            if getattr(getattr(existing, "stream", None), "closed", False):
+                logger.removeHandler(existing)
+                continue
+            existing.setLevel(level)
+            existing.setFormatter(formatter)
+            if logger.level == logging.NOTSET or level < logger.level:
+                logger.setLevel(level)
+            return existing
     handler = logging.StreamHandler()
+    handler._ton_configure_stderr = True  # type: ignore[attr-defined]
     handler.setLevel(level)
-    handler.setFormatter(
-        logging.Formatter(fmt or "ton: %(levelname)s %(message)s")
-    )
+    handler.setFormatter(formatter)
     logger.addHandler(handler)
     if logger.level == logging.NOTSET or level < logger.level:
         logger.setLevel(level)

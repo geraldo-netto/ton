@@ -22,6 +22,8 @@ from ton._engine import Engine
 from ton._registry import make_registry
 from ton.concurrency import derive_rng, fork_engine
 
+pytestmark = pytest.mark.fuzz
+
 # ---------------------------------------------------------------------------
 # Determinism: same seed -> identical full-row sequence, every type
 # ---------------------------------------------------------------------------

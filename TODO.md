@@ -60,9 +60,8 @@ Last full rescan: 2026-06-06.
 
 ## business/design patterns/DDD
 
-| id      | status | effort | description |
-|---------|--------|--------|-------------|
-| PAT-008 | open   | M      | Add a generic `hash` generator with `algorithm: md5\|sha1\|sha256\|sha512\|bcrypt` (later: argon2, scrypt). Keep `lmhash` as-is -- it stays the Windows NT-hash specialty. New `hash` should reuse `PairedGenerator` so `$word[id]$` returns the plaintext like `lmhash` already does. |
+| id | status | effort | description |
+|----|--------|--------|-------------|
 
 ## plugin extensibility
 

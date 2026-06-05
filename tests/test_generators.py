@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from datetime import datetime
 from random import Random
 
@@ -12,6 +13,7 @@ from ton.generators import (
     CharGenerator,
     DateGenerator,
     DecimalGenerator,
+    HashGenerator,
     IntegerGenerator,
     LMHashGenerator,
     StringGenerator,
@@ -131,6 +133,72 @@ def test_decimal_keeps_trailing_zeros_in_output() -> None:
 def test_lmhash_rejects_empty_values() -> None:
     with pytest.raises(ValueError):
         LMHashGenerator().prepare({"values": []})
+
+
+@pytest.mark.parametrize(
+    "algorithm,expected",
+    [
+        ("md5", "5ebe2294ecd0e0f08eab7690d2a6ee69"),
+        ("sha1", "e5e9fa1ba31ecd1ae84f75caaa474f3a663f05f4"),
+        ("sha256", "2bb80d537b1da3e38bd30361aa855686bde0eacd716"
+         "2fef6a25fe97bf527a25b"),
+        ("sha512", "bd2b1aaf7ef4f09be9f52ce2d8d599674d81aa9d6a"
+         "4421696dc4d93dd0619d682ce56b4d64a9ef097761ced99"
+         "e0f67265b5f76085e5b0ee7ca4696b2ad6fe2b2"),
+    ],
+)
+def test_hash_generator_algorithms(algorithm: str, expected: str) -> None:
+    gen = HashGenerator()
+    prepared = gen.prepare({"algorithm": algorithm, "values": ["secret"]})
+    plain, digest = gen.generate_pair(prepared, _rng())
+    assert plain == "secret"
+    assert digest == expected
+
+
+def test_hash_generator_defaults_to_sha256() -> None:
+    gen = HashGenerator()
+    prepared = gen.prepare({"values": ["secret"]})
+    assert gen.generate(prepared, _rng()) == (
+        "2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25f"
+        "e97bf527a25b"
+    )
+
+
+def test_hash_generator_rejects_unknown_algorithm() -> None:
+    with pytest.raises(ValueError, match="algorithm"):
+        HashGenerator().prepare({"algorithm": "scrypt", "values": ["secret"]})
+
+
+def test_hash_generator_bcrypt_is_deterministic() -> None:
+    gen = HashGenerator()
+    prepared = gen.prepare({"algorithm": "bcrypt", "rounds": 4, "values": ["secret"]})
+    assert gen.generate(prepared, _rng()) == (
+        "$2b$04$I5eLS1qbm8MJyuLfomTUfeuzPdxYbe9Z9taDPxzfKRS1bf.1N9wOi"
+    )
+
+
+def test_hash_generator_rejects_bad_bcrypt_rounds() -> None:
+    with pytest.raises(ValueError, match="rounds"):
+        HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 3, "values": ["secret"]})
+
+
+def test_hash_generator_reports_missing_bcrypt_dependency(monkeypatch) -> None:
+    real_import = builtins.__import__
+
+    def _blocked_import(name: str, *args: object, **kwargs: object) -> object:
+        if name == "bcrypt":
+            raise ImportError("blocked")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _blocked_import)
+    with pytest.raises(ValueError, match=r"ton\[bcrypt\]"):
+        HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 4, "values": ["secret"]})
+
+
+def test_hash_generator_bcrypt_base64_handles_two_byte_tail() -> None:
+    from ton.generators.hash import _bcrypt_base64
+
+    assert _bcrypt_base64(b"ab") == b"WUG"
 
 
 def test_date_within_bounds_and_default_format() -> None:

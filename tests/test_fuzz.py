@@ -27,6 +27,8 @@ from ton._template import (
     validate_against,
 )
 
+pytestmark = pytest.mark.fuzz
+
 # ---------------------------------------------------------------------------
 # Spec factories: (factory, type_name)
 # ---------------------------------------------------------------------------
@@ -171,6 +173,14 @@ def _spec_lmhash(rng: Random) -> dict[str, Any]:
     return {"type": "lmhash", "values": [f"word{i}" for i in range(rng.randint(1, 5))]}
 
 
+def _spec_hash(rng: Random) -> dict[str, Any]:
+    return {
+        "type": "hash",
+        "algorithm": rng.choice(["md5", "sha1", "sha256", "sha512"]),
+        "values": [f"word{i}" for i in range(rng.randint(1, 5))],
+    }
+
+
 _SPEC_FACTORIES: list[tuple[str, Callable[[Random], dict[str, Any]]]] = [
     ("boolean", _spec_boolean),
     ("integer", _spec_integer),
@@ -191,6 +201,7 @@ _SPEC_FACTORIES: list[tuple[str, Callable[[Random], dict[str, Any]]]] = [
     ("phone", _spec_phone),
     ("text", _spec_text),
     ("regex", _spec_regex),
+    ("hash", _spec_hash),
     ("lmhash", _spec_lmhash),
 ]
 
@@ -229,6 +240,7 @@ _BAD_SPEC_MUTATIONS: list[tuple[str, dict[str, Any]]] = [
     ("char", {"type": "char", "values": ["A"], "maxChar": 0}),
     ("char", {"type": "char", "values": [], "maxChar": 2}),
     ("string", {"type": "string", "values": []}),
+    ("hash", {"type": "hash", "algorithm": "bcrypt", "rounds": 3, "values": ["secret"]}),
     ("lmhash", {"type": "lmhash", "values": []}),
     ("uuid", {"type": "uuid", "version": 7}),
     ("sequence", {"type": "sequence", "step": 0}),

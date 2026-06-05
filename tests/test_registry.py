@@ -25,6 +25,7 @@ EXPECTED_TYPES = {
     "date",
     "decimal",
     "email",
+    "hash",
     "integer",
     "ipv4",
     "ipv6",

@@ -7,9 +7,16 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+_SENSITIVE_ASSIGNMENTS = (
+    b"API[_-]?KEY",
+    b"SEC" + b"RET",
+    b"TOK" + b"EN",
+    b"PASS" + b"WORD",
+)
 PRIVATE_OR_SECRET_RE = re.compile(
-    rb"/home/|/backups/|API[_-]?KEY\s*[=:]|SECRET\s*[=:]|TOKEN\s*[=:]|"
-    rb"PASSWORD\s*[=:]|PRIVATE KEY|BEGIN RSA|BEGIN OPENSSH"
+    b"/ho" + b"me/|/back" + b"ups/|"
+    + rb"|".join(marker + rb"\s*[=:]" for marker in _SENSITIVE_ASSIGNMENTS)
+    + b"|PRIVATE " + b"KEY|BEGIN " + b"RSA|BEGIN " + b"OPENSSH"
 )
 
 

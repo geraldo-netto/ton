@@ -12,6 +12,7 @@ config file so the per-type coverage is visible at a glance.
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import json
 import re
@@ -292,6 +293,24 @@ def _check_lmhash(rows: list[str], config: dict[str, Any]) -> None:
             seen_pairs[plain] = hashed
 
 
+def _check_hash(rows: list[str], config: dict[str, Any]) -> None:
+    spec = config["types"]["word"]
+    plain_pool = set(spec["values"])
+    algorithm = spec["algorithm"]
+    hex_pattern = re.compile(r"^[0-9a-f]{64}$")
+    seen_pairs: dict[str, str] = {}
+    for r in rows:
+        plain, digest = r.split("|")
+        assert plain in plain_pool
+        assert hex_pattern.match(digest)
+        expected = getattr(hashlib, algorithm)(plain.encode("utf-8")).hexdigest()
+        assert digest == expected
+        if plain in seen_pairs:
+            assert seen_pairs[plain] == digest
+        else:
+            seen_pairs[plain] = digest
+
+
 _CHECKERS: dict[str, Callable[[list[str], dict[str, Any]], None]] = {
     "boolean.json": _check_boolean,
     "integer.json": _check_integer,
@@ -317,6 +336,7 @@ _CHECKERS: dict[str, Callable[[list[str], dict[str, Any]], None]] = {
     "phone.json": _check_phone,
     "text.json": _check_text,
     "regex.json": _check_regex,
+    "hash.json": _check_hash,
     "lmhash.json": _check_lmhash,
 }
 

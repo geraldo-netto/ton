@@ -234,7 +234,7 @@ Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so adjacent w
 
 ### Type reference
 
-Twenty-two built-in types. Every output below was produced with `--seed 1` on a 4-row config of the form `{"rows": 4, "format": "$x$", "types": {"x": <spec>}}` so the examples are byte-reproducible.
+Twenty-three built-in types. Every output below was produced with `--seed 1` on a 4-row config of the form `{"rows": 4, "format": "$x$", "types": {"x": <spec>}}` so the examples are byte-reproducible.
 
 #### `boolean`
 
@@ -710,6 +710,33 @@ TYY-7439
 KAA-8063
 ```
 
+#### `hash` (paired)
+
+Generic byte-oriented digest drawn from a fixed plaintext list. **Paired**: a single row may reference both the digest (`$word$`) and the plaintext (`$word[id]$`). `lmhash` remains separate because it is the Windows NT-hash specialty.
+
+| field       | type     | description                                          |
+|-------------|----------|------------------------------------------------------|
+| `algorithm` | string   | `md5`, `sha1`, `sha256` (default), `sha512`, or `bcrypt` |
+| `values`    | string[] | non-empty plaintext pool                            |
+
+`bcrypt` requires the optional `ton[bcrypt]` extra and accepts `rounds` from `4` to `31` (default `12`). TON derives a stable bcrypt salt from the plaintext so synthetic fixtures remain reproducible.
+
+```json
+{
+  "rows": 4,
+  "format": "$word[id]$ -> $word$",
+  "types": {"word": {"type": "hash", "algorithm": "sha256",
+                     "values": ["password", "secret", "admin"]}}
+}
+```
+
+```
+password -> 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
+admin -> 8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918
+password -> 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
+secret -> 2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b
+```
+
 #### `lmhash` (paired)
 
 Canonical Windows NT hash (MD4 of UTF-16LE plaintext) drawn from a fixed word list. **Paired**: a single row may reference both the hash (`$word$`) and the plaintext that produced it (`$word[id]$`). Intentionally insecure — use only for synthetic credential fixtures.
@@ -735,7 +762,7 @@ secret -> 878d8014606cda29677a44efa1353fc7
 
 ### Paired references (`$name[id]$`)
 
-Any **paired** generator (currently `lmhash`; third parties can opt in via `PairedGenerator`) returns a `(id_value, primary_value)` tuple per row. The template engine routes:
+Any **paired** generator (currently `hash` and `lmhash`; third parties can opt in via `PairedGenerator`) returns a `(id_value, primary_value)` tuple per row. The template engine routes:
 
 - `$name$` → `primary_value`
 - `$name[id]$` → `id_value`
@@ -782,10 +809,10 @@ Library code emits structured INFO events on a single logger named `ton`. Attach
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest                              # 460+ tests, including fuzz/property suites
-pytest --cov=ton --cov-report=term  # 100% line coverage is the contract
+pytest                              # 500+ tests, 100% line coverage enforced
+pytest -m fuzz --no-cov             # seeded fuzz/property suites only
 ruff check ton tests
-mypy ton                            # strict mode is on
+mypy ton tests                      # strict mode is on
 ```
 
 Behavior guidelines for AI agents live in [`AGENTS.md`](AGENTS.md); open review findings are tracked in [`TODO.md`](TODO.md).

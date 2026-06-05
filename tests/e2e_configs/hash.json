@@ -1,0 +1,3 @@
+{"rows": 200, "format": "$word[id]$|$word$",
+ "types": {"word": {"type": "hash", "algorithm": "sha256",
+                    "values": ["alpha", "bravo", "charlie"]}}}

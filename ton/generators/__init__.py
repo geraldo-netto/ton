@@ -27,6 +27,7 @@ from .bytes import BytesGenerator
 from .char import CharGenerator
 from .date import DateGenerator
 from .decimal import DecimalGenerator
+from .hash import HashGenerator
 from .identity import EmailGenerator, NameGenerator, PhoneGenerator
 from .integer import IntegerGenerator
 from .lmhash import LMHashGenerator
@@ -53,6 +54,7 @@ BUILTIN_GENERATOR_CLASSES: tuple[type[Generator], ...] = (
     DateGenerator,
     DecimalGenerator,
     EmailGenerator,
+    HashGenerator,
     IPv4Generator,
     IPv6Generator,
     IntegerGenerator,
@@ -80,6 +82,7 @@ __all__ = [
     "DecimalGenerator",
     "EmailGenerator",
     "Generator",
+    "HashGenerator",
     "IPv4Generator",
     "IPv6Generator",
     "IntegerGenerator",

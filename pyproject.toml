@@ -27,7 +27,11 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
+bcrypt = [
+    "bcrypt>=4",
+]
 dev = [
+    "bcrypt>=4",
     "pytest>=7",
     "pytest-cov>=4",
     "ruff>=0.4",
@@ -46,7 +50,10 @@ packages = ["ton"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers --cov=ton --cov-report=term-missing --cov-fail-under=100"
+markers = [
+    "fuzz: seeded property/fuzz tests covering generator and template invariants",
+]
 
 [tool.ruff]
 line-length = 100

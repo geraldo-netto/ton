@@ -29,19 +29,27 @@ This file defines the expected behavior and usage model for AI agents working in
 - ALWAYS record review findings in `TODO.md` — never report them only in chat. Any time you
   scan, review, audit, or "look for issues" (not just major changes), add each finding to the
   matching category table in `TODO.md` before/while reporting it.
-- When making major changes, rescan the whole project and create or update `TODO.md` with one table per review category.
+- When making major changes, rescan the whole project and create or update `TODO.md` with one table per relevant review category.
   Each table should use the format: `id | status | effort | description`.
   - security
+  - code complexity
+  - code duplication
+  - reliability/correctness
   - performance
   - scalability
   - concurrency
-  - code complexity
-  - code duplication
+  - robustness/recovery — interrupted writes, partial output files, resume safety, and cleanup after failed generation.
   - architecture/modularity/SOLID
   - decoupling
   - business/design patterns/DDD
-  - reliability/correctness
+  - plugin extensibility — public generator extension points, entry-point loading, and registry behavior.
+  - CLI / option integrity — CLI declarations, help text, defaults, exit codes, and library behavior stay aligned.
+  - configuration discoverability — config schema, defaults, examples, and validation errors are documented and tested.
+  - data governance — no secrets, private absolute paths, or sensitive generated datasets are committed.
+  - dependency — optional or future dependencies are declared intentionally and degrade gracefully.
+  - platform — path, encoding, multiprocessing, and shell behavior stays portable across supported Python platforms.
   - observability when the application has it
+  - documentation — README, examples, CLI help, and public API docs stay truthful.
 
 ## File Editing
 
@@ -57,4 +65,4 @@ This file defines the expected behavior and usage model for AI agents working in
 
 ## References
 
-- This workspace currently contains only a small Python utility script, so agent actions should remain lightweight and focused.
+- This workspace contains a small dependency-free Python package, examples, and tests, so agent actions should remain lightweight and focused.

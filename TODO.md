@@ -25,13 +25,16 @@ Last full rescan: 2026-06-06.
 
 ## reliability/correctness
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id      | status | effort | description |
+|---------|--------|--------|-------------|
+| REL-001 | open   | L      | Add a generated-data proof-check architecture. Every generator and transform should expose a validator/proof function that can confirm emitted values satisfy the prepared spec after generation. The proof path must work for paired values (`$name$` and `$name[id]$`) and composite/transformed outputs. |
+| REL-002 | open   | M      | Define validation failure behavior: strict mode fails the run with a row/type/transform diagnostic, while audit mode records proof failures without stopping generation. Failures must include enough context to reproduce the bad row with seed/config. |
 
 ## performance
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id      | status | effort | description |
+|---------|--------|--------|-------------|
+| PERF-001 | open | M      | Design proof-check sampling controls so validation can run every row for tests/small jobs and sampled/batched for very large jobs without making normal generation unusably slow. |
 
 ## scalability
 
@@ -50,13 +53,17 @@ Last full rescan: 2026-06-06.
 
 ## architecture/modularity/SOLID
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id       | status | effort | description |
+|----------|--------|--------|-------------|
+| ARCH-001 | open   | L      | Model data types as a virtual filesystem-like namespace: built-ins live under a stable default namespace, plugin types mount into additional namespaces, and type lookup resolves by explicit path/name without allowing plugins to remove or shadow defaults accidentally. |
+| ARCH-002 | open   | L      | Split generation into explicit stages: source data type -> optional transform chain -> render -> proof-check. Each stage should be a small protocol with typed prepared specs so transforms and validators compose without bloating `Engine`. |
+| ARCH-003 | open   | M      | Define the transform contract for "applies to any data type" behavior. A transform must declare required input capabilities, output shape, pairing behavior, and proof composition so generic transforms can reject incompatible types early. |
 
 ## decoupling
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id      | status | effort | description |
+|---------|--------|--------|-------------|
+| DEC-001 | open   | M      | Decouple statistical distribution logic from concrete generators. Distribution should be a transform over two-or-more candidate instances of any compatible data type, not a special generator family that duplicates type-specific behavior. |
 
 ## business/design patterns/DDD
 
@@ -65,23 +72,30 @@ Last full rescan: 2026-06-06.
 
 ## plugin extensibility
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id       | status | effort | description |
+|----------|--------|--------|-------------|
+| PLUG-001 | open   | L      | Add public plugin registration APIs for data types, transforms, and validators. Built-in data types must always be registered first and remain non-removable; plugins can add namespaced types/transforms but cannot delete defaults. |
+| PLUG-002 | open   | M      | Extend entry-point loading to separate plugin kinds, e.g. `ton.generators`, `ton.transforms`, and `ton.validators`, with allowlist/trust controls matching the existing opt-in plugin security model. |
+| PLUG-003 | open   | L      | Implement generic transform plugins, starting with a statistical distribution transform that can weight or choose among two-or-more prepared instances of any compatible data type. Existing `weighted` behavior should migrate or delegate to this transform without breaking configs. |
 
 ## CLI / option integrity
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id      | status | effort | description |
+|---------|--------|--------|-------------|
+| CLI-001 | open   | M      | Add CLI flags for validation/proof-check mode (`off`, `sample`, `all`, `audit`) and plugin namespace visibility. Help text must make clear that built-in data types are always available and plugin loading is opt-in. |
 
 ## configuration discoverability
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id      | status | effort | description |
+|---------|--------|--------|-------------|
+| CFG-001 | open   | L      | Design a config schema for namespaced data types and transform chains. Example shape should make a data type look like a mounted path and transforms like ordered filters, while preserving compatibility with current `{"type": "integer"}` specs. |
+| CFG-002 | open   | M      | Add config validation that can list available built-in and plugin types/transforms, detect unknown namespaces, reject incompatible transform chains, and explain required capabilities in actionable error messages. |
 
 ## data governance
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id     | status | effort | description |
+|--------|--------|--------|-------------|
+| DG-001 | open   | M      | Define provenance metadata for generated values: source data type, plugin package/version when used, transform chain, validation mode, and proof result. Keep it optional for streaming output but available to audit logs or sidecar manifests. |
 
 ## dependency
 
@@ -95,10 +109,13 @@ Last full rescan: 2026-06-06.
 
 ## observability
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id      | status | effort | description |
+|---------|--------|--------|-------------|
+| OBS-001 | open   | M      | Add structured events for plugin mount/unmount decisions, transform preparation, proof-check failures, and validation summaries. Events should include namespace/type/transform ids without leaking generated sensitive values by default. |
 
 ## documentation
 
-| id | status | effort | description |
-|----|--------|--------|-------------|
+| id      | status | effort | description |
+|---------|--------|--------|-------------|
+| DOC-001 | open   | M      | Write an architecture note for the Unix-like virtual data-type filesystem: built-in namespace, plugin mounts, transform pipeline, validation/proof-check lifecycle, and compatibility guarantees for existing configs. |
+| DOC-002 | open   | S      | Add README examples showing a built-in type with a distribution transform, a plugin-provided type under a namespace, and proof-check/audit output. |

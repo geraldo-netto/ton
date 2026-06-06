@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from ton._engine import Engine, TemplateError
+from ton._engine import Engine, ProofError, TemplateError
 from ton._proof import ProofResult
 from ton._transforms import (
     BaseTransform,
@@ -241,3 +241,56 @@ def test_engine_collects_transform_proof_failure() -> None:
     assert failures[0].stage == "transform"
     assert failures[0].reference == "failproof"
     assert failures[0].reason == "transform mismatch"
+
+
+def test_engine_strict_proof_mode_raises_with_context() -> None:
+    class FailingGenerator(Generator):
+        type_name = "failing"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "bad"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared, result
+            return ProofResult(ok=False, reason="bad value")
+
+    config = {"rows": 1, "format": "$v$", "types": {"v": {"type": "failing"}}}
+    engine = Engine.from_config(
+        config,
+        registry={"failing": FailingGenerator()},
+        seed=123,
+        proof_mode="all",
+    )
+
+    with pytest.raises(ProofError, match="row 1.*'v'.*bad value"):
+        list(engine)
+
+
+def test_engine_audit_proof_mode_records_failures_without_stopping() -> None:
+    class FailingGenerator(Generator):
+        type_name = "failing"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "bad"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared, result
+            return ProofResult(ok=False, reason="bad value")
+
+    config = {"rows": 2, "format": "$v$", "types": {"v": {"type": "failing"}}}
+    engine = Engine.from_config(
+        config,
+        registry={"failing": FailingGenerator()},
+        seed=123,
+        proof_mode="audit",
+    )
+
+    assert list(engine) == ["bad", "bad"]
+    assert len(engine.proof_failures) == 2
+    assert engine.proof_failures[0].seed == 123
+    assert engine.proof_failures[0].spec == {"type": "failing"}
+
+
+def test_engine_rejects_unknown_proof_mode(basic_config: dict) -> None:
+    with pytest.raises(ValueError, match="proof_mode"):
+        Engine(basic_config, proof_mode="sometimes")

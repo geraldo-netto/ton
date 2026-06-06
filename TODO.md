@@ -27,7 +27,6 @@ Last full rescan: 2026-06-06.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-002 | open   | M      | Define validation failure behavior: strict mode fails the run with a row/type/transform diagnostic, while audit mode records proof failures without stopping generation. Failures must include enough context to reproduce the bad row with seed/config. |
 
 ## performance
 

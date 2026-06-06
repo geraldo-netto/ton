@@ -41,7 +41,7 @@ from typing import Any
 
 from . import _config
 from ._config import ConfigError
-from ._engine import Engine, TemplateError
+from ._engine import Engine, ProofError, TemplateError
 from ._logging import LogEvent, configure_stderr, logger
 from ._registry import (
     ExtensionCatalog,
@@ -62,6 +62,7 @@ __all__ = [
     "Generator",
     "LogEvent",
     "PairedGenerator",
+    "ProofError",
     "RegistryError",
     "TemplateError",
     "Transform",
@@ -127,6 +128,7 @@ def generate(
     seed: int | None = None,
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
+    proof_mode: str = "off",
     milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for an in-memory config mapping."""
@@ -136,6 +138,7 @@ def generate(
             seed=seed,
             registry=registry,
             transforms=transforms,
+            proof_mode=proof_mode,
             milestone_rows=milestone_rows,
         )
     )
@@ -147,6 +150,7 @@ def generate_from_file(
     seed: int | None = None,
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
+    proof_mode: str = "off",
     milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for a config loaded from ``path``."""
@@ -155,5 +159,6 @@ def generate_from_file(
         seed=seed,
         registry=registry,
         transforms=transforms,
+        proof_mode=proof_mode,
         milestone_rows=milestone_rows,
     )

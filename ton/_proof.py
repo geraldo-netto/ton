@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -24,3 +25,5 @@ class ProofFailure:
     reason: str
     value: str
     id_value: str | None = None
+    seed: int | None = None
+    spec: dict[str, Any] | None = None

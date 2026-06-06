@@ -27,6 +27,10 @@ class TemplateError(ValueError):
     """Raised when a template references a type not declared in the config."""
 
 
+class ProofError(TemplateError):
+    """Raised when strict proof checking finds an invalid generated value."""
+
+
 @dataclass(frozen=True)
 class PreparedTransform:
     transform: Transform
@@ -64,6 +68,8 @@ class Engine:
         transforms: Mapping[str, Transform] | None = None,
         rng: Random | None = None,
         *,
+        proof_mode: str = "off",
+        seed: int | None = None,
         milestone_rows: int = 0,
     ) -> None:
         self._template: str = config["format"]
@@ -73,6 +79,9 @@ class Engine:
         self._registry = self._resolve_registry(registry)
         self._transforms = dict(transforms or build_extension_catalog().transforms())
         self._rng = rng if rng is not None else Random()
+        self._proof_mode = _validate_proof_mode(proof_mode)
+        self._seed = seed
+        self._proof_failures_audit: list[ProofFailure] = []
         self._validate()
         # Each referenced type spec is parsed once via Generator.prepare;
         # the per-row hot path just looks up the prepared spec by name.
@@ -111,6 +120,7 @@ class Engine:
         registry: Mapping[str, Generator] | None = None,
         transforms: Mapping[str, Transform] | None = None,
         rng: Random | None = None,
+        proof_mode: str = "off",
         milestone_rows: int = 0,
     ) -> Engine:
         """Build an Engine, deriving the RNG from ``seed`` when ``rng`` is None.
@@ -127,6 +137,8 @@ class Engine:
             registry=registry,
             transforms=transforms,
             rng=engine_rng,
+            proof_mode=proof_mode,
+            seed=seed,
             milestone_rows=milestone_rows,
         )
 
@@ -138,6 +150,7 @@ class Engine:
         registry: Mapping[str, Generator] | None = None,
         transforms: Mapping[str, Transform] | None = None,
         rng: Random | None = None,
+        proof_mode: str = "off",
         milestone_rows: int = 0,
     ) -> Engine:
         """Build an Engine from a JSON config on disk.
@@ -151,6 +164,7 @@ class Engine:
             registry=registry,
             transforms=transforms,
             rng=rng,
+            proof_mode=proof_mode,
             milestone_rows=milestone_rows,
         )
 
@@ -168,6 +182,11 @@ class Engine:
     def total_rows(self) -> int:
         """Total rows the engine will yield when iterated to completion."""
         return self._rows
+
+    @property
+    def proof_failures(self) -> tuple[ProofFailure, ...]:
+        """Proof failures collected in audit mode."""
+        return tuple(self._proof_failures_audit)
 
     def _resolve_registry(
         self, registry: Mapping[str, Generator] | None
@@ -320,10 +339,12 @@ class Engine:
             if paired_cache is not None and field.is_paired:
                 pair = paired_cache.get(token.type_key)
                 if pair is None:
-                    pair = self._generate_pair(field)
+                    pair = self._generate_pair(token.type_key, field)
                     paired_cache[token.type_key] = pair
                 return pair[0] if token.wants_id else pair[1]
-            return self._generate_single(field)
+            return self._generate_single(token.type_key, field)
+        except ProofError:
+            raise
         except Exception as exc:  # noqa: BLE001 - boundary; re-raised below
             # A generator that raises mid-iteration would otherwise hit
             # the CLI's catch-all (TODO REL-014). Log an identifying
@@ -347,16 +368,39 @@ class Engine:
                 f"{token.type_key!r} raised {type(exc).__name__}: {exc}"
             ) from exc
 
-    def _generate_pair(self, field: PreparedField) -> tuple[str, str]:
+    def _generate_pair(self, type_key: str, field: PreparedField) -> tuple[str, str]:
         pair = field.generator.generate_pair(field.source_prepared, self._rng)  # type: ignore[attr-defined]
-        result = TransformResult(value=pair[1], id_value=pair[0])
-        transformed, _ = self._apply_transforms_with_trace(field, result)
+        source = TransformResult(value=pair[1], id_value=pair[0])
+        transformed, steps = self._apply_transforms_with_trace(field, source)
+        self._handle_proof_failures(type_key, field, source, steps)
         return (transformed.id_value or "", transformed.value)
 
-    def _generate_single(self, field: PreparedField) -> str:
-        result = TransformResult(field.generator.generate(field.source_prepared, self._rng))
-        transformed, _ = self._apply_transforms_with_trace(field, result)
+    def _generate_single(self, type_key: str, field: PreparedField) -> str:
+        source = TransformResult(field.generator.generate(field.source_prepared, self._rng))
+        transformed, steps = self._apply_transforms_with_trace(field, source)
+        self._handle_proof_failures(type_key, field, source, steps)
         return transformed.value
+
+    def _handle_proof_failures(
+        self,
+        type_key: str,
+        field: PreparedField,
+        source_result: TransformResult,
+        steps: tuple[TransformStep, ...],
+    ) -> None:
+        if self._proof_mode == "off":
+            return
+        failures = self._proof_failures(type_key, field, source_result, steps)
+        if not failures:
+            return
+        if self._proof_mode == "audit":
+            self._proof_failures_audit.extend(failures)
+            return
+        failure = failures[0]
+        raise ProofError(
+            f"Proof failed at row {failure.row} for {failure.type_key!r} "
+            f"{failure.stage} {failure.reference!r}: {failure.reason}"
+        )
 
     def _apply_transforms_with_trace(
         self,
@@ -386,14 +430,12 @@ class Engine:
             )
             if not proof.ok:
                 failures.append(
-                    ProofFailure(
-                        row=self._rows_emitted + 1,
+                    self._make_proof_failure(
                         type_key=type_key,
                         stage="transform",
                         reference=step.prepared.transform.type_name,
                         reason=proof.reason,
-                        value=step.after.value,
-                        id_value=step.after.id_value,
+                        result=step.after,
                     )
                 )
         return tuple(failures)
@@ -408,15 +450,34 @@ class Engine:
         if proof.ok:
             return ()
         return (
-            ProofFailure(
-                row=self._rows_emitted + 1,
+            self._make_proof_failure(
                 type_key=type_key,
                 stage="source",
                 reference=field.generator.type_name,
                 reason=proof.reason,
-                value=source_result.value,
-                id_value=source_result.id_value,
+                result=source_result,
             ),
+        )
+
+    def _make_proof_failure(
+        self,
+        *,
+        type_key: str,
+        stage: str,
+        reference: str,
+        reason: str,
+        result: TransformResult,
+    ) -> ProofFailure:
+        return ProofFailure(
+            row=self._rows_emitted + 1,
+            type_key=type_key,
+            stage=stage,
+            reference=reference,
+            reason=reason,
+            value=result.value,
+            id_value=result.id_value,
+            seed=self._seed,
+            spec=dict(self._types[type_key]),
         )
 
 
@@ -452,3 +513,9 @@ def _runtime_type_name(type_name: object) -> str:
     if isinstance(type_name, str) and type_name.startswith("core."):
         return type_name.split(".", 1)[1]
     return str(type_name)
+
+
+def _validate_proof_mode(proof_mode: str) -> str:
+    if proof_mode not in {"off", "all", "audit"}:
+        raise ValueError("proof_mode must be 'off', 'all', or 'audit'")
+    return proof_mode

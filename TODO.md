@@ -85,7 +85,6 @@ Last full rescan: 2026-06-06.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CFG-001 | open   | L      | Design a config schema for namespaced data types and transform chains. Example shape should make a data type look like a mounted path and transforms like ordered filters, while preserving compatibility with current `{"type": "integer"}` specs. |
 | CFG-002 | open   | M      | Add config validation that can list available built-in and plugin types/transforms, detect unknown namespaces, reject incompatible transform chains, and explain required capabilities in actionable error messages. |
 
 ## data governance

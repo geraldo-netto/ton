@@ -98,8 +98,23 @@ def _validate_types(types: Any) -> None:
     if not isinstance(types, dict) or not types:
         raise ConfigError("'types' must be a non-empty object.")
     for name, spec in types.items():
-        if not isinstance(spec, dict) or "type" not in spec:
-            raise ConfigError(f"Type spec {name!r} must be an object with a 'type' field.")
+        _validate_type_spec(name, spec)
+
+
+def _validate_type_spec(name: str, spec: Any) -> None:
+    if not isinstance(spec, dict) or "type" not in spec:
+        raise ConfigError(f"Type spec {name!r} must be an object with a 'type' field.")
+    if not isinstance(spec["type"], str) or not spec["type"]:
+        raise ConfigError(f"Type spec {name!r} 'type' must be a non-empty string.")
+    transforms = spec.get("transforms", [])
+    if not isinstance(transforms, list):
+        raise ConfigError(f"Type spec {name!r} 'transforms' must be a list.")
+    for index, transform in enumerate(transforms):
+        if not isinstance(transform, dict) or "type" not in transform:
+            raise ConfigError(
+                f"Type spec {name!r} transform {index} must be an object "
+                "with a 'type' field."
+            )
 
 
 def _validate_template_references(template: str, types: dict[str, Any]) -> None:

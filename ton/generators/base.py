@@ -236,7 +236,9 @@ def prepare_child_spec(
         raise ValueError(
             f"{parent_type} {location} must be an object with a 'type' field"
         )
-    nested_type = nested_spec["type"]
+    nested_type = str(nested_spec["type"])
+    if nested_type.startswith("core."):
+        nested_type = nested_type.split(".", 1)[1]
     if nested_type not in registry:
         raise ValueError(
             f"{parent_type} {location} references unknown type {nested_type!r}"

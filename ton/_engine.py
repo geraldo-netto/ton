@@ -160,7 +160,7 @@ class Engine:
         except UndeclaredVariableError as exc:
             raise TemplateError(str(exc)) from exc
         for token in self._tokens:
-            type_name = self._types[token.type_key]["type"]
+            type_name = _runtime_type_name(self._types[token.type_key]["type"])
             if type_name not in self._registry:
                 raise TemplateError(
                     f"Unknown type {type_name!r} for variable {token.type_key!r}"
@@ -172,7 +172,7 @@ class Engine:
             if token.type_key in prepared:
                 continue
             spec = self._types[token.type_key]
-            generator = self._registry[spec["type"]]
+            generator = self._registry[_runtime_type_name(spec["type"])]
             try:
                 if generator.is_composite:
                     prepared[token.type_key] = (
@@ -294,7 +294,7 @@ def _collect_nested_types(spec: Mapping[str, Any], needed: set[str]) -> None:
     """
     type_name = spec.get("type")
     if isinstance(type_name, str):
-        needed.add(type_name)
+        needed.add(_runtime_type_name(type_name))
     for value in spec.values():
         _walk_value_for_types(value, needed)
 
@@ -310,3 +310,9 @@ def _walk_value_for_types(value: Any, needed: set[str]) -> None:
     if isinstance(value, list):
         for item in value:
             _walk_value_for_types(item, needed)
+
+
+def _runtime_type_name(type_name: object) -> str:
+    if isinstance(type_name, str) and type_name.startswith("core."):
+        return type_name.split(".", 1)[1]
+    return str(type_name)

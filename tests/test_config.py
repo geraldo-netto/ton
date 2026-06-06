@@ -103,3 +103,37 @@ def test_bool_rows_rejected(tmp_path: Path) -> None:
     path = _write(tmp_path, payload)
     with pytest.raises(ConfigError):
         load(path)
+
+
+def test_namespaced_core_type_is_accepted_by_engine(tmp_path: Path) -> None:
+    payload = _valid_payload()
+    payload["types"]["a"] = {"type": "core.string", "values": ["x"]}
+    path = _write(tmp_path, payload)
+
+    assert list(Engine(load(path))) == ["x", "x", "x"]
+
+
+def test_transform_chain_shape_is_accepted(tmp_path: Path) -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["transforms"] = [{"type": "core.identity"}]
+    path = _write(tmp_path, payload)
+
+    assert load(path)["types"]["a"]["transforms"][0]["type"] == "core.identity"
+
+
+def test_transform_chain_must_be_a_list(tmp_path: Path) -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["transforms"] = {"type": "core.identity"}
+    path = _write(tmp_path, payload)
+
+    with pytest.raises(ConfigError, match="transforms"):
+        load(path)
+
+
+def test_transform_entries_need_type(tmp_path: Path) -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["transforms"] = [{}]
+    path = _write(tmp_path, payload)
+
+    with pytest.raises(ConfigError, match="transform 0"):
+        load(path)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 from random import Random
-from typing import Any
+from typing import Any, ClassVar
 from unittest import mock
 
 import pytest
@@ -179,7 +179,7 @@ def test_extension_catalog_registers_namespaced_plugins() -> None:
             return "custom"
 
     class CustomTransform(BaseTransform):
-        type_name = "trim"
+        type_name: ClassVar[str] = "trim"
 
     catalog = build_extension_catalog()
     catalog.register_data_type("plugin", "custom", CustomGenerator())
@@ -224,7 +224,7 @@ def test_core_registration_does_not_emit_plugin_event(
 
 def test_extension_catalog_rejects_ambiguous_registration() -> None:
     class CustomTransform(BaseTransform):
-        type_name = "trim"
+        type_name: ClassVar[str] = "trim"
 
     catalog = build_extension_catalog()
     catalog.register_transform("plugin", "trim", CustomTransform())
@@ -250,7 +250,7 @@ def test_catalog_entry_points_load_separate_plugin_kinds() -> None:
             return "custom"
 
     class CustomTransform(BaseTransform):
-        type_name = "trim"
+        type_name: ClassVar[str] = "trim"
 
     generator_ep = mock.Mock()
     generator_ep.name = "acme.custom"
@@ -331,7 +331,7 @@ def test_catalog_entry_points_skip_wrong_generator_kind() -> None:
 
 def test_catalog_entry_point_without_namespace_uses_plugin_namespace() -> None:
     class CustomTransform(BaseTransform):
-        type_name = "trim"
+        type_name: ClassVar[str] = "trim"
 
     ep = mock.Mock()
     ep.name = "trim"

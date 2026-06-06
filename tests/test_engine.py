@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from random import Random
 from threading import Barrier, Thread
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -112,7 +112,7 @@ def test_engine_rejects_concurrent_iteration(basic_config: dict) -> None:
 
 def test_engine_applies_transform_chain_to_single_value() -> None:
     class PrefixTransform(BaseTransform):
-        type_name = "prefix"
+        type_name: ClassVar[str] = "prefix"
 
         def apply(
             self,
@@ -148,7 +148,7 @@ def test_engine_applies_transform_chain_to_single_value() -> None:
 
 def test_engine_resolves_unqualified_custom_transform_key() -> None:
     class PrefixTransform(BaseTransform):
-        type_name = "prefix"
+        type_name: ClassVar[str] = "prefix"
 
         def apply(
             self,
@@ -209,8 +209,8 @@ def test_engine_preserves_paired_value_through_identity_transform() -> None:
 
 def test_engine_rejects_transform_that_cannot_accept_paired_input() -> None:
     class UnpairedTransform(BaseTransform):
-        type_name = "unpaired"
-        capabilities = TransformCapabilities(accepts_paired=False)
+        type_name: ClassVar[str] = "unpaired"
+        capabilities: ClassVar[TransformCapabilities] = TransformCapabilities(accepts_paired=False)
 
     config = {
         "rows": 1,
@@ -252,7 +252,7 @@ def test_engine_collects_source_proof_failure() -> None:
 
 def test_engine_collects_transform_proof_failure() -> None:
     class FailingProofTransform(BaseTransform):
-        type_name = "failproof"
+        type_name: ClassVar[str] = "failproof"
 
         def prove(
             self,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -184,8 +185,8 @@ def test_validate_config_lists_available_transforms() -> None:
 
 def test_validate_config_rejects_incompatible_transform_chain() -> None:
     class UnpairedOnlyTransform(BaseTransform):
-        type_name = "unpaired"
-        capabilities = TransformCapabilities(accepts_paired=False)
+        type_name: ClassVar[str] = "unpaired"
+        capabilities: ClassVar[TransformCapabilities] = TransformCapabilities(accepts_paired=False)
 
     payload = {
         "rows": 1,

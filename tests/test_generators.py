@@ -5,6 +5,7 @@ from __future__ import annotations
 import builtins
 from datetime import datetime
 from random import Random
+from typing import Any
 
 import pytest
 
@@ -186,7 +187,7 @@ def test_hash_generator_rejects_bad_bcrypt_rounds() -> None:
 def test_hash_generator_reports_missing_bcrypt_dependency(monkeypatch) -> None:
     real_import = builtins.__import__
 
-    def _blocked_import(name: str, *args: object, **kwargs: object) -> object:
+    def _blocked_import(name: str, *args: Any, **kwargs: Any) -> Any:
         if name == "bcrypt":
             raise ImportError("blocked")
         return real_import(name, *args, **kwargs)
@@ -254,8 +255,6 @@ def test_paired_generator_default_returns_primary() -> None:
 
 def test_paired_generator_knob_flips_to_id() -> None:
     """generate_returns_id=True flips the shortcut to the id half (ARCH-005)."""
-    from typing import Any
-
     from ton.generators.base import PairedGenerator
 
     class FlippedHash(PairedGenerator):

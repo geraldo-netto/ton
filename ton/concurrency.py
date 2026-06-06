@@ -60,7 +60,7 @@ def derive_seed(parent_seed: int, worker_id: int) -> int:
     """
     payload = struct.pack(">qq", parent_seed, worker_id)
     digest = hashlib.blake2b(payload, digest_size=8).digest()
-    return struct.unpack(">Q", digest)[0]
+    return int(struct.unpack(">Q", digest)[0])
 
 
 def derive_rng(parent_seed: int, worker_id: int) -> Random:

@@ -887,6 +887,16 @@ ruff check ton tests
 mypy ton tests                      # strict mode is on
 ```
 
+Enable the pre-commit gate once per clone so the CI lint + typecheck jobs
+(`ruff check`, `ruff format --check`, `mypy ton`, `pyright ton`) run before
+every commit and block it on failure:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Bypass in an emergency with `git commit --no-verify`.
+
 Behavior guidelines for AI agents live in [`AGENTS.md`](AGENTS.md); open review findings are tracked in [`TODO.md`](TODO.md).
 
 ## License

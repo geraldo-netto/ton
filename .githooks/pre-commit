@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Pre-commit gate: mirror the CI lint + typecheck jobs so a commit that
+# would fail the pipeline is refused locally.
+#
+# Runs the exact commands from .github/workflows/ci.yml:
+#   ruff check ton tests
+#   ruff format --check ton tests
+#   mypy ton
+#   pyright ton
+#
+# Enable once per clone with:
+#   git config core.hooksPath .githooks
+#
+# Bypass for an emergency commit with `git commit --no-verify`.
+
+set -u
+
+status=0
+
+run() {
+    local name="$1"
+    shift
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "pre-commit: $1 not found on PATH; cannot verify $name" >&2
+        status=1
+        return
+    fi
+    echo "pre-commit: $name" >&2
+    if ! "$@"; then
+        echo "pre-commit: FAILED $name" >&2
+        status=1
+    fi
+}
+
+run "ruff check" ruff check ton tests
+run "ruff format --check" ruff format --check ton tests
+run "mypy" mypy ton
+run "pyright" pyright ton
+
+if [ "$status" -ne 0 ]; then
+    echo "pre-commit: refusing to commit; fix the failures above or use --no-verify to bypass." >&2
+    exit 1
+fi
+
+echo "pre-commit: all checks green" >&2
+exit 0

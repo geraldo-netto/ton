@@ -44,20 +44,28 @@ from typing import Any
 from ._engine import Engine
 from ._logging import LogEvent
 from ._logging import logger as _logger
+from ._transforms import Transform
+from .generators import Generator
 
 
-def derive_rng(parent_seed: int, worker_id: int) -> Random:
-    """Return a fresh ``Random`` whose seed is a stable hash of
-    ``(parent_seed, worker_id)``.
+def derive_seed(parent_seed: int, worker_id: int) -> int:
+    """Return the deterministic per-worker seed for ``(parent_seed, worker_id)``.
 
     Using a hash rather than ``parent_seed + worker_id`` avoids the
     pathological case where adjacent workers see correlated streams
-    (e.g. starting from seeds N and N+1 with the same algorithm).
+    (e.g. starting from seeds N and N+1 with the same algorithm). The
+    derived integer is also recorded in each worker's
+    :class:`~ton._proof.ProofFailure` provenance so audit records can be
+    traced back to the worker that produced them (TODO CONC-001).
     """
     payload = struct.pack(">qq", parent_seed, worker_id)
     digest = hashlib.blake2b(payload, digest_size=8).digest()
-    seed = struct.unpack(">Q", digest)[0]
-    return Random(seed)
+    return struct.unpack(">Q", digest)[0]
+
+
+def derive_rng(parent_seed: int, worker_id: int) -> Random:
+    """Return a fresh ``Random`` seeded by :func:`derive_seed`."""
+    return Random(derive_seed(parent_seed, worker_id))
 
 
 def fork_engine(
@@ -66,14 +74,34 @@ def fork_engine(
     parent_seed: int,
     worker_id: int,
     rows: int | None = None,
-    registry: Mapping[str, Any] | None = None,
+    registry: Mapping[str, Generator] | None = None,
+    transforms: Mapping[str, Transform] | None = None,
+    proof_mode: str = "off",
+    proof_sample_rate: int = 1,
     milestone_rows: int = 0,
 ) -> Engine:
-    """Build an Engine with a per-worker RNG and an optional row override."""
-    rng = derive_rng(parent_seed, worker_id)
+    """Build an Engine with a per-worker RNG and an optional row override.
+
+    Mirrors the :meth:`Engine.from_config` surface so forked workers can
+    use plugin ``transforms`` and proof-check options the same way the
+    parent process does. The worker's derived seed is threaded into the
+    engine as ``seed`` so proof/provenance records are attributable to
+    the worker (TODO CONC-001).
+    """
+    seed = derive_seed(parent_seed, worker_id)
+    rng = Random(seed)
     if rows is not None:
         config = {**config, "rows": rows}
-    engine = Engine.from_config(config, registry=registry, rng=rng, milestone_rows=milestone_rows)
+    engine = Engine.from_config(
+        config,
+        registry=registry,
+        transforms=transforms,
+        rng=rng,
+        seed=seed,
+        proof_mode=proof_mode,
+        proof_sample_rate=proof_sample_rate,
+        milestone_rows=milestone_rows,
+    )
     _logger.info(
         "engine_forked worker_id=%d parent_seed=%d rows=%d",
         worker_id,

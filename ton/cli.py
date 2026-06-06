@@ -118,7 +118,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--entry-points",
         action="store_true",
-        help="Load trusted third-party generators from the ton.generators entry-point group.",
+        help=(
+            "Load trusted third-party plugins from the ton.generators, "
+            "ton.transforms, and ton.validators entry-point groups into "
+            "the extension catalog."
+        ),
     )
     parser.add_argument(
         "--entry-point",
@@ -196,14 +200,34 @@ def _run_inner(args: argparse.Namespace) -> int:
     if args.config is None:
         print("ton: config path is required", file=sys.stderr)
         return 1
+    if args.validate:
+        return _validate_config(args)
     built = _prepare_engine(args)
     if isinstance(built, int):
         return built
-    if args.validate:
-        print("ton: config valid", file=sys.stderr)
-        return 0
-    engine = built
-    return _execute(engine, args)
+    return _execute(built, args)
+
+
+def _validate_config(args: argparse.Namespace) -> int:
+    """Validate the config with catalog-aware diagnostics and exit.
+
+    Uses :func:`ton.api.validate_config` rather than constructing an
+    Engine so unknown type/transform references are reported with the
+    available-name lists and plugin-namespace diagnostics, keeping CLI
+    ``--validate`` aligned with the library validation path (TODO
+    CLI-002, CFG-003).
+    """
+    try:
+        config = api.load_config(args.config)
+        api.validate_config(config, catalog=_catalog_from_args(args))
+    except FileNotFoundError as exc:
+        print(f"ton: {exc}", file=sys.stderr)
+        return 1
+    except (ConfigError, TemplateError, json.JSONDecodeError) as exc:
+        print(f"ton: invalid config: {exc}", file=sys.stderr)
+        return 2
+    print("ton: config valid", file=sys.stderr)
+    return 0
 
 
 def _prepare_engine(args: argparse.Namespace) -> Engine | int:
@@ -256,7 +280,47 @@ def _execute(engine: Engine, args: argparse.Namespace) -> int:
         return 2
     if args.verbose:
         _report(rows_written, time.perf_counter() - started)
+    if args.proof_check == "audit":
+        _report_proof_audit(engine)
     return 0
+
+
+def _report_proof_audit(engine: Engine) -> None:
+    """Print the audit proof-check summary to stderr (TODO OBS-002).
+
+    Audit mode collects failures instead of aborting, so a normal run
+    exits 0 and the user would otherwise never learn that any value
+    failed its proof. Surface the count and point at the structured
+    ``proof_check_failed`` log events that carry the per-row detail.
+    """
+    count = len(engine.proof_failures)
+    _logger.info(
+        "cli_proof_audit_summary failures=%d",
+        count,
+        extra={"event": LogEvent.PROOF_CHECK_SUMMARY.value, "failures": count},
+    )
+    if count == 0:
+        print("ton: proof-check audit: all generated values passed", file=sys.stderr)
+        return
+    print(
+        f"ton: proof-check audit: {count} value(s) failed; "
+        "rerun with --log-level warning for per-row proof_check_failed detail",
+        file=sys.stderr,
+    )
+
+
+def _catalog_from_args(args: argparse.Namespace) -> api.ExtensionCatalog:
+    """Build the extension catalog implied by the entry-point flags.
+
+    Single source of truth for the catalog used by engine construction,
+    ``--validate``, and ``--list-namespaces`` so all three observe the
+    same plugin surface (TODO CFG-003).
+    """
+    allowed = set(args.entry_point_allowlist) or None
+    return api.build_extension_catalog(
+        include_entry_points=bool(args.entry_points or args.entry_point_allowlist),
+        allowed_entry_points=allowed,
+    )
 
 
 def _build_engine(args: argparse.Namespace) -> Engine:
@@ -265,11 +329,7 @@ def _build_engine(args: argparse.Namespace) -> Engine:
     registry = None
     transforms = None
     if args.entry_points or args.entry_point_allowlist:
-        allowed = set(args.entry_point_allowlist) or None
-        catalog = api.build_extension_catalog(
-            include_entry_points=True,
-            allowed_entry_points=allowed,
-        )
+        catalog = _catalog_from_args(args)
         registry = catalog.generators()
         transforms = catalog.transforms()
     # --progress already prints JSON; reuse the same interval as the
@@ -288,11 +348,7 @@ def _build_engine(args: argparse.Namespace) -> Engine:
 
 
 def _print_namespaces(args: argparse.Namespace) -> None:
-    allowed = set(args.entry_point_allowlist) or None
-    catalog = api.build_extension_catalog(
-        include_entry_points=args.entry_points or bool(args.entry_point_allowlist),
-        allowed_entry_points=allowed,
-    )
+    catalog = _catalog_from_args(args)
     print("namespaces:", ", ".join(catalog.namespaces()))
     print("data types:", ", ".join(catalog.list_data_types()))
     print("transforms:", ", ".join(catalog.list_transforms()))

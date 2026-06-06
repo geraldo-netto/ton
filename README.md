@@ -60,9 +60,14 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 | `--progress N`         | Emit a JSON progress line on stderr every `N` rows (also surfaces a logger event).   |
 | `--verbose`            | Print final row count, elapsed time, and rows/sec to stderr.                         |
 | `--log-level LEVEL`    | Attach a stderr handler to the `ton` logger (`debug`/`info`/`warning`/`error`/`critical`). |
-| `--entry-points`       | Load trusted third-party generators from the `ton.generators` entry-point group.     |
+| `--proof-check MODE`   | Proof-check generated values: `off`, `sample`, `all`, or `audit` (collect, don't abort). |
+| `--proof-sample-rate N`| With `--proof-check sample`, check every `N`th generated row.                        |
+| `--list-namespaces`    | List available namespaces, data types, and transforms, then exit.                    |
+| `--entry-points`       | Load trusted third-party plugins from the `ton.generators`, `ton.transforms`, and `ton.validators` entry-point groups. |
 | `--entry-point NAME`   | Allow only this trusted entry-point name; repeat for multiple names.                 |
 | `--version`            | Print the package version.                                                           |
+
+With `--proof-check audit` the run still exits `0`; the failure count is printed to stderr (`ton: proof-check audit: …`) and each failing row is emitted as a `proof_check_failed` log event (see `--log-level warning`).
 
 Everything observability-related goes to stderr; stdout stays clean for piping. Exit codes: `0` success, `1` missing config / output error / refused special-file target, `2` invalid config or unknown variable, `3` unexpected error, `130` interrupted (Ctrl-C).
 
@@ -191,15 +196,28 @@ engine = api.Engine.from_config(
 )
 ```
 
-Custom generators can register via the `ton.generators` entry-point group in any installed package:
+Custom plugins register via three entry-point groups in any installed package: `ton.generators` (data types), `ton.transforms`, and `ton.validators`:
 
 ```toml
 [project.entry-points."ton.generators"]
 my_type = "my_pkg.generators:MyGenerator"
+
+[project.entry-points."ton.transforms"]
+my_ns.my_transform = "my_pkg.transforms:MyTransform"
 ```
 
-A broken plugin is isolated: `entry_points()` failures are logged as `entry_point_failed` and skipped; one bad package never aborts the whole registry build.
-Entry points execute installed package code while loading, so TON loads them only when explicitly requested, either through `api.build_registry(include_entry_points=True)` or the CLI `--entry-points` / `--entry-point NAME` flags.
+`build_extension_catalog` is the canonical loading API; it returns a namespaced `ExtensionCatalog` exposing `generators()`, `transforms()`, and `validators()`:
+
+```python
+catalog = api.build_extension_catalog(include_entry_points=True)
+for row in api.generate(config_dict,
+                        registry=catalog.generators(),
+                        transforms=catalog.transforms()):
+    ...
+```
+
+A broken plugin is isolated: load failures are logged as `entry_point_failed` and skipped; one bad package never aborts the whole catalog build.
+Entry points execute installed package code while loading, so TON loads them only when explicitly requested, either through `api.build_extension_catalog(include_entry_points=True)` or the CLI `--entry-points` / `--entry-point NAME` flags. (`api.build_registry` remains as a deprecated generator-only shim.)
 
 Parallel runs use `ton.concurrency`:
 

@@ -9,7 +9,10 @@ The supported surface, re-exported here, is:
 
 * :func:`load_config` -- read and validate a JSON config file
 * :func:`generate` / :func:`generate_from_file` -- iterators of rows
-* :func:`build_registry` -- a fresh generator registry
+* :func:`build_extension_catalog` -- the canonical plugin-loading API:
+  namespaced data types, transforms, and validators (TODO PLUG-004)
+* :func:`build_registry` -- *deprecated* generator-only registry; kept
+  as a thin compatibility shim over the catalog
 * :data:`ConfigError`, :data:`TemplateError`,
   :data:`UndeclaredVariableError` -- the exception types
 * :class:`Engine` -- the iterator class, for callers that want to
@@ -28,14 +31,15 @@ Typical use::
         sink.write(row)
 
     # Opt into third-party entry points when you trust the installed packages:
-    registry = api.build_registry(include_entry_points=True)
-    registry["uuid"] = MyUuidGenerator()
-    for row in api.generate(config_dict, registry=registry):
+    catalog = api.build_extension_catalog(include_entry_points=True)
+    for row in api.generate(config_dict, registry=catalog.generators(),
+                            transforms=catalog.transforms()):
         ...
 """
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Container, Iterator, Mapping
 from typing import Any
 
@@ -94,7 +98,16 @@ def validate_config(
     *,
     catalog: ExtensionCatalog | None = None,
 ) -> None:
-    """Validate config references against an extension catalog."""
+    """Validate config references against an extension catalog.
+
+    This is the canonical catalog-aware validation path (TODO CFG-003):
+    it reports unknown type/transform references with the available-name
+    lists and plugin-namespace diagnostics. :func:`load_config` performs
+    structural-only validation, and constructing an :class:`Engine`
+    validates lazily at build time with a terser message; callers that
+    want full diagnostics (including the CLI ``--validate`` flag) should
+    route through here.
+    """
     _config.validate_with_catalog(config, catalog or build_extension_catalog())
 
 
@@ -103,13 +116,28 @@ def build_registry(
     *,
     allowed_entry_points: Container[str] | None = None,
 ) -> dict[str, Generator]:
-    """Return a fresh registry of generator instances.
+    """Return a fresh generator-only registry of generator instances.
+
+    .. deprecated::
+        :func:`build_extension_catalog` is the canonical plugin-loading
+        API (TODO PLUG-004). It loads generators, transforms, and
+        validators under one namespaced surface, whereas this helper only
+        loads generators and promotes plugin names to bare keys with
+        different shadowing rules. Prefer
+        ``build_extension_catalog(...).generators()``.
 
     When ``include_entry_points`` is True, generators advertised by
     other packages via the ``ton.generators`` entry-point group are
     merged in on top of the built-ins. Entry points execute package
     code while loading, so this path is opt-in.
     """
+    warnings.warn(
+        "api.build_registry is deprecated; use api.build_extension_catalog(...) "
+        "which loads generators, transforms, and validators as the canonical "
+        "plugin API.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if include_entry_points:
         return registry_with_entry_points(allowed_names=allowed_entry_points)
     return default_registry()

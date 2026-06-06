@@ -276,7 +276,8 @@ def test_api_build_registry_with_entry_points_default() -> None:
     """Cover the include_entry_points=True branch of build_registry."""
     from ton import api
 
-    registry = api.build_registry()  # default True
+    with pytest.warns(DeprecationWarning):
+        registry = api.build_registry()  # default True
     assert "integer" in registry
 
 

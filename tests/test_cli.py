@@ -139,6 +139,71 @@ def test_cli_validate_checks_config_without_generating_rows(
     assert "config valid" in captured.err
 
 
+def test_cli_validate_reports_unknown_type_with_catalog_diagnostics(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = write_config({"format": "$x$", "types": {"x": {"type": "nope"}}})
+    exit_code = main([str(config), "--validate"])
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "invalid config" in captured.err
+    assert "Available types" in captured.err
+
+
+def test_cli_validate_missing_config_returns_1(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    exit_code = main([str(tmp_path / "missing.json"), "--validate"])
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "ton:" in captured.err
+
+
+def test_cli_proof_audit_reports_clean_summary(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = write_config()
+    exit_code = main([str(config), "--proof-check", "audit", "--seed", "0"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "all generated values passed" in captured.err
+
+
+def test_cli_proof_audit_reports_failure_count(
+    monkeypatch, write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from random import Random
+    from typing import Any
+
+    from ton import cli
+    from ton._engine import Engine
+    from ton._proof import ProofResult
+    from ton._transforms import TransformResult
+    from ton.generators import Generator
+
+    class FailingGenerator(Generator):
+        type_name = "failing"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "bad"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared, result
+            return ProofResult(ok=False, reason="bad value")
+
+    engine = Engine.from_config(
+        {"rows": 2, "format": "$v$", "types": {"v": {"type": "failing"}}},
+        registry={"failing": FailingGenerator()},
+        proof_mode="audit",
+    )
+    monkeypatch.setattr(cli, "_build_engine", lambda args: engine)
+    config = write_config()
+    exit_code = main([str(config), "--proof-check", "audit"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "2 value(s) failed" in captured.err
+
+
 def test_cli_help_does_not_expose_internal_todo_ids(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

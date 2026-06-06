@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from ton.concurrency import derive_rng, fork_engine
+from random import Random
+
+from ton.concurrency import derive_rng, derive_seed, fork_engine
 
 
 def test_derive_rng_is_deterministic_for_same_inputs() -> None:
@@ -37,3 +39,26 @@ def test_fork_engine_reproducible_per_worker() -> None:
     first = list(fork_engine(config, parent_seed=99, worker_id=2))
     second = list(fork_engine(config, parent_seed=99, worker_id=2))
     assert first == second
+
+
+def test_derive_seed_matches_derive_rng() -> None:
+    seed = derive_seed(parent_seed=7, worker_id=1)
+    assert derive_rng(parent_seed=7, worker_id=1).random() == Random(seed).random()
+
+
+def test_fork_engine_threads_worker_seed_and_proof_options() -> None:
+    config = {
+        "rows": 1,
+        "format": "$n$",
+        "types": {"n": {"type": "integer", "minValue": 0, "maxValue": 9, "padWithZero": False}},
+    }
+    engine = fork_engine(
+        config,
+        parent_seed=5,
+        worker_id=1,
+        proof_mode="audit",
+        proof_sample_rate=3,
+    )
+    assert engine._seed == derive_seed(parent_seed=5, worker_id=1)
+    assert engine._proof_mode == "audit"
+    assert engine._proof_sample_rate == 3

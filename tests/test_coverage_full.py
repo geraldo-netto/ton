@@ -166,6 +166,25 @@ def test_engine_from_file_loads_and_iterates(tmp_path: Path) -> None:
     assert engine.rows_emitted == 3
 
 
+def test_engine_from_file_accepts_seed(tmp_path: Path) -> None:
+    path = tmp_path / "cfg.json"
+    path.write_text(
+        json.dumps(
+            {
+                "rows": 3,
+                "format": "$n$",
+                "types": {
+                    "n": {"type": "integer", "minValue": 1, "maxValue": 9, "padWithZero": False}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    engine = Engine.from_file(str(path), seed=42)
+    assert engine._seed == 42
+    assert list(engine) == list(Engine.from_file(str(path), seed=42))
+
+
 # ---------------------------------------------------------------------------
 # Engine._render_row: literal-only template (no placeholders)
 # ---------------------------------------------------------------------------

@@ -149,6 +149,7 @@ class Engine:
         cls,
         path: str,
         *,
+        seed: int | None = None,
         registry: Mapping[str, Generator] | None = None,
         transforms: Mapping[str, Transform] | None = None,
         rng: Random | None = None,
@@ -158,12 +159,15 @@ class Engine:
     ) -> Engine:
         """Build an Engine from a JSON config on disk.
 
-        Wraps :func:`ton._config.load` + the regular constructor so
-        callers do not need to import the private config module just to
-        load a file (TODO PAT-009).
+        Wraps :func:`ton._config.load` + :meth:`from_config` so callers
+        do not need to import the private config module just to load a
+        file (TODO PAT-009). Accepts ``seed`` for parity with
+        :meth:`from_config`; when ``rng`` is also given, ``rng`` wins and
+        ``seed`` is recorded only as proof/provenance context.
         """
-        return cls(
+        return cls.from_config(
             _config.load(path),
+            seed=seed,
             registry=registry,
             transforms=transforms,
             rng=rng,

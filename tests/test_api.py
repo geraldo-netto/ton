@@ -31,10 +31,16 @@ def test_generate_from_file_round_trip(write_config) -> None:
 
 
 def test_build_registry_includes_builtins() -> None:
-    registry = api.build_registry(include_entry_points=False)
+    with pytest.warns(DeprecationWarning):
+        registry = api.build_registry(include_entry_points=False)
     assert "integer" in registry
     assert "date" in registry
     assert "lmhash" in registry
+
+
+def test_build_registry_warns_pointing_at_catalog() -> None:
+    with pytest.warns(DeprecationWarning, match="build_extension_catalog"):
+        api.build_registry()
 
 
 def test_build_registry_can_opt_into_entry_points(monkeypatch) -> None:
@@ -45,10 +51,11 @@ def test_build_registry_can_opt_into_entry_points(monkeypatch) -> None:
         return {}
 
     monkeypatch.setattr(api, "registry_with_entry_points", _fake_registry)
-    registry = api.build_registry(
-        include_entry_points=True,
-        allowed_entry_points={"custom"},
-    )
+    with pytest.warns(DeprecationWarning):
+        registry = api.build_registry(
+            include_entry_points=True,
+            allowed_entry_points={"custom"},
+        )
     assert registry == {}
     assert seen["allowed_names"] == {"custom"}
 
@@ -60,7 +67,8 @@ def test_custom_registry_can_override_or_add_types() -> None:
         def generate(self, prepared: Any, rng: Random) -> str:
             return prepared["tag"]
 
-    registry = api.build_registry(include_entry_points=False)
+    with pytest.warns(DeprecationWarning):
+        registry = api.build_registry(include_entry_points=False)
     registry["tag"] = TagGenerator()
     config = {
         "rows": 3,

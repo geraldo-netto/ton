@@ -32,7 +32,6 @@ Last full rescan: 2026-06-06.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-001 | open | M      | Design proof-check sampling controls so validation can run every row for tests/small jobs and sampled/batched for very large jobs without making normal generation unusably slow. |
 
 ## scalability
 

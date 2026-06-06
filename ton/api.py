@@ -129,6 +129,7 @@ def generate(
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
     proof_mode: str = "off",
+    proof_sample_rate: int = 1,
     milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for an in-memory config mapping."""
@@ -139,6 +140,7 @@ def generate(
             registry=registry,
             transforms=transforms,
             proof_mode=proof_mode,
+            proof_sample_rate=proof_sample_rate,
             milestone_rows=milestone_rows,
         )
     )
@@ -151,6 +153,7 @@ def generate_from_file(
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
     proof_mode: str = "off",
+    proof_sample_rate: int = 1,
     milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for a config loaded from ``path``."""
@@ -160,5 +163,6 @@ def generate_from_file(
         registry=registry,
         transforms=transforms,
         proof_mode=proof_mode,
+        proof_sample_rate=proof_sample_rate,
         milestone_rows=milestone_rows,
     )

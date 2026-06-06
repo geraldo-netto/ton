@@ -294,3 +294,60 @@ def test_engine_audit_proof_mode_records_failures_without_stopping() -> None:
 def test_engine_rejects_unknown_proof_mode(basic_config: dict) -> None:
     with pytest.raises(ValueError, match="proof_mode"):
         Engine(basic_config, proof_mode="sometimes")
+
+
+def test_engine_sample_proof_mode_skips_unsampled_rows() -> None:
+    class FailingSecondRowGenerator(Generator):
+        type_name = "sampled"
+
+        def __init__(self) -> None:
+            self.count = 0
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            del prepared, rng
+            self.count += 1
+            return f"row-{self.count}"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared
+            return ProofResult(ok=result.value != "row-2", reason="bad second row")
+
+    config = {"rows": 3, "format": "$v$", "types": {"v": {"type": "sampled"}}}
+    rows = list(
+        Engine.from_config(
+            config,
+            registry={"sampled": FailingSecondRowGenerator()},
+            proof_mode="sample",
+            proof_sample_rate=2,
+        )
+    )
+
+    assert rows == ["row-1", "row-2", "row-3"]
+
+
+def test_engine_sample_proof_mode_checks_sampled_rows() -> None:
+    class AlwaysFailingGenerator(Generator):
+        type_name = "sampled"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "bad"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared, result
+            return ProofResult(ok=False, reason="sampled failure")
+
+    config = {"rows": 2, "format": "$v$", "types": {"v": {"type": "sampled"}}}
+    engine = Engine.from_config(
+        config,
+        registry={"sampled": AlwaysFailingGenerator()},
+        proof_mode="sample",
+        proof_sample_rate=2,
+    )
+
+    with pytest.raises(ProofError, match="sampled failure"):
+        list(engine)
+
+
+def test_engine_rejects_bad_proof_sample_rate(basic_config: dict) -> None:
+    with pytest.raises(ValueError, match="proof_sample_rate"):
+        Engine(basic_config, proof_mode="sample", proof_sample_rate=0)

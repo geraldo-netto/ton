@@ -69,6 +69,7 @@ class Engine:
         rng: Random | None = None,
         *,
         proof_mode: str = "off",
+        proof_sample_rate: int = 1,
         seed: int | None = None,
         milestone_rows: int = 0,
     ) -> None:
@@ -80,6 +81,7 @@ class Engine:
         self._transforms = dict(transforms or build_extension_catalog().transforms())
         self._rng = rng if rng is not None else Random()
         self._proof_mode = _validate_proof_mode(proof_mode)
+        self._proof_sample_rate = _validate_proof_sample_rate(proof_sample_rate)
         self._seed = seed
         self._proof_failures_audit: list[ProofFailure] = []
         self._validate()
@@ -121,6 +123,7 @@ class Engine:
         transforms: Mapping[str, Transform] | None = None,
         rng: Random | None = None,
         proof_mode: str = "off",
+        proof_sample_rate: int = 1,
         milestone_rows: int = 0,
     ) -> Engine:
         """Build an Engine, deriving the RNG from ``seed`` when ``rng`` is None.
@@ -138,6 +141,7 @@ class Engine:
             transforms=transforms,
             rng=engine_rng,
             proof_mode=proof_mode,
+            proof_sample_rate=proof_sample_rate,
             seed=seed,
             milestone_rows=milestone_rows,
         )
@@ -151,6 +155,7 @@ class Engine:
         transforms: Mapping[str, Transform] | None = None,
         rng: Random | None = None,
         proof_mode: str = "off",
+        proof_sample_rate: int = 1,
         milestone_rows: int = 0,
     ) -> Engine:
         """Build an Engine from a JSON config on disk.
@@ -165,6 +170,7 @@ class Engine:
             transforms=transforms,
             rng=rng,
             proof_mode=proof_mode,
+            proof_sample_rate=proof_sample_rate,
             milestone_rows=milestone_rows,
         )
 
@@ -388,7 +394,7 @@ class Engine:
         source_result: TransformResult,
         steps: tuple[TransformStep, ...],
     ) -> None:
-        if self._proof_mode == "off":
+        if not self._should_check_proof():
             return
         failures = self._proof_failures(type_key, field, source_result, steps)
         if not failures:
@@ -401,6 +407,13 @@ class Engine:
             f"Proof failed at row {failure.row} for {failure.type_key!r} "
             f"{failure.stage} {failure.reference!r}: {failure.reason}"
         )
+
+    def _should_check_proof(self) -> bool:
+        if self._proof_mode == "off":
+            return False
+        if self._proof_mode == "sample":
+            return self._rows_emitted % self._proof_sample_rate == 0
+        return True
 
     def _apply_transforms_with_trace(
         self,
@@ -516,6 +529,13 @@ def _runtime_type_name(type_name: object) -> str:
 
 
 def _validate_proof_mode(proof_mode: str) -> str:
-    if proof_mode not in {"off", "all", "audit"}:
-        raise ValueError("proof_mode must be 'off', 'all', or 'audit'")
+    if proof_mode not in {"off", "sample", "all", "audit"}:
+        raise ValueError("proof_mode must be 'off', 'sample', 'all', or 'audit'")
     return proof_mode
+
+
+def _validate_proof_sample_rate(proof_sample_rate: int) -> int:
+    parsed = int(proof_sample_rate)
+    if parsed < 1:
+        raise ValueError("proof_sample_rate must be >= 1")
+    return parsed

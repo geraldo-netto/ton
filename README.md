@@ -401,6 +401,57 @@ common
 
 Composite `choices` may themselves nest `weighted` / `oneOf` / `sequence_of`. Paired generators (`lmhash`) cannot be used as a composite child — the `[id]` half would be unreachable from outside the wrapper, so the engine rejects such configs at construction time.
 
+#### Transform chains
+
+Type specs may include an ordered `transforms` list. Legacy specs such as
+`{"type": "integer"}` still work; built-ins can also be referenced with the
+explicit `core.` namespace, for example `{"type": "core.integer"}`.
+
+The built-in `distribution` transform chooses among two or more prepared
+candidate type specs:
+
+```json
+{
+  "type": "string",
+  "values": ["ignored"],
+  "transforms": [
+    {
+      "type": "distribution",
+      "choices": [
+        {"weight": 80, "spec": {"type": "string", "values": ["common"]}},
+        {"weight": 20, "spec": {"type": "integer", "minValue": 1, "maxValue": 9}}
+      ]
+    }
+  ]
+}
+```
+
+Plugins register namespaced data types and transforms through the public
+catalog API or trusted entry points. A plugin-provided type can be referenced
+with its qualified name:
+
+```json
+{"type": "acme.customer_id", "prefix": "CUST"}
+```
+
+Load installed plugin entry points explicitly:
+
+```bash
+ton config.json --entry-points --list-namespaces
+```
+
+Proof checking can validate generated values during a run:
+
+```bash
+ton config.json --proof-check sample --proof-sample-rate 1000
+ton config.json --proof-check all
+ton config.json --proof-check audit
+```
+
+Strict modes (`sample` and `all`) stop on the first proof failure with row,
+field, stage, and reason. Audit mode keeps generating rows and records proof
+failures for library callers via `Engine.proof_failures`.
+
 #### `oneOf`
 
 Pick uniformly between several nested type specs. Same as `weighted` with equal weights, just less typing.

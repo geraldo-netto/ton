@@ -52,7 +52,7 @@ Last full rescan: 2026-06-06.
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| ARCH-001 | open   | L      | Model data types as a virtual filesystem-like namespace: built-ins live under a stable default namespace, plugin types mount into additional namespaces, and type lookup resolves by explicit path/name without allowing plugins to remove or shadow defaults accidentally. |
+| ARCH-001 | open   | L      | Model data types as namespaced registrations: built-ins live under a stable default namespace, plugin types register into additional namespaces, and type lookup resolves by explicit qualified or legacy name without allowing plugins to remove or shadow defaults accidentally. |
 
 ## decoupling
 
@@ -105,5 +105,4 @@ Last full rescan: 2026-06-06.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-001 | open   | M      | Write an architecture note for the Unix-like virtual data-type filesystem: built-in namespace, plugin mounts, transform pipeline, validation/proof-check lifecycle, and compatibility guarantees for existing configs. |
-| DOC-002 | open   | S      | Add README examples showing a built-in type with a distribution transform, a plugin-provided type under a namespace, and proof-check/audit output. |
+| DOC-001 | open   | M      | Write an architecture note for namespaced data-type registration: built-in namespace, plugin registrations, transform pipeline, validation/proof-check lifecycle, and compatibility guarantees for existing configs. |

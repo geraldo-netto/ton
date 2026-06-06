@@ -81,8 +81,7 @@ def _prepare_choice(
 ) -> tuple[float, tuple[Generator, Any]]:
     if not isinstance(choice, Mapping):
         raise ValueError(
-            f"{label} 'choices[{index}]' must be an object with "
-            "'weight' and 'spec' keys"
+            f"{label} 'choices[{index}]' must be an object with 'weight' and 'spec' keys"
         )
     weight = _coerce_weight(index, choice, label)
     child = prepare_child_spec(

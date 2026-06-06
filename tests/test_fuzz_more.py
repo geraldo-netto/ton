@@ -33,8 +33,9 @@ def _basic_int_config(rows: int) -> dict[str, Any]:
     return {
         "rows": rows,
         "format": "$n$",
-        "types": {"n": {"type": "integer", "minValue": 0, "maxValue": 1_000_000,
-                         "padWithZero": False}},
+        "types": {
+            "n": {"type": "integer", "minValue": 0, "maxValue": 1_000_000, "padWithZero": False}
+        },
     }
 
 
@@ -67,9 +68,7 @@ def test_core_namespaced_type_matches_legacy_type(seed: int) -> None:
         },
     }
 
-    assert list(api.generate(namespaced, seed=seed)) == list(
-        api.generate(legacy, seed=seed)
-    )
+    assert list(api.generate(namespaced, seed=seed)) == list(api.generate(legacy, seed=seed))
 
 
 # ---------------------------------------------------------------------------
@@ -91,9 +90,7 @@ def test_rows_emitted_tracks_iteration_count(rows: int) -> None:
 
 
 @pytest.mark.parametrize("k", [0, 1, 5, 9, 10])
-def test_cli_resume_from_matches_truncated_full_run(
-    write_config, tmp_path: Path, k: int
-) -> None:
+def test_cli_resume_from_matches_truncated_full_run(write_config, tmp_path: Path, k: int) -> None:
     from ton.cli import main as cli_main
 
     config = write_config({"rows": 10})
@@ -103,9 +100,7 @@ def test_cli_resume_from_matches_truncated_full_run(
     full_rows = full_out.read_text().splitlines()
 
     resume_out = tmp_path / "resume.txt"
-    cli_main(
-        [str(config), "--seed", "0", "-o", str(resume_out), "--resume-from", str(k)]
-    )
+    cli_main([str(config), "--seed", "0", "-o", str(resume_out), "--resume-from", str(k)])
     resume_rows = resume_out.read_text().splitlines()
     assert resume_rows == full_rows[k:]
 
@@ -124,15 +119,17 @@ def test_fork_engine_workers_yield_disjoint_streams_when_partitioned() -> None:
         config = {
             "rows": rows_per_worker,
             "format": "$id$",
-            "types": {"id": {
-                "type": "sequence",
-                "start": wid * rows_per_worker,
-                "step": 1,
-            }},
+            "types": {
+                "id": {
+                    "type": "sequence",
+                    "start": wid * rows_per_worker,
+                    "step": 1,
+                }
+            },
         }
-        chunks.append(list(fork_engine(
-            config, parent_seed=42, worker_id=wid, rows=rows_per_worker
-        )))
+        chunks.append(
+            list(fork_engine(config, parent_seed=42, worker_id=wid, rows=rows_per_worker))
+        )
     flattened = [row for chunk in chunks for row in chunk]
     assert len(set(flattened)) == workers * rows_per_worker
 
@@ -194,8 +191,15 @@ def test_multi_token_templates_render_consistently(seed: int) -> None:
 def test_make_registry_returns_only_requested_types(seed: int) -> None:
     rng = Random(seed)
     universe = [
-        "integer", "decimal", "uuid", "sequence", "bytes",
-        "text", "char", "string", "boolean",
+        "integer",
+        "decimal",
+        "uuid",
+        "sequence",
+        "bytes",
+        "text",
+        "char",
+        "string",
+        "boolean",
     ]
     requested = set(rng.sample(universe, k=rng.randint(1, len(universe))))
     registry = make_registry(requested)
@@ -221,8 +225,7 @@ def test_integer_pad_width_matches_widest_bound(lo: int, hi: int, seed: int) -> 
     config = {
         "rows": 60,
         "format": "$n$",
-        "types": {"n": {"type": "integer", "minValue": lo, "maxValue": hi,
-                         "padWithZero": True}},
+        "types": {"n": {"type": "integer", "minValue": lo, "maxValue": hi, "padWithZero": True}},
     }
     expected_width = max(len(str(lo)), len(str(hi)))
     rows = list(api.generate(config, seed=seed))
@@ -284,14 +287,16 @@ def test_lmhash_paired_within_row_stays_consistent() -> None:
 def test_cli_output_lines_are_utf8_decodable(write_config, tmp_path: Path) -> None:
     config_path = tmp_path / "cfg.json"
     config_path.write_text(
-        json.dumps({
-            "rows": 25,
-            "format": "$a$|$b$",
-            "types": {
-                "a": {"type": "uuid", "version": 4},
-                "b": {"type": "bytes", "length": 8, "encoding": "hex"},
-            },
-        }),
+        json.dumps(
+            {
+                "rows": 25,
+                "format": "$a$|$b$",
+                "types": {
+                    "a": {"type": "uuid", "version": 4},
+                    "b": {"type": "bytes", "length": 8, "encoding": "hex"},
+                },
+            }
+        ),
         encoding="utf-8",
     )
     out = tmp_path / "out.txt"

@@ -37,9 +37,9 @@ from .base import Generator
 
 @dataclass(frozen=True)
 class IPNetworkSpec:
-    network_int: int   # first usable address (network address)
-    size: int          # number of addresses in the block
-    version: int       # 4 or 6
+    network_int: int  # first usable address (network address)
+    size: int  # number of addresses in the block
+    version: int  # 4 or 6
 
 
 def _prepare_ip(spec: Mapping[str, Any], default_cidr: str, version: int) -> IPNetworkSpec:

@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 from pathlib import Path
-from threading import Thread
+from unittest import mock
 
 import pytest
 
 from ton.cli import main
 
 
-def test_cli_writes_rows_to_stdout(
-    write_config, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_writes_rows_to_stdout(write_config, capsys: pytest.CaptureFixture[str]) -> None:
     config = write_config()
     exit_code = main([str(config), "--seed", "0"])
     captured = capsys.readouterr()
@@ -32,9 +31,7 @@ def test_cli_writes_rows_to_output_file(write_config, tmp_path: Path) -> None:
     assert len(out_file.read_text().strip().splitlines()) == 4
 
 
-def test_cli_seed_is_reproducible(
-    write_config, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_seed_is_reproducible(write_config, capsys: pytest.CaptureFixture[str]) -> None:
     config = write_config()
     main([str(config), "--seed", "42"])
     first = capsys.readouterr().out
@@ -43,18 +40,14 @@ def test_cli_seed_is_reproducible(
     assert first == second
 
 
-def test_cli_missing_config_returns_1(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_missing_config_returns_1(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main([str(tmp_path / "missing.json")])
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "ton:" in captured.err
 
 
-def test_cli_invalid_config_returns_2(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_invalid_config_returns_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     bad = tmp_path / "bad.json"
     bad.write_text("{}", encoding="utf-8")
     exit_code = main([str(bad)])
@@ -178,17 +171,17 @@ def test_cli_requires_config_when_not_listing(
     assert "config path is required" in captured.err
 
 
-def test_cli_accepts_proof_check_flags(
-    write_config, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_accepts_proof_check_flags(write_config, capsys: pytest.CaptureFixture[str]) -> None:
     config = write_config()
-    exit_code = main([
-        str(config),
-        "--proof-check",
-        "sample",
-        "--proof-sample-rate",
-        "2",
-    ])
+    exit_code = main(
+        [
+            str(config),
+            "--proof-check",
+            "sample",
+            "--proof-sample-rate",
+            "2",
+        ]
+    )
     captured = capsys.readouterr()
 
     assert exit_code == 0
@@ -199,13 +192,15 @@ def test_cli_build_engine_preserves_seed_for_proof_context(write_config) -> None
     from ton import cli
 
     config = write_config()
-    args = cli._build_parser().parse_args([
-        str(config),
-        "--seed",
-        "7",
-        "--proof-check",
-        "audit",
-    ])
+    args = cli._build_parser().parse_args(
+        [
+            str(config),
+            "--seed",
+            "7",
+            "--proof-check",
+            "audit",
+        ]
+    )
     engine = cli._build_engine(args)
 
     assert engine._seed == 7
@@ -258,22 +253,31 @@ def test_cli_entry_point_allowlist_option_still_generates_rows(
 
 
 def test_open_output_streams_existing_fifo(tmp_path: Path) -> None:
-    if not hasattr(os, "mkfifo"):
-        pytest.skip("mkfifo is not available on this platform")
     from ton.cli import _open_output
 
     fifo = tmp_path / "rows.fifo"
-    os.mkfifo(fifo)
-    received: list[str] = []
-
-    def _read_fifo() -> None:
-        with open(fifo, encoding="utf-8") as reader:
-            received.append(reader.read())
-
-    reader_thread = Thread(target=_read_fifo)
-    reader_thread.start()
-    with _open_output(str(fifo)) as writer:
+    fifo.write_text("", encoding="utf-8")
+    fifo_stat = os.stat_result(
+        (
+            stat.S_IFIFO | 0o600,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
+    )
+    opened = mock.mock_open()
+    with (
+        mock.patch("ton.cli.os.stat", return_value=fifo_stat),
+        mock.patch("builtins.open", opened),
+        _open_output(str(fifo)) as writer,
+    ):
         writer.write("row\n")
-    reader_thread.join(timeout=2)
 
-    assert received == ["row\n"]
+    opened.assert_called_once_with(str(fifo), "w", encoding="utf-8")
+    opened().write.assert_called_once_with("row\n")

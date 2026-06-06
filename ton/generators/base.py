@@ -203,9 +203,7 @@ def coerce_int(
     try:
         return int(raw)
     except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"{type_name} {key!r} must be an integer (got {raw!r})"
-        ) from exc
+        raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})") from exc
 
 
 def require_min_le_max(type_name: str, lo: Any, hi: Any) -> None:
@@ -213,9 +211,7 @@ def require_min_le_max(type_name: str, lo: Any, hi: Any) -> None:
     integer / decimal / date / timestamp_unix generators (TODO DUP-004).
     """
     if hi < lo:
-        raise ValueError(
-            f"{type_name} 'maxValue' ({hi}) must be >= 'minValue' ({lo})"
-        )
+        raise ValueError(f"{type_name} 'maxValue' ({hi}) must be >= 'minValue' ({lo})")
 
 
 def assert_below_cap(type_name: str, field: str, value: int, cap: int, cap_name: str) -> None:
@@ -223,9 +219,7 @@ def assert_below_cap(type_name: str, field: str, value: int, cap: int, cap_name:
     to keep their "X exceeds MAX_X" rejections in one place (TODO DUP-005).
     """
     if value > cap:
-        raise ValueError(
-            f"{type_name} {field!r} exceeds {cap_name} ({cap})"
-        )
+        raise ValueError(f"{type_name} {field!r} exceeds {cap_name} ({cap})")
 
 
 def prepare_child_spec(
@@ -246,16 +240,12 @@ def prepare_child_spec(
     lose its ``[id]`` half once nested -- REL-019).
     """
     if not isinstance(nested_spec, Mapping) or "type" not in nested_spec:
-        raise ValueError(
-            f"{parent_type} {location} must be an object with a 'type' field"
-        )
+        raise ValueError(f"{parent_type} {location} must be an object with a 'type' field")
     nested_type = str(nested_spec["type"])
     if nested_type.startswith("core."):
         nested_type = nested_type.split(".", 1)[1]
     if nested_type not in registry:
-        raise ValueError(
-            f"{parent_type} {location} references unknown type {nested_type!r}"
-        )
+        raise ValueError(f"{parent_type} {location} references unknown type {nested_type!r}")
     child = registry[nested_type]
     if child.is_paired:
         raise ValueError(

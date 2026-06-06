@@ -41,9 +41,7 @@ CORE_NAMESPACE = "core"
 #: Allowlist of built-in ``type_name`` strings. Used by
 #: :func:`discover_generator_classes` to ignore in-process subclasses
 #: that aren't part of TON itself (TODO ARCH-005).
-_BUILTIN_TYPE_NAMES: frozenset[str] = frozenset(
-    cls.type_name for cls in BUILTIN_GENERATOR_CLASSES
-)
+_BUILTIN_TYPE_NAMES: frozenset[str] = frozenset(cls.type_name for cls in BUILTIN_GENERATOR_CLASSES)
 
 
 class RegistryError(ValueError):
@@ -63,12 +61,8 @@ class ExtensionCatalog:
         self._generators: dict[str, dict[str, Generator]] = {
             CORE_NAMESPACE: dict(generators or default_registry())
         }
-        self._transforms: dict[str, dict[str, Transform]] = {
-            CORE_NAMESPACE: dict(transforms or {})
-        }
-        self._validators: dict[str, dict[str, Any]] = {
-            CORE_NAMESPACE: dict(validators or {})
-        }
+        self._transforms: dict[str, dict[str, Transform]] = {CORE_NAMESPACE: dict(transforms or {})}
+        self._validators: dict[str, dict[str, Any]] = {CORE_NAMESPACE: dict(validators or {})}
 
     def register_data_type(
         self,
@@ -302,9 +296,7 @@ def discover_generator_classes() -> list[type[Generator]]:
     return [
         cls
         for cls in _walk_subclasses(Generator)  # type: ignore[type-abstract]
-        if not inspect.isabstract(cls)
-        and cls.type_name
-        and cls.type_name in _BUILTIN_TYPE_NAMES
+        if not inspect.isabstract(cls) and cls.type_name and cls.type_name in _BUILTIN_TYPE_NAMES
     ]
 
 

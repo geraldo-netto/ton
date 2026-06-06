@@ -147,9 +147,7 @@ def _coerce(spec: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[float, ...]
         )
     weights: Sequence[Any] = spec["weights"]
     if not isinstance(weights, list) or len(weights) != len(raw_values):
-        raise ValueError(
-            "weighted 'weights' must be a list the same length as 'values'"
-        )
+        raise ValueError("weighted 'weights' must be a list the same length as 'values'")
     return (
         tuple(str(v) for v in raw_values),
         tuple(float(w) for w in weights),

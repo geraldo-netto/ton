@@ -46,8 +46,7 @@ class TimestampUnixGenerator(Generator):
         unit = str(spec.get("unit", "seconds"))
         if unit not in _UNIT_MULTIPLIERS:
             raise ValueError(
-                f"timestamp_unix 'unit' must be one of {sorted(_UNIT_MULTIPLIERS)} "
-                f"(got {unit!r})"
+                f"timestamp_unix 'unit' must be one of {sorted(_UNIT_MULTIPLIERS)} (got {unit!r})"
             )
         return TimestampUnixSpec(
             lo_epoch_seconds=int(lo.timestamp()),

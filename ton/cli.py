@@ -321,9 +321,7 @@ def _open_output(path: str | None, *, no_clobber: bool = False) -> Iterator[Text
                     "mode": st.st_mode,
                 },
             )
-            raise OSError(
-                f"refusing to write to special file (not a regular file): {path}"
-            )
+            raise OSError(f"refusing to write to special file (not a regular file): {path}")
         if no_clobber:
             raise OSError(f"refusing to overwrite existing file: {path}")
         _logger.warning(

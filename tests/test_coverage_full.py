@@ -69,9 +69,7 @@ def test_walk_subclasses_skips_already_yielded_diamond() -> None:
     real_root_subs = Root.__subclasses__
     real_middle_subs = Middle.__subclasses__
 
-    with mock.patch.object(Root, "__subclasses__", staticmethod(
-        lambda: real_root_subs() + [Leaf]
-    )):
+    with mock.patch.object(Root, "__subclasses__", staticmethod(lambda: real_root_subs() + [Leaf])):
         seen = list(_walk_subclasses(Root))  # type: ignore[arg-type]
     assert seen.count(Leaf) == 1  # type: ignore[comparison-overlap]
     # Silence unused-warning lint on the unused helper.
@@ -151,12 +149,15 @@ def test_entry_point_dist_returns_none_when_attribute_missing() -> None:
 def test_engine_from_file_loads_and_iterates(tmp_path: Path) -> None:
     path = tmp_path / "cfg.json"
     path.write_text(
-        json.dumps({
-            "rows": 3,
-            "format": "$n$",
-            "types": {"n": {"type": "integer", "minValue": 1, "maxValue": 9,
-                            "padWithZero": False}},
-        }),
+        json.dumps(
+            {
+                "rows": 3,
+                "format": "$n$",
+                "types": {
+                    "n": {"type": "integer", "minValue": 1, "maxValue": 9, "padWithZero": False}
+                },
+            }
+        ),
         encoding="utf-8",
     )
     engine = Engine.from_file(str(path))
@@ -174,8 +175,9 @@ def test_engine_iter_literal_only_template() -> None:
     config = {
         "rows": 2,
         "format": "literal-row",
-        "types": {"unused": {"type": "integer", "minValue": 0, "maxValue": 1,
-                              "padWithZero": False}},
+        "types": {
+            "unused": {"type": "integer", "minValue": 0, "maxValue": 1, "padWithZero": False}
+        },
     }
     rows = list(api.generate(config, seed=0))
     assert rows == ["literal-row", "literal-row"]
@@ -214,9 +216,7 @@ def test_engine_logs_generate_failed_and_wraps_in_template_error(
 # ---------------------------------------------------------------------------
 
 
-def test_cli_rejects_negative_progress(
-    write_config, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_rejects_negative_progress(write_config, capsys: pytest.CaptureFixture[str]) -> None:
     config = write_config()
     with pytest.raises(SystemExit):
         cli_main([str(config), "--progress", "-1"])
@@ -224,9 +224,7 @@ def test_cli_rejects_negative_progress(
     assert "must be >= 0" in err
 
 
-def test_cli_rejects_zero_batch_rows(
-    write_config, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_rejects_zero_batch_rows(write_config, capsys: pytest.CaptureFixture[str]) -> None:
     config = write_config()
     with pytest.raises(SystemExit):
         cli_main([str(config), "--batch-rows", "0"])
@@ -247,9 +245,7 @@ def test_cli_accepts_explicit_batch_rows(write_config, tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_cli_log_level_attaches_handler(
-    write_config, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_log_level_attaches_handler(write_config, capsys: pytest.CaptureFixture[str]) -> None:
     config = write_config()
     code = cli_main([str(config), "--seed", "0", "--log-level", "info"])
     assert code == 0
@@ -290,9 +286,7 @@ def test_cli_overwrite_logs_warning(
 # ---------------------------------------------------------------------------
 
 
-def test_cli_resume_from_skips_rows(
-    write_config, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_cli_resume_from_skips_rows(write_config, capsys: pytest.CaptureFixture[str]) -> None:
     config = write_config({"rows": 10})
     code = cli_main([str(config), "--seed", "0", "--resume-from", "7"])
     assert code == 0
@@ -314,9 +308,7 @@ def test_progress_handler_install_idempotent(
     config = write_config()
     cli_main([str(config), "--seed", "0", "--progress", "2"])
     cli_main([str(config), "--seed", "0", "--progress", "2"])
-    progress_handlers = [
-        h for h in cli._logger.handlers if isinstance(h, cli._ProgressJSONHandler)
-    ]
+    progress_handlers = [h for h in cli._logger.handlers if isinstance(h, cli._ProgressJSONHandler)]
     assert len(progress_handlers) == 1
     # Drain captured output so subsequent tests do not see this run's JSON.
     capsys.readouterr()
@@ -372,8 +364,9 @@ def test_registry_skips_broken_entry_point(
     ):
         registry = registry_with_entry_points()
     assert "bad_plugin" not in registry
-    events = [r for r in caplog.records
-              if getattr(r, "event", None) == _LE.ENTRY_POINT_FAILED.value]
+    events = [
+        r for r in caplog.records if getattr(r, "event", None) == _LE.ENTRY_POINT_FAILED.value
+    ]
     assert events and getattr(events[0], "error", "").startswith("ImportError")
 
 
@@ -383,13 +376,23 @@ def test_registry_skips_broken_entry_point(
 
 
 def test_cli_refuses_write_to_special_file(
-    write_config, capsys: pytest.CaptureFixture[str]
+    write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     """``/dev/null`` is a character device; the CLI must reject it."""
-    if not Path("/dev/null").exists():
-        pytest.skip("/dev/null not present")
     config = write_config()
-    code = cli_main([str(config), "-o", "/dev/null"])
+    output = tmp_path / "special-output"
+    output.write_text("", encoding="utf-8")
+    real_stat = mock.Mock(wraps=__import__("os").stat)
+    device_stat = mock.Mock()
+    device_stat.st_mode = 0
+
+    def fake_stat(path: str | Path, *args: Any, **kwargs: Any) -> object:
+        if Path(path) == output:
+            return device_stat
+        return real_stat(path, *args, **kwargs)
+
+    with mock.patch("ton.cli.os.stat", side_effect=fake_stat):
+        code = cli_main([str(config), "-o", str(output)])
     assert code == 1
     assert "special file" in capsys.readouterr().err
 
@@ -433,8 +436,9 @@ def test_entry_point_load_logs_sanitized_name(
         caplog.at_level(logging_mod.INFO, logger="ton"),
     ):
         registry_with_entry_points()
-    record = next(r for r in caplog.records
-                  if getattr(r, "event", None) == _LE.ENTRY_POINT_LOADED.value)
+    record = next(
+        r for r in caplog.records if getattr(r, "event", None) == _LE.ENTRY_POINT_LOADED.value
+    )
     assert "\x1b" not in getattr(record, "ep_name", "")
     assert "\x00" not in getattr(record, "value", "")
 
@@ -449,8 +453,7 @@ def test_cli_resume_overshoot_warns_and_empties(
 ) -> None:
     config = write_config({"rows": 4})
     out = tmp_path / "out.txt"
-    code = cli_main([str(config), "--seed", "0", "-o", str(out),
-                     "--resume-from", "999"])
+    code = cli_main([str(config), "--seed", "0", "-o", str(out), "--resume-from", "999"])
     assert code == 0
     assert out.read_text() == ""
     err = capsys.readouterr().err

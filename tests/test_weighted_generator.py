@@ -22,9 +22,11 @@ def test_weighted_parallel_arrays_distribution() -> None:
 
 def test_weighted_record_form() -> None:
     gen = WeightedGenerator()
-    prepared = gen.prepare({
-        "values": [{"value": "x", "weight": 1}, {"value": "y", "weight": 0}],
-    })
+    prepared = gen.prepare(
+        {
+            "values": [{"value": "x", "weight": 1}, {"value": "y", "weight": 0}],
+        }
+    )
     rng = Random(0)
     assert all(gen.generate(prepared, rng) == "x" for _ in range(50))
 
@@ -65,12 +67,16 @@ def test_weighted_composite_mixes_types_via_engine() -> None:
             "v": {
                 "type": "weighted",
                 "choices": [
-                    {"weight": 70,
-                     "spec": {"type": "string", "values": ["STR"]}},
-                    {"weight": 30,
-                     "spec": {"type": "integer",
-                              "minValue": 0, "maxValue": 9,
-                              "padWithZero": False}},
+                    {"weight": 70, "spec": {"type": "string", "values": ["STR"]}},
+                    {
+                        "weight": 30,
+                        "spec": {
+                            "type": "integer",
+                            "minValue": 0,
+                            "maxValue": 9,
+                            "padWithZero": False,
+                        },
+                    },
                 ],
             }
         },
@@ -124,15 +130,16 @@ def test_weighted_composite_can_nest_inside_weighted() -> None:
             "v": {
                 "type": "weighted",
                 "choices": [
-                    {"weight": 1, "spec": {
-                        "type": "weighted",
-                        "choices": [
-                            {"weight": 1, "spec": {"type": "string",
-                                                    "values": ["inner-a"]}},
-                            {"weight": 1, "spec": {"type": "string",
-                                                    "values": ["inner-b"]}},
-                        ],
-                    }},
+                    {
+                        "weight": 1,
+                        "spec": {
+                            "type": "weighted",
+                            "choices": [
+                                {"weight": 1, "spec": {"type": "string", "values": ["inner-a"]}},
+                                {"weight": 1, "spec": {"type": "string", "values": ["inner-b"]}},
+                            ],
+                        },
+                    },
                     {"weight": 0, "spec": {"type": "string", "values": ["zzz"]}},
                 ],
             }
@@ -146,11 +153,13 @@ def test_weighted_composite_rejects_direct_prepare_call() -> None:
     """``WeightedGenerator.prepare`` cannot resolve nested specs without
     the engine's registry; calling it on a composite spec is an error."""
     with pytest.raises(ValueError, match="composite"):
-        WeightedGenerator().prepare({
-            "choices": [
-                {"weight": 1, "spec": {"type": "string", "values": ["x"]}},
-            ],
-        })
+        WeightedGenerator().prepare(
+            {
+                "choices": [
+                    {"weight": 1, "spec": {"type": "string", "values": ["x"]}},
+                ],
+            }
+        )
 
 
 def test_weighted_composite_rejects_unknown_nested_type() -> None:
@@ -160,12 +169,14 @@ def test_weighted_composite_rejects_unknown_nested_type() -> None:
     config = {
         "rows": 1,
         "format": "$v$",
-        "types": {"v": {
-            "type": "weighted",
-            "choices": [
-                {"weight": 1, "spec": {"type": "no_such_type"}},
-            ],
-        }},
+        "types": {
+            "v": {
+                "type": "weighted",
+                "choices": [
+                    {"weight": 1, "spec": {"type": "no_such_type"}},
+                ],
+            }
+        },
     }
     with pytest.raises(TemplateError, match="no_such_type"):
         list(api.generate(config))
@@ -193,14 +204,16 @@ def test_weighted_composite_defaults_to_uniform_when_weight_omitted() -> None:
     config = {
         "rows": 300,
         "format": "$v$",
-        "types": {"v": {
-            "type": "weighted",
-            "choices": [
-                {"spec": {"type": "string", "values": ["A"]}},
-                {"spec": {"type": "string", "values": ["B"]}},
-                {"spec": {"type": "string", "values": ["C"]}},
-            ],
-        }},
+        "types": {
+            "v": {
+                "type": "weighted",
+                "choices": [
+                    {"spec": {"type": "string", "values": ["A"]}},
+                    {"spec": {"type": "string", "values": ["B"]}},
+                    {"spec": {"type": "string", "values": ["C"]}},
+                ],
+            }
+        },
     }
     counts = Counter(api.generate(config, seed=0))
     # Uniform over 3 choices: each ~100 +/- generous slack.
@@ -217,11 +230,12 @@ def test_weighted_composite_rejects_non_numeric_weight() -> None:
     config = {
         "rows": 1,
         "format": "$v$",
-        "types": {"v": {
-            "type": "weighted",
-            "choices": [{"weight": "abc",
-                         "spec": {"type": "string", "values": ["x"]}}],
-        }},
+        "types": {
+            "v": {
+                "type": "weighted",
+                "choices": [{"weight": "abc", "spec": {"type": "string", "values": ["x"]}}],
+            }
+        },
     }
     with pytest.raises(TemplateError, match="numeric"):
         list(api.generate(config))
@@ -234,10 +248,12 @@ def test_weighted_composite_rejects_choice_missing_spec() -> None:
     config = {
         "rows": 1,
         "format": "$v$",
-        "types": {"v": {
-            "type": "weighted",
-            "choices": [{"weight": 1, "spec": {"values": ["x"]}}],
-        }},
+        "types": {
+            "v": {
+                "type": "weighted",
+                "choices": [{"weight": 1, "spec": {"values": ["x"]}}],
+            }
+        },
     }
     with pytest.raises(TemplateError, match="type"):
         list(api.generate(config))
@@ -250,10 +266,12 @@ def test_weighted_composite_rejects_non_mapping_choice() -> None:
     config = {
         "rows": 1,
         "format": "$v$",
-        "types": {"v": {
-            "type": "weighted",
-            "choices": ["not-an-object"],
-        }},
+        "types": {
+            "v": {
+                "type": "weighted",
+                "choices": ["not-an-object"],
+            }
+        },
     }
     with pytest.raises(TemplateError, match="weight"):
         list(api.generate(config))

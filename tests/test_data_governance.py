@@ -14,9 +14,14 @@ _SENSITIVE_ASSIGNMENTS = (
     b"PASS" + b"WORD",
 )
 PRIVATE_OR_SECRET_RE = re.compile(
-    b"/ho" + b"me/|/back" + b"ups/|"
+    b"/ho"
+    + b"me/|/back"
+    + b"ups/|"
     + rb"|".join(marker + rb"\s*[=:]" for marker in _SENSITIVE_ASSIGNMENTS)
-    + b"|PRIVATE " + b"KEY|BEGIN " + b"RSA|BEGIN " + b"OPENSSH"
+    + b"|PRIVATE "
+    + b"KEY|BEGIN "
+    + b"RSA|BEGIN "
+    + b"OPENSSH"
 )
 
 

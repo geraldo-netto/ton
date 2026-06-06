@@ -114,6 +114,4 @@ class PhoneGenerator(Generator):
         return PhoneSpec(pattern=pattern)
 
     def generate(self, prepared: PhoneSpec, rng: Random) -> str:
-        return "".join(
-            str(rng.randint(0, 9)) if ch == "#" else ch for ch in prepared.pattern
-        )
+        return "".join(str(rng.randint(0, 9)) if ch == "#" else ch for ch in prepared.pattern)

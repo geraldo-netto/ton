@@ -140,15 +140,15 @@ def test_cli_report_handles_zero_elapsed(capsys: pytest.CaptureFixture[str]) -> 
 @pytest.mark.parametrize(
     "pattern",
     [
-        ".",            # ANY
-        "[^abc]",       # NEGATE
-        "[^0-9]",       # NEGATE with RANGE
-        "\\D",          # CATEGORY_NOT_DIGIT
-        "\\W",          # CATEGORY_NOT_WORD
-        "\\S",          # CATEGORY_NOT_SPACE
-        "[^\\d]",       # NEGATE with CATEGORY
-        r"^abc$",       # AT anchors
-        "[abc\\d]",     # class with literal + category
+        ".",  # ANY
+        "[^abc]",  # NEGATE
+        "[^0-9]",  # NEGATE with RANGE
+        "\\D",  # CATEGORY_NOT_DIGIT
+        "\\W",  # CATEGORY_NOT_WORD
+        "\\S",  # CATEGORY_NOT_SPACE
+        "[^\\d]",  # NEGATE with CATEGORY
+        r"^abc$",  # AT anchors
+        "[abc\\d]",  # class with literal + category
     ],
 )
 def test_regex_generator_handles_extended_constructs(pattern: str) -> None:
@@ -250,10 +250,12 @@ def test_timestamp_unix_handles_tz_aware_input() -> None:
     from ton.generators.timestamp_unix import TimestampUnixGenerator
 
     gen = TimestampUnixGenerator()
-    prepared = gen.prepare({
-        "minValue": "2024-01-01T00:00:00+00:00",
-        "maxValue": "2024-01-01T00:00:01+00:00",
-    })
+    prepared = gen.prepare(
+        {
+            "minValue": "2024-01-01T00:00:00+00:00",
+            "maxValue": "2024-01-01T00:00:01+00:00",
+        }
+    )
     assert int(gen.generate(prepared, Random(0))) > 0
 
 
@@ -288,11 +290,15 @@ def test_cli_stream_flushes_batch_when_buffer_full(
 
     config_path = tmp_path / "big.json"
     config_path.write_text(
-        json.dumps({
-            "rows": 5000,  # > 2 * _BATCH_ROWS triggers the mid-stream write
-            "format": "$n$",
-            "types": {"n": {"type": "integer", "minValue": 0, "maxValue": 9, "padWithZero": False}},
-        }),
+        json.dumps(
+            {
+                "rows": 5000,  # > 2 * _BATCH_ROWS triggers the mid-stream write
+                "format": "$n$",
+                "types": {
+                    "n": {"type": "integer", "minValue": 0, "maxValue": 9, "padWithZero": False}
+                },
+            }
+        ),
         encoding="utf-8",
     )
     output = tmp_path / "out.txt"

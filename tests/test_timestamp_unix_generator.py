@@ -23,11 +23,13 @@ def test_seconds_within_bounds() -> None:
 
 def test_millis_multiplies_by_1000() -> None:
     gen = TimestampUnixGenerator()
-    prepared = gen.prepare({
-        "minValue": "2024-01-01T00:00:00",
-        "maxValue": "2024-01-01T00:00:00",
-        "unit": "millis",
-    })
+    prepared = gen.prepare(
+        {
+            "minValue": "2024-01-01T00:00:00",
+            "maxValue": "2024-01-01T00:00:00",
+            "unit": "millis",
+        }
+    )
     value = int(gen.generate(prepared, Random(0)))
     assert value == _epoch(2024, 1, 1) * 1000
 

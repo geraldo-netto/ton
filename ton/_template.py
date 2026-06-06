@@ -104,7 +104,7 @@ def split_segments(template: str) -> tuple[list[str], list[Token]]:
     for match in _TOKEN_RE.finditer(template):
         if match.group(0) == _LITERAL_DOLLAR:
             continue
-        literals.append(template[last_end:match.start()].replace(_LITERAL_DOLLAR, "$"))
+        literals.append(template[last_end : match.start()].replace(_LITERAL_DOLLAR, "$"))
         raw = match.group(1)
         wants_id = raw.endswith(_ID_SUFFIX)
         key = raw[: -len(_ID_SUFFIX)] if wants_id else raw
@@ -122,6 +122,7 @@ def render(template: str, values: Mapping[str, str]) -> str:
     placeholders are left in place. One regex pass replaces every
     match, so the cost is O(template_length) per row.
     """
+
     def _sub(match: re.Match[str]) -> str:
         if match.group(0) == _LITERAL_DOLLAR:
             return "$"

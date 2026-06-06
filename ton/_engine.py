@@ -132,9 +132,7 @@ class Engine:
         :mod:`ton.concurrency` so RNG-construction defaults stay in one
         place (TODO DEC-004).
         """
-        engine_rng = rng if rng is not None else (
-            Random(seed) if seed is not None else Random()
-        )
+        engine_rng = rng if rng is not None else (Random(seed) if seed is not None else Random())
         return cls(
             config,
             registry=registry,
@@ -206,16 +204,14 @@ class Engine:
             seen.add(type_key)
             spec = self._types[type_key]
             failures = sum(
-                1 for failure in self._proof_failures_audit
-                if failure.type_key == type_key
+                1 for failure in self._proof_failures_audit if failure.type_key == type_key
             )
             records.append(
                 ProvenanceRecord(
                     type_key=type_key,
                     source_type=str(spec["type"]),
                     transforms=tuple(
-                        str(transform["type"])
-                        for transform in spec.get("transforms", [])
+                        str(transform["type"]) for transform in spec.get("transforms", [])
                     ),
                     proof_mode=self._proof_mode,
                     proof_sample_rate=self._proof_sample_rate,
@@ -251,9 +247,7 @@ class Engine:
         for token in self._tokens:
             type_name = _runtime_type_name(self._types[token.type_key]["type"])
             if type_name not in self._registry:
-                raise TemplateError(
-                    f"Unknown type {type_name!r} for variable {token.type_key!r}"
-                )
+                raise TemplateError(f"Unknown type {type_name!r} for variable {token.type_key!r}")
 
     def _build_prepared(self) -> dict[str, PreparedField]:
         prepared: dict[str, PreparedField] = {}
@@ -290,8 +284,7 @@ class Engine:
                     },
                 )
                 raise TemplateError(
-                    f"Invalid spec for variable {token.type_key!r}: "
-                    f"{type(exc).__name__}: {exc}"
+                    f"Invalid spec for variable {token.type_key!r}: {type(exc).__name__}: {exc}"
                 ) from exc
         return prepared
 
@@ -395,9 +388,7 @@ class Engine:
         parts.append(literals[-1])
         return "".join(parts)
 
-    def _resolve(
-        self, token: Token, paired_cache: dict[str, tuple[str, str]] | None
-    ) -> str:
+    def _resolve(self, token: Token, paired_cache: dict[str, tuple[str, str]] | None) -> str:
         field = self._prepared[token.type_key]
         generator = field.generator
         try:

@@ -133,8 +133,7 @@ def _validate_type_spec(name: str, spec: Any) -> None:
     for index, transform in enumerate(transforms):
         if not isinstance(transform, dict) or "type" not in transform:
             raise ConfigError(
-                f"Type spec {name!r} transform {index} must be an object "
-                "with a 'type' field."
+                f"Type spec {name!r} transform {index} must be an object with a 'type' field."
             )
 
 

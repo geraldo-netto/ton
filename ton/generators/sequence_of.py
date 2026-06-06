@@ -66,15 +66,16 @@ class SequenceOfGenerator(Generator):
         if count < 1:
             raise ValueError("sequence_of 'count' must be >= 1")
         assert_below_cap(
-            "sequence_of", "count", count,
-            MAX_SEQUENCE_OF_COUNT, "MAX_SEQUENCE_OF_COUNT",
+            "sequence_of",
+            "count",
+            count,
+            MAX_SEQUENCE_OF_COUNT,
+            "MAX_SEQUENCE_OF_COUNT",
         )
         separator = spec.get("separator", "")
         if not isinstance(separator, str):
             raise ValueError("sequence_of 'separator' must be a string")
-        child = prepare_child_spec(
-            "sequence_of", "'spec'", spec.get("spec"), registry
-        )
+        child = prepare_child_spec("sequence_of", "'spec'", spec.get("spec"), registry)
         return SequenceOfSpec(count=count, separator=separator, child=child)
 
     def generate(self, prepared: SequenceOfSpec, rng: Random) -> str:

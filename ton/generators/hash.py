@@ -43,20 +43,15 @@ class HashGenerator(PairedGenerator):
         algorithm = str(spec.get("algorithm", "sha256")).lower()
         if algorithm not in _ALGORITHMS:
             raise ValueError(
-                "hash 'algorithm' must be one of "
-                f"{list(_ALGORITHMS)} (got {algorithm!r})"
+                f"hash 'algorithm' must be one of {list(_ALGORITHMS)} (got {algorithm!r})"
             )
         if algorithm == "bcrypt":
             rounds = coerce_int(spec, "rounds", type_name="hash", default=12)
             if not 4 <= rounds <= 31:
                 raise ValueError("hash 'rounds' must be between 4 and 31")
-            return HashSpec(
-                pairs=tuple((word, _bcrypt_digest(word, rounds)) for word in words)
-            )
+            return HashSpec(pairs=tuple((word, _bcrypt_digest(word, rounds)) for word in words))
         hash_one = _HASHERS[algorithm]
-        return HashSpec(
-            pairs=tuple((word, hash_one(word.encode("utf-8"))) for word in words)
-        )
+        return HashSpec(pairs=tuple((word, hash_one(word.encode("utf-8"))) for word in words))
 
     def generate_pair(self, prepared: HashSpec, rng: Random) -> tuple[str, str]:
         """Return ``(plaintext, digest)`` drawn from the precomputed pool."""
@@ -67,9 +62,7 @@ def _bcrypt_digest(plaintext: str, rounds: int) -> str:
     try:
         import bcrypt
     except ImportError as exc:
-        raise ValueError(
-            "hash algorithm 'bcrypt' requires installing ton[bcrypt]"
-        ) from exc
+        raise ValueError("hash algorithm 'bcrypt' requires installing ton[bcrypt]") from exc
     salt = _bcrypt_salt(plaintext, rounds)
     return bcrypt.hashpw(plaintext.encode("utf-8"), salt).decode("ascii")
 

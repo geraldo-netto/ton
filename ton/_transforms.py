@@ -64,6 +64,7 @@ class Transform(Protocol):
         rng: Random,
     ) -> TransformResult:
         """Return the transformed value."""
+        raise NotImplementedError  # pragma: no cover
 
     def prove(
         self,
@@ -72,6 +73,7 @@ class Transform(Protocol):
         after: TransformResult,
     ) -> TransformProof:
         """Return whether ``after`` is valid for ``before`` and ``prepared``."""
+        raise NotImplementedError  # pragma: no cover
 
 
 class BaseTransform:

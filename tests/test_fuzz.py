@@ -161,12 +161,17 @@ def _spec_text(rng: Random) -> dict[str, Any]:
 
 
 def _spec_regex(rng: Random) -> dict[str, Any]:
-    return {"type": "regex", "pattern": rng.choice([
-        "[A-Z]{3}-\\d{4}",
-        "[a-z]{5,10}",
-        "\\d{4}-\\d{2}-\\d{2}",
-        "(foo|bar|baz)",
-    ])}
+    return {
+        "type": "regex",
+        "pattern": rng.choice(
+            [
+                "[A-Z]{3}-\\d{4}",
+                "[a-z]{5,10}",
+                "\\d{4}-\\d{2}-\\d{2}",
+                "(foo|bar|baz)",
+            ]
+        ),
+    }
 
 
 def _spec_lmhash(rng: Random) -> dict[str, Any]:
@@ -249,9 +254,15 @@ _BAD_SPEC_MUTATIONS: list[tuple[str, dict[str, Any]]] = [
     ("bytes", {"type": "bytes", "length": 0}),
     ("bytes", {"type": "bytes", "encoding": "rot13"}),
     ("date", {"type": "date", "minValue": "2024-12-31", "maxValue": "2024-01-01"}),
-    ("timestamp_unix",
-     {"type": "timestamp_unix", "minValue": "2024-01-01",
-      "maxValue": "2024-12-31", "unit": "nanos"}),
+    (
+        "timestamp_unix",
+        {
+            "type": "timestamp_unix",
+            "minValue": "2024-01-01",
+            "maxValue": "2024-12-31",
+            "unit": "nanos",
+        },
+    ),
     ("ipv4", {"type": "ipv4", "cidr": "::/0"}),  # IPv6 CIDR for IPv4 type
     ("mac", {"type": "mac", "oui": "not-hex"}),
     ("mac", {"type": "mac", "separator": "::"}),

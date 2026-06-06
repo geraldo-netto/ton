@@ -78,6 +78,7 @@ def test_engine_pairs_lmhash_within_a_row() -> None:
     for row in Engine(config, rng=Random(0)):
         plain, _, digest = row.partition("=")
         from ton.generators.lmhash import LMHashGenerator
+
         expected = LMHashGenerator._nt_hash(plain)
         assert digest == expected
 
@@ -203,9 +204,7 @@ def test_engine_preserves_paired_value_through_identity_transform() -> None:
         },
     }
 
-    assert list(Engine(config, rng=Random(0))) == [
-        "alpha=c89eee2b363e6de65346d055e0c839e1"
-    ]
+    assert list(Engine(config, rng=Random(0))) == ["alpha=c89eee2b363e6de65346d055e0c839e1"]
 
 
 def test_engine_rejects_transform_that_cannot_accept_paired_input() -> None:

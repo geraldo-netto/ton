@@ -30,7 +30,7 @@ from ton import api
 
 E2E_DIR = Path(__file__).parent / "e2e_configs"
 SEED = 1
-DISTRIBUTION_SLACK = 0.10   # +/-10pp tolerance on observed vs expected probability
+DISTRIBUTION_SLACK = 0.10  # +/-10pp tolerance on observed vs expected probability
 
 
 # ---------------------------------------------------------------------------
@@ -128,8 +128,7 @@ def _check_weighted_composite(rows: list[str], config: dict[str, Any]) -> None:
     raw_weights = [float(c.get("weight", 1.0)) for c in choices]
     total = sum(raw_weights)
     expected_labels = [c["spec"]["values"][0] for c in choices]
-    expected = {label: w / total
-                for label, w in zip(expected_labels, raw_weights, strict=True)}
+    expected = {label: w / total for label, w in zip(expected_labels, raw_weights, strict=True)}
     counts = Counter(rows)
     n = len(rows)
     for label, p in expected.items():
@@ -175,9 +174,7 @@ def _check_date(rows: list[str], config: dict[str, Any]) -> None:
 def _check_timestamp_unix(rows: list[str], config: dict[str, Any]) -> None:
     spec = config["types"]["v"]
     lo_dt = datetime.fromisoformat(spec["minValue"])
-    hi_dt = datetime.fromisoformat(spec["maxValue"]).replace(
-        hour=23, minute=59, second=59
-    )
+    hi_dt = datetime.fromisoformat(spec["maxValue"]).replace(hour=23, minute=59, second=59)
     lo = int(lo_dt.timestamp())
     hi = int(hi_dt.timestamp())
     multiplier = 1 if spec.get("unit", "seconds") == "seconds" else 1000

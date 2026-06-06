@@ -73,9 +73,7 @@ def fork_engine(
     rng = derive_rng(parent_seed, worker_id)
     if rows is not None:
         config = {**config, "rows": rows}
-    engine = Engine.from_config(
-        config, registry=registry, rng=rng, milestone_rows=milestone_rows
-    )
+    engine = Engine.from_config(config, registry=registry, rng=rng, milestone_rows=milestone_rows)
     _logger.info(
         "engine_forked worker_id=%d parent_seed=%d rows=%d",
         worker_id,

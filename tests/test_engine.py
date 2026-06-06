@@ -9,7 +9,14 @@ from typing import Any
 import pytest
 
 from ton._engine import Engine, TemplateError
-from ton._transforms import BaseTransform, TransformCapabilities, TransformResult
+from ton._proof import ProofResult
+from ton._transforms import (
+    BaseTransform,
+    TransformCapabilities,
+    TransformProof,
+    TransformResult,
+)
+from ton.generators import Generator
 
 
 def test_engine_yields_requested_row_count(basic_config: dict) -> None:
@@ -176,3 +183,61 @@ def test_engine_rejects_transform_that_cannot_accept_paired_input() -> None:
 
     with pytest.raises(TemplateError, match="does not accept paired"):
         Engine(config, transforms={"plugin.unpaired": UnpairedTransform()})
+
+
+def test_engine_collects_source_proof_failure() -> None:
+    class ProvingGenerator(Generator):
+        type_name = "proving"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "bad"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared, result
+            return ProofResult(ok=False, reason="not allowed")
+
+    config = {"rows": 1, "format": "$v$", "types": {"v": {"type": "proving"}}}
+    engine = Engine(config, registry={"proving": ProvingGenerator()})
+    field = engine._prepared["v"]
+
+    failures = engine._proof_failures("v", field, TransformResult("bad"), ())
+
+    assert failures[0].stage == "source"
+    assert failures[0].reference == "proving"
+    assert failures[0].reason == "not allowed"
+
+
+def test_engine_collects_transform_proof_failure() -> None:
+    class FailingProofTransform(BaseTransform):
+        type_name = "failproof"
+
+        def prove(
+            self,
+            prepared: Any,
+            before: TransformResult,
+            after: TransformResult,
+        ) -> TransformProof:
+            del prepared, before, after
+            return TransformProof(ok=False, reason="transform mismatch")
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "plugin.failproof"}],
+            }
+        },
+    }
+    engine = Engine(config, transforms={"plugin.failproof": FailingProofTransform()})
+    field = engine._prepared["v"]
+    source = TransformResult("x")
+    _, steps = engine._apply_transforms_with_trace(field, source)
+
+    failures = engine._proof_failures("v", field, source, steps)
+
+    assert failures[0].stage == "transform"
+    assert failures[0].reference == "failproof"
+    assert failures[0].reason == "transform mismatch"

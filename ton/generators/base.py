@@ -32,6 +32,9 @@ from collections.abc import Mapping
 from random import Random
 from typing import Any, ClassVar
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
+
 
 class Generator(ABC):
     """Strategy interface: produce one string value from a (prepared) spec."""
@@ -80,6 +83,16 @@ class Generator(ABC):
     @abstractmethod
     def generate(self, prepared: Any, rng: Random) -> str:
         """Return the generated value, using the prepared spec."""
+
+    def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+        """Return whether ``result`` satisfies ``prepared``.
+
+        Generators that can cheaply check their output should override
+        this. The default is permissive so existing third-party generators
+        automatically participate in the proof-check protocol.
+        """
+        del prepared, result
+        return ProofResult(ok=True)
 
 
 class PairedGenerator(Generator):

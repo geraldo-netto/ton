@@ -57,7 +57,6 @@ Last full rescan: 2026-06-06.
 |----------|--------|--------|-------------|
 | ARCH-001 | open   | L      | Model data types as a virtual filesystem-like namespace: built-ins live under a stable default namespace, plugin types mount into additional namespaces, and type lookup resolves by explicit path/name without allowing plugins to remove or shadow defaults accidentally. |
 | ARCH-002 | open   | L      | Split generation into explicit stages: source data type -> optional transform chain -> render -> proof-check. Each stage should be a small protocol with typed prepared specs so transforms and validators compose without bloating `Engine`. |
-| ARCH-003 | open   | M      | Define the transform contract for "applies to any data type" behavior. A transform must declare required input capabilities, output shape, pairing behavior, and proof composition so generic transforms can reject incompatible types early. |
 
 ## decoupling
 

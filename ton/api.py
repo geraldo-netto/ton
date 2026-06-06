@@ -43,7 +43,14 @@ from . import _config
 from ._config import ConfigError
 from ._engine import Engine, TemplateError
 from ._logging import LogEvent, configure_stderr, logger
-from ._registry import default_registry, registry_with_entry_points
+from ._registry import (
+    ExtensionCatalog,
+    RegistryError,
+    build_extension_catalog,
+    default_registry,
+    normalize_reference,
+    registry_with_entry_points,
+)
 from ._template import UndeclaredVariableError
 from .generators import Generator, PairedGenerator
 
@@ -53,14 +60,18 @@ __all__ = [
     "Generator",
     "LogEvent",
     "PairedGenerator",
+    "RegistryError",
     "TemplateError",
     "UndeclaredVariableError",
+    "ExtensionCatalog",
+    "build_extension_catalog",
     "build_registry",
     "configure_stderr",
     "generate",
     "generate_from_file",
     "load_config",
     "logger",
+    "normalize_reference",
 ]
 
 

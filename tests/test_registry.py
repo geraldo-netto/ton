@@ -7,12 +7,18 @@ from random import Random
 from typing import Any
 from unittest import mock
 
+import pytest
+
 from ton._registry import (
+    RegistryError,
+    build_extension_catalog,
     clear_default_registry_cache,
     default_registry,
     discover_generator_classes,
+    normalize_reference,
     registry_with_entry_points,
 )
+from ton._transforms import BaseTransform
 from ton.generators import Generator
 
 #: Every built-in type that ships with TON. If this list grows or
@@ -138,3 +144,51 @@ def test_registry_skips_entry_point_that_returns_non_generator() -> None:
         registry = registry_with_entry_points()
 
     assert "bad" not in registry
+
+
+def test_extension_catalog_registers_namespaced_plugins() -> None:
+    class CustomGenerator(Generator):
+        type_name = "custom"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "custom"
+
+    class CustomTransform(BaseTransform):
+        type_name = "trim"
+
+    catalog = build_extension_catalog()
+    catalog.register_data_type("plugin", "custom", CustomGenerator())
+    catalog.register_transform("plugin", "trim", CustomTransform())
+    catalog.register_validator("plugin", "custom", object())
+
+    assert "string" in catalog.list_data_types()
+    assert "core.string" in catalog.list_data_types()
+    assert "plugin.custom" in catalog.list_data_types()
+    assert "plugin.trim" in catalog.list_transforms()
+    assert "plugin.custom" in catalog.list_validators()
+    assert catalog.get_data_type("plugin.custom").generate({}, Random(0)) == "custom"
+
+
+def test_extension_catalog_rejects_builtin_replacement() -> None:
+    catalog = build_extension_catalog()
+
+    with pytest.raises(RegistryError, match="cannot replace"):
+        catalog.register_data_type("core", "string", default_registry()["string"])
+
+
+def test_extension_catalog_rejects_ambiguous_registration() -> None:
+    class CustomTransform(BaseTransform):
+        type_name = "trim"
+
+    catalog = build_extension_catalog()
+    catalog.register_transform("plugin", "trim", CustomTransform())
+
+    with pytest.raises(RegistryError, match="already exists"):
+        catalog.register_transform("plugin", "trim", CustomTransform())
+
+
+def test_normalize_reference_defaults_to_core_namespace() -> None:
+    assert normalize_reference("integer") == "core.integer"
+    assert normalize_reference("plugin.integer") == "plugin.integer"
+    with pytest.raises(RegistryError):
+        normalize_reference("bad-name")

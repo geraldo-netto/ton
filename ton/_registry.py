@@ -17,11 +17,13 @@ from __future__ import annotations
 
 import inspect
 import threading
-from collections.abc import Container, Iterable, Iterator
+from collections.abc import Container, Iterable, Iterator, Mapping
 from importlib.metadata import entry_points
+from typing import Any
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
+from ._transforms import Transform
 
 # Importing ``ton.generators`` imports every concrete-generator submodule,
 # which is what populates Generator.__subclasses__() below.
@@ -32,6 +34,7 @@ from .generators import BUILTIN_GENERATOR_CLASSES, Generator
 #: the loaded object must be a callable returning a Generator (typically
 #: the Generator subclass itself).
 ENTRY_POINT_GROUP = "ton.generators"
+CORE_NAMESPACE = "core"
 
 #: Allowlist of built-in ``type_name`` strings. Used by
 #: :func:`discover_generator_classes` to ignore in-process subclasses
@@ -39,6 +42,130 @@ ENTRY_POINT_GROUP = "ton.generators"
 _BUILTIN_TYPE_NAMES: frozenset[str] = frozenset(
     cls.type_name for cls in BUILTIN_GENERATOR_CLASSES
 )
+
+
+class RegistryError(ValueError):
+    """Raised when plugin registration would make lookup ambiguous."""
+
+
+class ExtensionCatalog:
+    """Namespaced catalog for data types, transforms, and validators."""
+
+    def __init__(
+        self,
+        *,
+        generators: Mapping[str, Generator] | None = None,
+        transforms: Mapping[str, Transform] | None = None,
+        validators: Mapping[str, Any] | None = None,
+    ) -> None:
+        self._generators: dict[str, dict[str, Generator]] = {
+            CORE_NAMESPACE: dict(generators or default_registry())
+        }
+        self._transforms: dict[str, dict[str, Transform]] = {
+            CORE_NAMESPACE: dict(transforms or {})
+        }
+        self._validators: dict[str, dict[str, Any]] = {
+            CORE_NAMESPACE: dict(validators or {})
+        }
+
+    def register_data_type(
+        self,
+        namespace: str,
+        name: str,
+        generator: Generator,
+    ) -> None:
+        self._register(self._generators, namespace, name, generator)
+
+    def register_transform(
+        self,
+        namespace: str,
+        name: str,
+        transform: Transform,
+    ) -> None:
+        self._register(self._transforms, namespace, name, transform)
+
+    def register_validator(self, namespace: str, name: str, validator: Any) -> None:
+        self._register(self._validators, namespace, name, validator)
+
+    def generators(self) -> dict[str, Generator]:
+        return self._flatten(self._generators)
+
+    def transforms(self) -> dict[str, Transform]:
+        return self._flatten(self._transforms)
+
+    def validators(self) -> dict[str, Any]:
+        return self._flatten(self._validators)
+
+    def list_data_types(self) -> tuple[str, ...]:
+        return tuple(sorted(self.generators()))
+
+    def list_transforms(self) -> tuple[str, ...]:
+        return tuple(sorted(self.transforms()))
+
+    def list_validators(self) -> tuple[str, ...]:
+        return tuple(sorted(self.validators()))
+
+    def get_data_type(self, reference: str) -> Generator:
+        return self.generators()[normalize_reference(reference)]
+
+    def get_transform(self, reference: str) -> Transform:
+        return self.transforms()[normalize_reference(reference)]
+
+    @staticmethod
+    def _flatten(store: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+        flattened: dict[str, Any] = {}
+        for namespace, values in store.items():
+            for name, value in values.items():
+                flattened[f"{namespace}.{name}"] = value
+                if namespace == CORE_NAMESPACE:
+                    flattened.setdefault(name, value)
+        return flattened
+
+    @staticmethod
+    def _register(
+        store: dict[str, dict[str, Any]],
+        namespace: str,
+        name: str,
+        value: Any,
+    ) -> None:
+        _validate_identifier("namespace", namespace)
+        _validate_identifier("name", name)
+        if namespace == CORE_NAMESPACE and name in store[CORE_NAMESPACE]:
+            raise RegistryError(f"cannot replace built-in registration {name!r}")
+        bucket = store.setdefault(namespace, {})
+        if name in bucket:
+            raise RegistryError(f"registration {namespace}.{name} already exists")
+        bucket[name] = value
+
+
+def normalize_reference(reference: str) -> str:
+    """Return a qualified registry reference."""
+    _validate_reference(reference)
+    if "." in reference:
+        return reference
+    return f"{CORE_NAMESPACE}.{reference}"
+
+
+def build_extension_catalog() -> ExtensionCatalog:
+    """Return a catalog containing the built-in data types."""
+    return ExtensionCatalog()
+
+
+def _validate_reference(reference: str) -> None:
+    parts = reference.split(".")
+    if len(parts) == 1:
+        _validate_identifier("name", parts[0])
+        return
+    if len(parts) == 2:
+        _validate_identifier("namespace", parts[0])
+        _validate_identifier("name", parts[1])
+        return
+    raise RegistryError(f"invalid registry reference {reference!r}")
+
+
+def _validate_identifier(label: str, value: str) -> None:
+    if not value or not value.replace("_", "").isalnum():
+        raise RegistryError(f"{label} must contain only letters, numbers, or '_'")
 
 
 def discover_generator_classes() -> list[type[Generator]]:

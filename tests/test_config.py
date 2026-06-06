@@ -141,6 +141,15 @@ def test_transform_entries_need_type(tmp_path: Path) -> None:
         load(path)
 
 
+def test_type_field_must_be_a_string(tmp_path: Path) -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["type"] = 123
+    path = _write(tmp_path, payload)
+
+    with pytest.raises(ConfigError, match="non-empty string"):
+        load(path)
+
+
 def test_validate_config_lists_available_types_for_unknown_type() -> None:
     payload = _valid_payload()
     payload["types"]["a"] = {"type": "missing"}
@@ -154,6 +163,14 @@ def test_validate_config_reports_unknown_namespace() -> None:
     payload["types"]["a"] = {"type": "other.string"}
 
     with pytest.raises(ConfigError, match="Unknown namespace 'other'"):
+        api.validate_config(payload)
+
+
+def test_validate_config_wraps_bad_reference() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"] = {"type": "bad-name"}
+
+    with pytest.raises(ConfigError, match="letters, numbers"):
         api.validate_config(payload)
 
 

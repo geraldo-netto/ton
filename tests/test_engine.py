@@ -146,6 +146,51 @@ def test_engine_applies_transform_chain_to_single_value() -> None:
     assert rows == ["pre-x"]
 
 
+def test_engine_resolves_unqualified_custom_transform_key() -> None:
+    class PrefixTransform(BaseTransform):
+        type_name = "prefix"
+
+        def apply(
+            self,
+            prepared: Any,
+            value: TransformResult,
+            rng: Random,
+        ) -> TransformResult:
+            del rng
+            return TransformResult(f"{prepared['prefix']}{value.value}")
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "prefix", "prefix": "pre-"}],
+            }
+        },
+    }
+
+    assert list(Engine(config, transforms={"prefix": PrefixTransform()})) == ["pre-x"]
+
+
+def test_engine_rejects_unknown_transform() -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "plugin.missing"}],
+            }
+        },
+    }
+
+    with pytest.raises(TemplateError, match="Unknown transform"):
+        Engine(config)
+
+
 def test_engine_preserves_paired_value_through_identity_transform() -> None:
     config = {
         "rows": 1,

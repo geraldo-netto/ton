@@ -99,6 +99,21 @@ def test_weighted_composite_uses_distribution_delegate() -> None:
     assert gen.generate(prepared, Random(0)) == "always"
 
 
+def test_weighted_composite_accepts_core_qualified_child_type() -> None:
+    gen = WeightedGenerator()
+    prepared = gen.prepare_composite(
+        {
+            "type": "weighted",
+            "choices": [
+                {"weight": 1, "spec": {"type": "core.string", "values": ["ok"]}},
+            ],
+        },
+        default_registry(),
+    )
+
+    assert gen.generate(prepared, Random(0)) == "ok"
+
+
 def test_weighted_composite_can_nest_inside_weighted() -> None:
     from ton import api
 

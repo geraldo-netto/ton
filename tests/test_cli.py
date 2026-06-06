@@ -195,6 +195,24 @@ def test_cli_accepts_proof_check_flags(
     assert len(captured.out.strip().splitlines()) == 4
 
 
+def test_cli_proof_error_returns_2(
+    monkeypatch, write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from ton import cli
+    from ton.api import ProofError
+
+    def _boom(*args, **kwargs):
+        raise ProofError("bad generated value")
+
+    monkeypatch.setattr(cli, "_stream", _boom)
+    config = write_config()
+    exit_code = main([str(config), "--proof-check", "all"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "proof failed" in captured.err
+
+
 def test_cli_atomic_output_keeps_existing_file_on_failure(
     monkeypatch, write_config, tmp_path: Path
 ) -> None:

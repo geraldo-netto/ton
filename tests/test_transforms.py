@@ -72,3 +72,43 @@ def test_distribution_transform_requires_two_choices() -> None:
         assert "at least 2" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_distribution_transform_rejects_negative_weight() -> None:
+    transform = DistributionTransform()
+
+    try:
+        transform.prepare_composite(
+            {
+                "type": "distribution",
+                "choices": [
+                    {"weight": -1, "spec": {"type": "string", "values": ["bad"]}},
+                    {"weight": 2, "spec": {"type": "string", "values": ["ok"]}},
+                ],
+            },
+            default_registry(),
+        )
+    except ValueError as exc:
+        assert "non-negative" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_distribution_transform_rejects_zero_total_weight() -> None:
+    transform = DistributionTransform()
+
+    try:
+        transform.prepare_composite(
+            {
+                "type": "distribution",
+                "choices": [
+                    {"weight": 0, "spec": {"type": "string", "values": ["a"]}},
+                    {"weight": 0, "spec": {"type": "string", "values": ["b"]}},
+                ],
+            },
+            default_registry(),
+        )
+    except ValueError as exc:
+        assert "positive number" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")

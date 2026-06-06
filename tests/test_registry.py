@@ -168,6 +168,7 @@ def test_extension_catalog_registers_namespaced_plugins() -> None:
     assert "plugin.trim" in catalog.list_transforms()
     assert "plugin.custom" in catalog.list_validators()
     assert catalog.get_data_type("plugin.custom").generate({}, Random(0)) == "custom"
+    assert catalog.get_transform("plugin.trim").type_name == "trim"
 
 
 def test_extension_catalog_rejects_builtin_replacement() -> None:
@@ -193,6 +194,8 @@ def test_normalize_reference_defaults_to_core_namespace() -> None:
     assert normalize_reference("plugin.integer") == "plugin.integer"
     with pytest.raises(RegistryError):
         normalize_reference("bad-name")
+    with pytest.raises(RegistryError, match="invalid registry reference"):
+        normalize_reference("too.many.parts")
 
 
 def test_catalog_entry_points_load_separate_plugin_kinds() -> None:
@@ -265,3 +268,36 @@ def test_catalog_entry_points_skip_wrong_plugin_kind() -> None:
         catalog = catalog_with_entry_points()
 
     assert "acme.bad" not in catalog.list_transforms()
+
+
+def test_catalog_entry_points_skip_wrong_generator_kind() -> None:
+    bad = mock.Mock()
+    bad.name = "acme.bad"
+    bad.value = "pkg:Bad"
+    bad.load.return_value = lambda: object()
+
+    def _entry_points(group: str):
+        return [bad] if group == "ton.generators" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points()
+
+    assert "acme.bad" not in catalog.list_data_types()
+
+
+def test_catalog_entry_point_without_namespace_uses_plugin_namespace() -> None:
+    class CustomTransform(BaseTransform):
+        type_name = "trim"
+
+    ep = mock.Mock()
+    ep.name = "trim"
+    ep.value = "pkg:Transform"
+    ep.load.return_value = CustomTransform
+
+    def _entry_points(group: str):
+        return [ep] if group == "ton.transforms" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points()
+
+    assert "plugin.trim" in catalog.list_transforms()

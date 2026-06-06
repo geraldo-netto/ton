@@ -93,8 +93,6 @@ class WeightedGenerator(Generator):
         raw_choices = spec.get("choices")
         if raw_choices is None:
             return self._prepare_legacy(spec)
-        if not isinstance(raw_choices, list) or not raw_choices:
-            raise ValueError("weighted 'choices' must be a non-empty list")
         distribution = prepare_distribution(
             _distribution_spec(spec),
             registry,

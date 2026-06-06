@@ -54,6 +54,24 @@ def test_engine_from_config_matches_constructor(seed: int) -> None:
     assert via_helper == via_ctor
 
 
+@pytest.mark.parametrize("seed", list(range(20)))
+def test_core_namespaced_type_matches_legacy_type(seed: int) -> None:
+    legacy = _basic_int_config(20)
+    namespaced = {
+        **legacy,
+        "types": {
+            "n": {
+                **legacy["types"]["n"],
+                "type": "core.integer",
+            }
+        },
+    }
+
+    assert list(api.generate(namespaced, seed=seed)) == list(
+        api.generate(legacy, seed=seed)
+    )
+
+
 # ---------------------------------------------------------------------------
 # rows_emitted always equals the iteration count
 # ---------------------------------------------------------------------------

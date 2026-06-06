@@ -77,6 +77,7 @@ class ExtensionCatalog:
         generator: Generator,
     ) -> None:
         self._register(self._generators, namespace, name, generator)
+        _log_plugin_registered("data_type", namespace, name)
 
     def register_transform(
         self,
@@ -85,9 +86,11 @@ class ExtensionCatalog:
         transform: Transform,
     ) -> None:
         self._register(self._transforms, namespace, name, transform)
+        _log_plugin_registered("transform", namespace, name)
 
     def register_validator(self, namespace: str, name: str, validator: Any) -> None:
         self._register(self._validators, namespace, name, validator)
+        _log_plugin_registered("validator", namespace, name)
 
     def generators(self) -> dict[str, Generator]:
         return self._flatten(self._generators)
@@ -205,7 +208,7 @@ def _load_catalog_entry_points(
             continue
         try:
             plugin = ep.load()()
-            namespace, name = _entry_point_namespace_name(ep.name)
+            namespace, name = _entry_point_namespace_name(ep.name, kind, plugin)
             _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
         except Exception as exc:  # noqa: BLE001 - per-entry sandbox
             failed += 1
@@ -251,13 +254,24 @@ def _is_transform(plugin: Any) -> bool:
     return all(callable(getattr(plugin, name, None)) for name in ("prepare", "apply", "prove"))
 
 
-def _entry_point_namespace_name(entry_point_name: str) -> tuple[str, str]:
+def _entry_point_namespace_name(
+    entry_point_name: str,
+    kind: str,
+    plugin: Any,
+) -> tuple[str, str]:
     if "." in entry_point_name:
         namespace, name = entry_point_name.split(".", 1)
         _validate_identifier("namespace", namespace)
         _validate_identifier("name", name)
         return namespace, name
-    _validate_identifier("name", entry_point_name)
+    try:
+        _validate_identifier("name", entry_point_name)
+    except RegistryError:
+        if kind != "data_type":
+            raise
+        type_name = getattr(plugin, "type_name", "")
+        _validate_identifier("name", type_name)
+        return "plugin", type_name
     return "plugin", entry_point_name
 
 
@@ -393,72 +407,33 @@ def registry_with_entry_points(
     ``allowed_names`` is provided, only matching entry-point names are
     loaded; all others are ignored without importing their target.
     """
-    registry = default_registry()
-    loaded = 0
-    failed = 0
-    for ep in entry_points(group=ENTRY_POINT_GROUP):
-        if allowed_names is not None and ep.name not in allowed_names:
+    catalog = catalog_with_entry_points(allowed_names=allowed_names)
+    registry = catalog.generators()
+    for qualified, generator in list(registry.items()):
+        if "." not in qualified:
             continue
-        safe_name = _sanitize_for_log(ep.name)
-        safe_value = _sanitize_for_log(ep.value)
-        dist_name, dist_version = _entry_point_dist(ep)
-        try:
-            factory = ep.load()
-            instance = factory()
-            if not isinstance(instance, Generator):
-                raise TypeError(
-                    "entry point factory must return a ton.generators.Generator "
-                    f"instance, got {type(instance).__name__}"
-                )
-        except Exception as exc:  # noqa: BLE001 - per-entry sandbox
-            # SEC-004: one broken third-party plugin must not abort the
-            # whole registry build. Log a WARNING with attribution and
-            # skip the entry instead of letting ImportError/etc. bubble
-            # up to every Engine construction.
-            failed += 1
-            _logger.warning(
-                "entry_point_failed name=%s value=%s error=%s",
-                safe_name,
-                safe_value,
-                exc,
-                extra={
-                    "event": LogEvent.ENTRY_POINT_FAILED.value,
-                    "ep_name": safe_name,
-                    "value": safe_value,
-                    "dist_name": dist_name,
-                    "dist_version": dist_version,
-                    "error": f"{type(exc).__name__}: {exc}",
-                },
-            )
-            continue
-        registry[ep.name] = instance
-        loaded += 1
-        _logger.info(
-            "entry_point_loaded name=%s value=%s dist=%s version=%s",
-            safe_name,
-            safe_value,
-            dist_name,
-            dist_version,
-            extra={
-                "event": LogEvent.ENTRY_POINT_LOADED.value,
-                "ep_name": safe_name,
-                "value": safe_value,
-                "dist_name": dist_name,
-                "dist_version": dist_version,
-            },
-        )
-    if loaded or failed:
-        _logger.info(
-            "entry_points_summary loaded=%d failed=%d",
-            loaded,
-            failed,
-            extra={
-                "event": LogEvent.ENTRY_POINTS_SUMMARY.value,
-                "loaded": loaded,
-                "failed": failed,
-            },
-        )
+        namespace, name = qualified.split(".", 1)
+        if namespace != CORE_NAMESPACE and name not in registry:
+            registry[name] = generator
     return registry
+
+
+def _log_plugin_registered(kind: str, namespace: str, name: str) -> None:
+    if namespace == CORE_NAMESPACE:
+        return
+    _logger.info(
+        "plugin_registered kind=%s namespace=%s name=%s",
+        kind,
+        namespace,
+        name,
+        extra={
+            "event": LogEvent.PLUGIN_REGISTERED.value,
+            "kind": kind,
+            "namespace": namespace,
+            "plugin_name": name,
+            "reference": f"{namespace}.{name}",
+        },
+    )
 
 
 def _log_entry_point_failed(ep: object, exc: Exception) -> None:

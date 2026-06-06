@@ -5,12 +5,17 @@ from __future__ import annotations
 import logging
 from random import Random
 from typing import Any
+from unittest import mock
 
 import pytest
 
+from ton import api
 from ton._engine import Engine
 from ton._logging import LOGGER_NAME, configure_stderr, logger
+from ton._proof import ProofResult
 from ton._registry import clear_default_registry_cache, default_registry
+from ton._transforms import TransformResult
+from ton.generators import Generator
 
 
 def test_logger_name_is_ton() -> None:
@@ -73,6 +78,105 @@ def test_registry_discovery_emits_event(caplog: pytest.LogCaptureFixture) -> Non
     assert events, "expected a registry_discovered log record"
     assert events[0].generators >= 20  # type: ignore[attr-defined]
     clear_default_registry_cache()
+
+
+def test_plugin_registration_emits_structured_event(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class CustomGenerator(Generator):
+        type_name = "custom"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "custom"
+
+    ep = mock.Mock()
+    ep.name = "acme.custom"
+    ep.value = "pkg:Custom"
+    ep.load.return_value = CustomGenerator
+
+    def _entry_points(group: str):
+        return [ep] if group == "ton.generators" else []
+
+    with (
+        mock.patch("ton._registry.entry_points", side_effect=_entry_points),
+        caplog.at_level(logging.INFO, logger=LOGGER_NAME),
+    ):
+        api.build_extension_catalog(include_entry_points=True)
+
+    events = [r for r in caplog.records if getattr(r, "event", None) == "plugin_registered"]
+    assert events
+    assert events[0].kind == "data_type"  # type: ignore[attr-defined]
+    assert events[0].reference == "acme.custom"  # type: ignore[attr-defined]
+
+
+def test_transform_preparation_emits_structured_event(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "identity"}],
+            }
+        },
+    }
+
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        Engine(config, rng=Random(0))
+
+    events = [r for r in caplog.records if getattr(r, "event", None) == "transform_prepared"]
+    assert events
+    assert events[0].type_key == "v"  # type: ignore[attr-defined]
+    assert events[0].transform == "identity"  # type: ignore[attr-defined]
+
+
+def test_proof_failure_logs_identifier_without_value(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class FailingGenerator(Generator):
+        type_name = "failing"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "secret-value"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared, result
+            return ProofResult(ok=False, reason="bad")
+
+    config = {"rows": 1, "format": "$v$", "types": {"v": {"type": "failing"}}}
+    engine = Engine.from_config(
+        config,
+        registry={"failing": FailingGenerator()},
+        proof_mode="audit",
+    )
+
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        assert list(engine) == ["secret-value"]
+
+    failures = [r for r in caplog.records if getattr(r, "event", None) == "proof_check_failed"]
+    summaries = [r for r in caplog.records if getattr(r, "event", None) == "proof_check_summary"]
+    assert failures
+    assert failures[0].type_key == "v"  # type: ignore[attr-defined]
+    assert not any("secret-value" in record.getMessage() for record in caplog.records)
+    assert summaries[0].failures == 1  # type: ignore[attr-defined]
+
+
+def test_catalog_validation_emits_summary(caplog: pytest.LogCaptureFixture) -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {"v": {"type": "string", "values": ["x"]}},
+    }
+
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        api.validate_config(config)
+
+    events = [r for r in caplog.records if getattr(r, "event", None) == "config_validated"]
+    assert events
+    assert events[0].types == 1  # type: ignore[attr-defined]
 
 
 def test_configure_stderr_attaches_stream_handler() -> None:

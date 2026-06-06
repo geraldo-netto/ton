@@ -47,7 +47,6 @@ def test_engine_wraps_unexpected_prepare_error_as_template_error() -> None:
     """A buggy third-party generator that raises a non-ValueError must still
     surface as TemplateError so the CLI maps to exit 2 (REL-012)."""
     from collections.abc import Mapping
-    from typing import Any
 
     from ton.generators import Generator
 
@@ -334,6 +333,64 @@ def test_engine_audit_proof_mode_records_failures_without_stopping() -> None:
     assert len(engine.proof_failures) == 2
     assert engine.proof_failures[0].seed == 123
     assert engine.proof_failures[0].spec == {"type": "failing"}
+
+
+def test_engine_audit_proof_failures_reset_between_iterations() -> None:
+    class FailingGenerator(Generator):
+        type_name = "failing"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "bad"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared, result
+            return ProofResult(ok=False, reason="bad value")
+
+    config = {"rows": 1, "format": "$v$", "types": {"v": {"type": "failing"}}}
+    engine = Engine.from_config(
+        config,
+        registry={"failing": FailingGenerator()},
+        seed=123,
+        proof_mode="audit",
+    )
+
+    assert list(engine) == ["bad"]
+    assert len(engine.proof_failures) == 1
+    assert list(engine) == ["bad"]
+    assert len(engine.proof_failures) == 1
+
+
+def test_engine_provenance_reports_source_transforms_and_proof_state() -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "identity"}],
+            }
+        },
+    }
+    engine = Engine.from_config(config, proof_mode="sample", proof_sample_rate=5)
+
+    assert engine.provenance[0].type_key == "v"
+    assert engine.provenance[0].source_type == "string"
+    assert engine.provenance[0].transforms == ("identity",)
+    assert engine.provenance[0].proof_mode == "sample"
+    assert engine.provenance[0].proof_sample_rate == 5
+
+
+def test_engine_provenance_reports_repeated_type_once() -> None:
+    engine = Engine(
+        {
+            "rows": 1,
+            "format": "$name$:$name$",
+            "types": {"name": {"type": "name"}},
+        },
+    )
+
+    assert [record.type_key for record in engine.provenance] == ["name"]
 
 
 def test_engine_rejects_unknown_proof_mode(basic_config: dict) -> None:

@@ -5,8 +5,8 @@ from __future__ import annotations
 from random import Random
 from typing import Any
 
-from ton._transforms import BaseTransform, TransformProof, TransformResult
 from ton._registry import default_registry
+from ton._transforms import BaseTransform, TransformProof, TransformResult
 from ton.transforms import DistributionTransform
 
 

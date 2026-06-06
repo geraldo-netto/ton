@@ -16,7 +16,7 @@ from typing import Any
 from . import _config
 from ._logging import LogEvent
 from ._logging import logger as _logger
-from ._proof import ProofFailure
+from ._proof import ProofFailure, ProvenanceRecord
 from ._registry import build_extension_catalog, make_registry, normalize_reference
 from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
 from ._transforms import Transform, TransformResult
@@ -194,6 +194,36 @@ class Engine:
         """Proof failures collected in audit mode."""
         return tuple(self._proof_failures_audit)
 
+    @property
+    def provenance(self) -> tuple[ProvenanceRecord, ...]:
+        """Generation metadata for each prepared template field."""
+        records: list[ProvenanceRecord] = []
+        seen: set[str] = set()
+        for token in self._tokens:
+            type_key = token.type_key
+            if type_key in seen:
+                continue
+            seen.add(type_key)
+            spec = self._types[type_key]
+            failures = sum(
+                1 for failure in self._proof_failures_audit
+                if failure.type_key == type_key
+            )
+            records.append(
+                ProvenanceRecord(
+                    type_key=type_key,
+                    source_type=str(spec["type"]),
+                    transforms=tuple(
+                        str(transform["type"])
+                        for transform in spec.get("transforms", [])
+                    ),
+                    proof_mode=self._proof_mode,
+                    proof_sample_rate=self._proof_sample_rate,
+                    proof_failures=failures,
+                )
+            )
+        return tuple(records)
+
     def _resolve_registry(
         self, registry: Mapping[str, Generator] | None
     ) -> Mapping[str, Generator]:
@@ -286,6 +316,18 @@ class Engine:
                     transform.prepare_composite(transform_spec, self._registry),
                 )
             )
+            _logger.info(
+                "transform_prepared type_key=%s transform=%s paired=%s",
+                type_key,
+                transform.type_name,
+                is_paired,
+                extra={
+                    "event": LogEvent.TRANSFORM_PREPARED.value,
+                    "type_key": type_key,
+                    "transform": transform.type_name,
+                    "paired_input": is_paired,
+                },
+            )
             is_paired = is_paired and transform.capabilities.preserves_pairing
         return tuple(prepared)
 
@@ -303,6 +345,7 @@ class Engine:
         try:
             milestone = self._milestone_rows
             self._rows_emitted = 0
+            self._proof_failures_audit.clear()
             for _ in range(self._rows):
                 yield self._render_row()
                 self._rows_emitted += 1
@@ -325,6 +368,17 @@ class Engine:
                     "rows": self._rows_emitted,
                 },
             )
+            if self._proof_mode != "off":
+                _logger.info(
+                    "proof_check_summary mode=%s failures=%d",
+                    self._proof_mode,
+                    len(self._proof_failures_audit),
+                    extra={
+                        "event": LogEvent.PROOF_CHECK_SUMMARY.value,
+                        "mode": self._proof_mode,
+                        "failures": len(self._proof_failures_audit),
+                    },
+                )
         finally:
             self._iteration_lock.release()
 
@@ -406,11 +460,32 @@ class Engine:
             return
         if self._proof_mode == "audit":
             self._proof_failures_audit.extend(failures)
+            for failure in failures:
+                self._log_proof_failure(failure)
             return
         failure = failures[0]
+        self._log_proof_failure(failure)
         raise ProofError(
             f"Proof failed at row {failure.row} for {failure.type_key!r} "
             f"{failure.stage} {failure.reference!r}: {failure.reason}"
+        )
+
+    @staticmethod
+    def _log_proof_failure(failure: ProofFailure) -> None:
+        _logger.warning(
+            "proof_check_failed row=%d type_key=%s stage=%s reference=%s",
+            failure.row,
+            failure.type_key,
+            failure.stage,
+            failure.reference,
+            extra={
+                "event": LogEvent.PROOF_CHECK_FAILED.value,
+                "row": failure.row,
+                "type_key": failure.type_key,
+                "stage": failure.stage,
+                "reference": failure.reference,
+                "reason": failure.reason,
+            },
         )
 
     def _should_check_proof(self) -> bool:

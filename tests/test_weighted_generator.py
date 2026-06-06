@@ -7,8 +7,8 @@ from random import Random
 
 import pytest
 
-from ton.generators.weighted import WeightedGenerator
 from ton._registry import default_registry
+from ton.generators.weighted import WeightedGenerator
 
 
 def test_weighted_parallel_arrays_distribution() -> None:

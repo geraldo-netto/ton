@@ -43,14 +43,17 @@ from . import _config
 from ._config import ConfigError
 from ._engine import Engine, ProofError, TemplateError
 from ._logging import LogEvent, configure_stderr, logger
+from ._proof import ProvenanceRecord
 from ._registry import (
     ExtensionCatalog,
     RegistryError,
-    build_extension_catalog as _build_extension_catalog,
     catalog_with_entry_points,
     default_registry,
     normalize_reference,
     registry_with_entry_points,
+)
+from ._registry import (
+    build_extension_catalog as _build_extension_catalog,
 )
 from ._template import UndeclaredVariableError
 from ._transforms import Transform
@@ -63,6 +66,7 @@ __all__ = [
     "LogEvent",
     "PairedGenerator",
     "ProofError",
+    "ProvenanceRecord",
     "RegistryError",
     "TemplateError",
     "Transform",

@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+from ._logging import LogEvent
+from ._logging import logger as _logger
 from ._registry import ExtensionCatalog, RegistryError, normalize_reference
 from ._template import UndeclaredVariableError, validate_against
 
@@ -73,6 +75,16 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
     for field_name, spec in data["types"].items():
         _validate_type_reference(field_name, spec["type"], catalog)
         _validate_transforms(field_name, spec, catalog)
+    _logger.info(
+        "config_validated types=%d",
+        len(data["types"]),
+        extra={
+            "event": LogEvent.CONFIG_VALIDATED.value,
+            "types": len(data["types"]),
+            "available_types": catalog.list_data_types(),
+            "available_transforms": catalog.list_transforms(),
+        },
+    )
 
 
 def _validate(data: Any) -> None:

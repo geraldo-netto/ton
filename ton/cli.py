@@ -279,6 +279,7 @@ def _build_engine(args: argparse.Namespace) -> Engine:
         config,
         registry=registry,
         transforms=transforms,
+        seed=args.seed,
         rng=rng,
         proof_mode=args.proof_check,
         proof_sample_rate=args.proof_sample_rate,

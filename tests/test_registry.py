@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import inspect
+import logging
 from random import Random
 from typing import Any
 from unittest import mock
 
 import pytest
 
+from ton._logging import LogEvent
 from ton._registry import (
+    ExtensionCatalog,
     RegistryError,
     build_extension_catalog,
     catalog_with_entry_points,
@@ -132,7 +135,28 @@ def test_registry_with_entry_points_honors_allowlist() -> None:
         registry = registry_with_entry_points(allowed_names={"allowed"})
 
     assert registry["allowed"].generate({}, Random(0)) == "custom"
+    assert registry["plugin.allowed"].generate({}, Random(0)) == "custom"
     skipped.load.assert_not_called()
+
+
+def test_registry_with_entry_points_does_not_shadow_builtin() -> None:
+    class CustomGenerator(Generator):
+        type_name = "string"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "custom"
+
+    ep = mock.Mock()
+    ep.name = "string"
+    ep.value = "pkg:String"
+    ep.load.return_value = CustomGenerator
+
+    with mock.patch("ton._registry.entry_points", return_value=[ep]):
+        registry = registry_with_entry_points()
+
+    prepared = registry["string"].prepare({"values": ["builtin"]})
+    assert registry["string"].generate(prepared, Random(0)) == "builtin"
+    assert registry["plugin.string"].generate({}, Random(0)) == "custom"
 
 
 def test_registry_skips_entry_point_that_returns_non_generator() -> None:
@@ -176,6 +200,26 @@ def test_extension_catalog_rejects_builtin_replacement() -> None:
 
     with pytest.raises(RegistryError, match="cannot replace"):
         catalog.register_data_type("core", "string", default_registry()["string"])
+
+
+def test_core_registration_does_not_emit_plugin_event(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class CustomGenerator(Generator):
+        type_name = "custom_core"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "custom"
+
+    catalog = ExtensionCatalog(generators={})
+
+    with caplog.at_level(logging.INFO, logger="ton"):
+        catalog.register_data_type("core", "custom_core", CustomGenerator())
+
+    assert not any(
+        getattr(record, "event", None) == LogEvent.PLUGIN_REGISTERED.value
+        for record in caplog.records
+    )
 
 
 def test_extension_catalog_rejects_ambiguous_registration() -> None:

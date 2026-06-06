@@ -195,6 +195,22 @@ def test_cli_accepts_proof_check_flags(
     assert len(captured.out.strip().splitlines()) == 4
 
 
+def test_cli_build_engine_preserves_seed_for_proof_context(write_config) -> None:
+    from ton import cli
+
+    config = write_config()
+    args = cli._build_parser().parse_args([
+        str(config),
+        "--seed",
+        "7",
+        "--proof-check",
+        "audit",
+    ])
+    engine = cli._build_engine(args)
+
+    assert engine._seed == 7
+
+
 def test_cli_proof_error_returns_2(
     monkeypatch, write_config, capsys: pytest.CaptureFixture[str]
 ) -> None:

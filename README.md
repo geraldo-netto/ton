@@ -79,6 +79,9 @@ For large offsets, `--resume-from` still pays the cost of generating skipped row
 
 ## Architecture
 
+For a deeper description of namespaced registrations, transform preparation,
+proof checking, and compatibility rules, see [docs/architecture.md](docs/architecture.md).
+
 ```mermaid
 flowchart TB
   subgraph callers["Callers"]

@@ -27,3 +27,17 @@ class ProofFailure:
     id_value: str | None = None
     seed: int | None = None
     spec: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class ProvenanceRecord:
+    """Metadata describing how one template field is generated."""
+
+    type_key: str
+    source_type: str
+    transforms: tuple[str, ...]
+    proof_mode: str
+    proof_sample_rate: int
+    proof_failures: int = 0
+    plugin_package: str | None = None
+    plugin_version: str | None = None

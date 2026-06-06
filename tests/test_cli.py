@@ -154,6 +154,45 @@ def test_cli_help_does_not_expose_internal_todo_ids(
     captured = capsys.readouterr()
     assert exc.value.code == 0
     assert "OBS-003" not in captured.out
+    assert "--proof-check" in captured.out
+    assert "loading is opt-in" in captured.out
+
+
+def test_cli_list_namespaces_without_config(capsys: pytest.CaptureFixture[str]) -> None:
+    exit_code = main(["--list-namespaces"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "namespaces: core" in captured.out
+    assert "string" in captured.out
+    assert "distribution" in captured.out
+
+
+def test_cli_requires_config_when_not_listing(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exit_code = main([])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "config path is required" in captured.err
+
+
+def test_cli_accepts_proof_check_flags(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = write_config()
+    exit_code = main([
+        str(config),
+        "--proof-check",
+        "sample",
+        "--proof-sample-rate",
+        "2",
+    ])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert len(captured.out.strip().splitlines()) == 4
 
 
 def test_cli_atomic_output_keeps_existing_file_on_failure(

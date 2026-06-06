@@ -16,7 +16,7 @@ from random import Random
 from typing import TextIO, cast
 
 from . import __version__, api
-from .api import ConfigError, Engine, LogEvent, TemplateError, configure_stderr
+from .api import ConfigError, Engine, LogEvent, ProofError, TemplateError, configure_stderr
 from .api import logger as _logger
 
 _LOG_LEVELS = {
@@ -39,7 +39,7 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="ton",
         description="TON: mass data generator. Render rows from a JSON template.",
     )
-    parser.add_argument("config", help="Path to the JSON config file.")
+    parser.add_argument("config", nargs="?", help="Path to the JSON config file.")
     parser.add_argument(
         "-o",
         "--output",
@@ -93,6 +93,27 @@ def _build_parser() -> argparse.ArgumentParser:
         "--validate",
         action="store_true",
         help="Validate the config and exit without generating rows.",
+    )
+    parser.add_argument(
+        "--proof-check",
+        choices=("off", "sample", "all", "audit"),
+        default="off",
+        help="Proof-check generated values: off, sampled strict checks, all rows, or audit.",
+    )
+    parser.add_argument(
+        "--proof-sample-rate",
+        type=_positive_int,
+        metavar="N",
+        default=1,
+        help="With --proof-check=sample, check every Nth generated row.",
+    )
+    parser.add_argument(
+        "--list-namespaces",
+        action="store_true",
+        help=(
+            "List available built-in namespaces, data types, and transforms. "
+            "Built-ins are always available; plugin loading is opt-in."
+        ),
     )
     parser.add_argument(
         "--entry-points",
@@ -169,6 +190,12 @@ def _run(args: argparse.Namespace) -> int:
 
 
 def _run_inner(args: argparse.Namespace) -> int:
+    if args.list_namespaces:
+        _print_namespaces(args)
+        return 0
+    if args.config is None:
+        print("ton: config path is required", file=sys.stderr)
+        return 1
     built = _prepare_engine(args)
     if isinstance(built, int):
         return built
@@ -224,6 +251,9 @@ def _execute(engine: Engine, args: argparse.Namespace) -> int:
     except OSError as exc:
         print(f"ton: cannot write output: {exc}", file=sys.stderr)
         return 1
+    except ProofError as exc:
+        print(f"ton: proof failed: {exc}", file=sys.stderr)
+        return 2
     if args.verbose:
         _report(rows_written, time.perf_counter() - started)
     return 0
@@ -233,21 +263,38 @@ def _build_engine(args: argparse.Namespace) -> Engine:
     rng = Random(args.seed) if args.seed is not None else Random()
     config = api.load_config(args.config)
     registry = None
+    transforms = None
     if args.entry_points or args.entry_point_allowlist:
         allowed = set(args.entry_point_allowlist) or None
-        registry = api.build_registry(
+        catalog = api.build_extension_catalog(
             include_entry_points=True,
             allowed_entry_points=allowed,
         )
+        registry = catalog.generators()
+        transforms = catalog.transforms()
     # --progress already prints JSON; reuse the same interval as the
     # engine's logger milestone so structured handlers see the same
     # boundaries.
     return Engine.from_config(
         config,
         registry=registry,
+        transforms=transforms,
         rng=rng,
+        proof_mode=args.proof_check,
+        proof_sample_rate=args.proof_sample_rate,
         milestone_rows=args.progress,
     )
+
+
+def _print_namespaces(args: argparse.Namespace) -> None:
+    allowed = set(args.entry_point_allowlist) or None
+    catalog = api.build_extension_catalog(
+        include_entry_points=args.entry_points or bool(args.entry_point_allowlist),
+        allowed_entry_points=allowed,
+    )
+    print("namespaces:", ", ".join(catalog.namespaces()))
+    print("data types:", ", ".join(catalog.list_data_types()))
+    print("transforms:", ", ".join(catalog.list_transforms()))
 
 
 @contextmanager

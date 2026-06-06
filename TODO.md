@@ -73,7 +73,6 @@ Last full rescan: 2026-06-06.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CLI-001 | open   | M      | Add CLI flags for validation/proof-check mode (`off`, `sample`, `all`, `audit`) and plugin namespace visibility. Help text must make clear that built-in data types are always available and plugin loading is opt-in. |
 
 ## configuration discoverability
 

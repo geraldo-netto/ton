@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from random import Random
 from threading import Barrier, Thread
+from typing import Any
 
 import pytest
 
 from ton._engine import Engine, TemplateError
+from ton._transforms import BaseTransform, TransformCapabilities, TransformResult
 
 
 def test_engine_yields_requested_row_count(basic_config: dict) -> None:
@@ -99,3 +101,78 @@ def test_engine_rejects_concurrent_iteration(basic_config: dict) -> None:
     assert len(errors) == 1
     assert isinstance(errors[0], RuntimeError)
     assert "concurrently" in str(errors[0])
+
+
+def test_engine_applies_transform_chain_to_single_value() -> None:
+    class PrefixTransform(BaseTransform):
+        type_name = "prefix"
+
+        def apply(
+            self,
+            prepared: Any,
+            value: TransformResult,
+            rng: Random,
+        ) -> TransformResult:
+            del rng
+            return TransformResult(f"{prepared['prefix']}{value.value}")
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "plugin.prefix", "prefix": "pre-"}],
+            }
+        },
+    }
+
+    rows = list(
+        Engine(
+            config,
+            transforms={"plugin.prefix": PrefixTransform()},
+            rng=Random(0),
+        )
+    )
+
+    assert rows == ["pre-x"]
+
+
+def test_engine_preserves_paired_value_through_identity_transform() -> None:
+    config = {
+        "rows": 1,
+        "format": "$word[id]$=$word$",
+        "types": {
+            "word": {
+                "type": "lmhash",
+                "values": ["alpha"],
+                "transforms": [{"type": "identity"}],
+            }
+        },
+    }
+
+    assert list(Engine(config, rng=Random(0))) == [
+        "alpha=c89eee2b363e6de65346d055e0c839e1"
+    ]
+
+
+def test_engine_rejects_transform_that_cannot_accept_paired_input() -> None:
+    class UnpairedTransform(BaseTransform):
+        type_name = "unpaired"
+        capabilities = TransformCapabilities(accepts_paired=False)
+
+    config = {
+        "rows": 1,
+        "format": "$word[id]$=$word$",
+        "types": {
+            "word": {
+                "type": "lmhash",
+                "values": ["alpha"],
+                "transforms": [{"type": "plugin.unpaired"}],
+            }
+        },
+    }
+
+    with pytest.raises(TemplateError, match="does not accept paired"):
+        Engine(config, transforms={"plugin.unpaired": UnpairedTransform()})

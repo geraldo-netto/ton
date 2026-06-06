@@ -9,19 +9,41 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from random import Random
 from typing import Any
 
 from . import _config
 from ._logging import LogEvent
 from ._logging import logger as _logger
-from ._registry import make_registry
+from ._registry import build_extension_catalog, make_registry, normalize_reference
 from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
+from ._transforms import Transform, TransformResult
 from .generators import Generator
 
 
 class TemplateError(ValueError):
     """Raised when a template references a type not declared in the config."""
+
+
+@dataclass(frozen=True)
+class PreparedTransform:
+    transform: Transform
+    prepared: Any
+
+
+@dataclass(frozen=True)
+class PreparedField:
+    generator: Generator
+    source_prepared: Any
+    transforms: tuple[PreparedTransform, ...]
+
+    @property
+    def is_paired(self) -> bool:
+        if not self.transforms:
+            return self.generator.is_paired
+        last = self.transforms[-1].transform
+        return self.generator.is_paired and last.capabilities.preserves_pairing
 
 
 class Engine:
@@ -31,6 +53,7 @@ class Engine:
         self,
         config: Mapping[str, Any],
         registry: Mapping[str, Generator] | None = None,
+        transforms: Mapping[str, Transform] | None = None,
         rng: Random | None = None,
         *,
         milestone_rows: int = 0,
@@ -40,15 +63,14 @@ class Engine:
         self._rows: int = int(config["rows"])
         self._tokens = parse(self._template)
         self._registry = self._resolve_registry(registry)
+        self._transforms = dict(transforms or build_extension_catalog().transforms())
         self._rng = rng if rng is not None else Random()
         self._validate()
         # Each referenced type spec is parsed once via Generator.prepare;
         # the per-row hot path just looks up the prepared spec by name.
-        self._prepared: dict[str, tuple[Generator, Any]] = self._build_prepared()
+        self._prepared: dict[str, PreparedField] = self._build_prepared()
         # Skip per-row paired_cache allocation when no referenced type is paired.
-        self._has_paired = any(
-            self._prepared[t.type_key][0].is_paired for t in self._tokens
-        )
+        self._has_paired = any(self._prepared[t.type_key].is_paired for t in self._tokens)
         # Precompute the literal segments that surround placeholders so
         # the per-row render is a straight string-join with no regex
         # pass (TODO PERF-009).
@@ -79,6 +101,7 @@ class Engine:
         *,
         seed: int | None = None,
         registry: Mapping[str, Generator] | None = None,
+        transforms: Mapping[str, Transform] | None = None,
         rng: Random | None = None,
         milestone_rows: int = 0,
     ) -> Engine:
@@ -94,6 +117,7 @@ class Engine:
         return cls(
             config,
             registry=registry,
+            transforms=transforms,
             rng=engine_rng,
             milestone_rows=milestone_rows,
         )
@@ -104,6 +128,7 @@ class Engine:
         path: str,
         *,
         registry: Mapping[str, Generator] | None = None,
+        transforms: Mapping[str, Transform] | None = None,
         rng: Random | None = None,
         milestone_rows: int = 0,
     ) -> Engine:
@@ -116,6 +141,7 @@ class Engine:
         return cls(
             _config.load(path),
             registry=registry,
+            transforms=transforms,
             rng=rng,
             milestone_rows=milestone_rows,
         )
@@ -166,8 +192,8 @@ class Engine:
                     f"Unknown type {type_name!r} for variable {token.type_key!r}"
                 )
 
-    def _build_prepared(self) -> dict[str, tuple[Generator, Any]]:
-        prepared: dict[str, tuple[Generator, Any]] = {}
+    def _build_prepared(self) -> dict[str, PreparedField]:
+        prepared: dict[str, PreparedField] = {}
         for token in self._tokens:
             if token.type_key in prepared:
                 continue
@@ -175,12 +201,14 @@ class Engine:
             generator = self._registry[_runtime_type_name(spec["type"])]
             try:
                 if generator.is_composite:
-                    prepared[token.type_key] = (
-                        generator,
-                        generator.prepare_composite(spec, self._registry),
-                    )
-                    continue
-                prepared[token.type_key] = (generator, generator.prepare(spec))
+                    source_prepared = generator.prepare_composite(spec, self._registry)
+                else:
+                    source_prepared = generator.prepare(spec)
+                prepared[token.type_key] = PreparedField(
+                    generator=generator,
+                    source_prepared=source_prepared,
+                    transforms=self._prepare_transforms(token.type_key, spec, generator),
+                )
             except Exception as exc:  # noqa: BLE001 - boundary; re-raised below
                 # Surface the failing spec to log handlers before
                 # collapsing the exception to a TemplateError so a
@@ -203,6 +231,33 @@ class Engine:
                     f"{type(exc).__name__}: {exc}"
                 ) from exc
         return prepared
+
+    def _prepare_transforms(
+        self,
+        type_key: str,
+        spec: Mapping[str, Any],
+        generator: Generator,
+    ) -> tuple[PreparedTransform, ...]:
+        is_paired = bool(generator.is_paired)
+        prepared: list[PreparedTransform] = []
+        for transform_spec in spec.get("transforms", []):
+            transform = self._resolve_transform(type_key, transform_spec["type"])
+            if is_paired and not transform.capabilities.accepts_paired:
+                raise TemplateError(
+                    f"Transform {transform_spec['type']!r} for variable "
+                    f"{type_key!r} does not accept paired input"
+                )
+            prepared.append(PreparedTransform(transform, transform.prepare(transform_spec)))
+            is_paired = is_paired and transform.capabilities.preserves_pairing
+        return tuple(prepared)
+
+    def _resolve_transform(self, type_key: str, reference: str) -> Transform:
+        normalized = normalize_reference(reference)
+        if normalized in self._transforms:
+            return self._transforms[normalized]
+        if reference in self._transforms:
+            return self._transforms[reference]
+        raise TemplateError(f"Unknown transform {reference!r} for variable {type_key!r}")
 
     def __iter__(self) -> Iterator[str]:
         if not self._iteration_lock.acquire(blocking=False):
@@ -251,15 +306,16 @@ class Engine:
     def _resolve(
         self, token: Token, paired_cache: dict[str, tuple[str, str]] | None
     ) -> str:
-        generator, prepared = self._prepared[token.type_key]
+        field = self._prepared[token.type_key]
+        generator = field.generator
         try:
-            if paired_cache is not None and generator.is_paired:
+            if paired_cache is not None and field.is_paired:
                 pair = paired_cache.get(token.type_key)
                 if pair is None:
-                    pair = generator.generate_pair(prepared, self._rng)  # type: ignore[attr-defined]
+                    pair = self._generate_pair(field)
                     paired_cache[token.type_key] = pair
                 return pair[0] if token.wants_id else pair[1]
-            return generator.generate(prepared, self._rng)
+            return self._generate_single(field)
         except Exception as exc:  # noqa: BLE001 - boundary; re-raised below
             # A generator that raises mid-iteration would otherwise hit
             # the CLI's catch-all (TODO REL-014). Log an identifying
@@ -282,6 +338,25 @@ class Engine:
                 f"Generator {type(generator).__name__} for variable "
                 f"{token.type_key!r} raised {type(exc).__name__}: {exc}"
             ) from exc
+
+    def _generate_pair(self, field: PreparedField) -> tuple[str, str]:
+        pair = field.generator.generate_pair(field.source_prepared, self._rng)  # type: ignore[attr-defined]
+        result = TransformResult(value=pair[1], id_value=pair[0])
+        transformed = self._apply_transforms(field, result)
+        return (transformed.id_value or "", transformed.value)
+
+    def _generate_single(self, field: PreparedField) -> str:
+        result = TransformResult(field.generator.generate(field.source_prepared, self._rng))
+        return self._apply_transforms(field, result).value
+
+    def _apply_transforms(
+        self,
+        field: PreparedField,
+        result: TransformResult,
+    ) -> TransformResult:
+        for prepared in field.transforms:
+            result = prepared.transform.apply(prepared.prepared, result, self._rng)
+        return result
 
 
 def _collect_nested_types(spec: Mapping[str, Any], needed: set[str]) -> None:

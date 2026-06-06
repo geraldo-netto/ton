@@ -53,6 +53,7 @@ from ._registry import (
     registry_with_entry_points,
 )
 from ._template import UndeclaredVariableError
+from ._transforms import Transform
 from .generators import Generator, PairedGenerator
 
 __all__ = [
@@ -63,6 +64,7 @@ __all__ = [
     "PairedGenerator",
     "RegistryError",
     "TemplateError",
+    "Transform",
     "UndeclaredVariableError",
     "ExtensionCatalog",
     "build_extension_catalog",
@@ -124,6 +126,7 @@ def generate(
     *,
     seed: int | None = None,
     registry: Mapping[str, Generator] | None = None,
+    transforms: Mapping[str, Transform] | None = None,
     milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for an in-memory config mapping."""
@@ -132,6 +135,7 @@ def generate(
             config,
             seed=seed,
             registry=registry,
+            transforms=transforms,
             milestone_rows=milestone_rows,
         )
     )
@@ -142,6 +146,7 @@ def generate_from_file(
     *,
     seed: int | None = None,
     registry: Mapping[str, Generator] | None = None,
+    transforms: Mapping[str, Transform] | None = None,
     milestone_rows: int = 0,
 ) -> Iterator[str]:
     """Yield generated rows for a config loaded from ``path``."""
@@ -149,5 +154,6 @@ def generate_from_file(
         load_config(path),
         seed=seed,
         registry=registry,
+        transforms=transforms,
         milestone_rows=milestone_rows,
     )

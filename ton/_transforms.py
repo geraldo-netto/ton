@@ -93,3 +93,13 @@ class BaseTransform:
     ) -> TransformProof:
         del prepared, before, after
         return TransformProof(ok=True)
+
+
+class IdentityTransform(BaseTransform):
+    """Built-in transform that returns values unchanged."""
+
+    type_name: ClassVar[str] = "identity"
+    capabilities: ClassVar[TransformCapabilities] = TransformCapabilities(
+        accepts_paired=True,
+        preserves_pairing=True,
+    )

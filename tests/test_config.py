@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
+from ton import api
 from ton._config import MAX_ROWS, ConfigError, load
+from ton._transforms import BaseTransform, TransformCapabilities
 from ton._engine import Engine, TemplateError
 
 
@@ -137,3 +139,57 @@ def test_transform_entries_need_type(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="transform 0"):
         load(path)
+
+
+def test_validate_config_lists_available_types_for_unknown_type() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"] = {"type": "missing"}
+
+    with pytest.raises(ConfigError, match="Available types:"):
+        api.validate_config(payload)
+
+
+def test_validate_config_reports_unknown_namespace() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"] = {"type": "other.string"}
+
+    with pytest.raises(ConfigError, match="Unknown namespace 'other'"):
+        api.validate_config(payload)
+
+
+def test_validate_config_lists_available_transforms() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["transforms"] = [{"type": "missing"}]
+
+    with pytest.raises(ConfigError, match="Available transforms:"):
+        api.validate_config(payload)
+
+
+def test_validate_config_rejects_incompatible_transform_chain() -> None:
+    class UnpairedOnlyTransform(BaseTransform):
+        type_name = "unpaired"
+        capabilities = TransformCapabilities(accepts_paired=False)
+
+    payload = {
+        "rows": 1,
+        "format": "$word$;$word[id]$",
+        "types": {
+            "word": {
+                "type": "lmhash",
+                "values": ["secret"],
+                "transforms": [{"type": "plugin.unpaired"}],
+            }
+        },
+    }
+    catalog = api.build_extension_catalog()
+    catalog.register_transform("plugin", "unpaired", UnpairedOnlyTransform())
+
+    with pytest.raises(ConfigError, match="does not accept paired input"):
+        api.validate_config(payload, catalog=catalog)
+
+
+def test_validate_config_accepts_core_identity_transform() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["transforms"] = [{"type": "identity"}]
+
+    api.validate_config(payload)

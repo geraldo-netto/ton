@@ -73,12 +73,22 @@ __all__ = [
     "load_config",
     "logger",
     "normalize_reference",
+    "validate_config",
 ]
 
 
 def load_config(path: str) -> dict[str, Any]:
     """Read, parse, and validate a JSON config file."""
     return _config.load(path)
+
+
+def validate_config(
+    config: dict[str, Any],
+    *,
+    catalog: ExtensionCatalog | None = None,
+) -> None:
+    """Validate config references against an extension catalog."""
+    _config.validate_with_catalog(config, catalog or build_extension_catalog())
 
 
 def build_registry(

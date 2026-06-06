@@ -85,7 +85,6 @@ Last full rescan: 2026-06-06.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CFG-002 | open   | M      | Add config validation that can list available built-in and plugin types/transforms, detect unknown namespaces, reject incompatible transform chains, and explain required capabilities in actionable error messages. |
 
 ## data governance
 

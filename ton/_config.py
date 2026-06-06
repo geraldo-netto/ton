@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+from ._registry import ExtensionCatalog, RegistryError, normalize_reference
 from ._template import UndeclaredVariableError, validate_against
 
 
@@ -64,6 +65,14 @@ def load(path: str | Path) -> dict[str, Any]:
 
     _validate(data)
     return cast(dict[str, Any], data)
+
+
+def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> None:
+    """Validate type and transform references against ``catalog``."""
+    _validate(data)
+    for field_name, spec in data["types"].items():
+        _validate_type_reference(field_name, spec["type"], catalog)
+        _validate_transforms(field_name, spec, catalog)
 
 
 def _validate(data: Any) -> None:
@@ -123,3 +132,63 @@ def _validate_template_references(template: str, types: dict[str, Any]) -> None:
         validate_against(template, types.keys())
     except UndeclaredVariableError as exc:
         raise ConfigError(str(exc)) from exc
+
+
+def _validate_type_reference(
+    field_name: str,
+    reference: str,
+    catalog: ExtensionCatalog,
+) -> None:
+    normalized = _normalize_config_reference(reference)
+    if normalized not in catalog.generators():
+        _raise_unknown_reference("type", field_name, reference, catalog.list_data_types())
+
+
+def _validate_transforms(
+    field_name: str,
+    spec: dict[str, Any],
+    catalog: ExtensionCatalog,
+) -> None:
+    generator = catalog.generators()[_normalize_config_reference(spec["type"])]
+    is_paired = bool(generator.is_paired)
+    for transform_spec in spec.get("transforms", []):
+        reference = transform_spec["type"]
+        normalized = _normalize_config_reference(reference)
+        transforms = catalog.transforms()
+        if normalized not in transforms:
+            _raise_unknown_reference("transform", field_name, reference, catalog.list_transforms())
+        transform = transforms[normalized]
+        if is_paired and not transform.capabilities.accepts_paired:
+            raise ConfigError(
+                f"Transform {reference!r} for {field_name!r} does not accept paired input."
+            )
+        is_paired = is_paired and transform.capabilities.preserves_pairing
+
+
+def _normalize_config_reference(reference: str) -> str:
+    try:
+        return normalize_reference(reference)
+    except RegistryError as exc:
+        raise ConfigError(str(exc)) from exc
+
+
+def _raise_unknown_reference(
+    kind: str,
+    field_name: str,
+    reference: str,
+    available: tuple[str, ...],
+) -> None:
+    namespace = _unknown_namespace(reference, available)
+    detail = f" Unknown namespace {namespace!r}." if namespace else ""
+    raise ConfigError(
+        f"Unknown {kind} {reference!r} for {field_name!r}.{detail} "
+        f"Available {kind}s: {', '.join(available) or '(none)'}."
+    )
+
+
+def _unknown_namespace(reference: str, available: tuple[str, ...]) -> str | None:
+    if "." not in reference:
+        return None
+    namespace = reference.split(".", 1)[0]
+    known = {item.split(".", 1)[0] for item in available if "." in item}
+    return namespace if namespace not in known else None

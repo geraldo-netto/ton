@@ -23,7 +23,7 @@ from typing import Any
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
-from ._transforms import Transform
+from ._transforms import IdentityTransform, Transform
 
 # Importing ``ton.generators`` imports every concrete-generator submodule,
 # which is what populates Generator.__subclasses__() below.
@@ -107,6 +107,10 @@ class ExtensionCatalog:
     def list_validators(self) -> tuple[str, ...]:
         return tuple(sorted(self.validators()))
 
+    def namespaces(self) -> tuple[str, ...]:
+        names = set(self._generators) | set(self._transforms) | set(self._validators)
+        return tuple(sorted(names))
+
     def get_data_type(self, reference: str) -> Generator:
         return self.generators()[normalize_reference(reference)]
 
@@ -150,7 +154,7 @@ def normalize_reference(reference: str) -> str:
 
 def build_extension_catalog() -> ExtensionCatalog:
     """Return a catalog containing the built-in data types."""
-    return ExtensionCatalog()
+    return ExtensionCatalog(transforms={"identity": IdentityTransform()})
 
 
 def catalog_with_entry_points(

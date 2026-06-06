@@ -6,6 +6,8 @@ from random import Random
 from typing import Any
 
 from ton._transforms import BaseTransform, TransformProof, TransformResult
+from ton._registry import default_registry
+from ton.transforms import DistributionTransform
 
 
 class EchoTransform(BaseTransform):
@@ -33,3 +35,40 @@ def test_base_transform_prepare_and_prove_defaults() -> None:
 
     assert result.value == "x"
     assert transform.prove(prepared, result, result) == TransformProof(ok=True)
+
+
+def test_distribution_transform_chooses_prepared_candidate() -> None:
+    transform = DistributionTransform()
+    prepared = transform.prepare_composite(
+        {
+            "type": "distribution",
+            "choices": [
+                {"weight": 0, "spec": {"type": "string", "values": ["never"]}},
+                {"weight": 1, "spec": {"type": "string", "values": ["always"]}},
+            ],
+        },
+        default_registry(),
+    )
+
+    result = transform.apply(prepared, TransformResult("ignored"), Random(0))
+
+    assert result == TransformResult("always")
+
+
+def test_distribution_transform_requires_two_choices() -> None:
+    transform = DistributionTransform()
+
+    try:
+        transform.prepare_composite(
+            {
+                "type": "distribution",
+                "choices": [
+                    {"spec": {"type": "string", "values": ["only"]}},
+                ],
+            },
+            default_registry(),
+        )
+    except ValueError as exc:
+        assert "at least two" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")

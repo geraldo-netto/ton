@@ -280,7 +280,12 @@ class Engine:
                     f"Transform {transform_spec['type']!r} for variable "
                     f"{type_key!r} does not accept paired input"
                 )
-            prepared.append(PreparedTransform(transform, transform.prepare(transform_spec)))
+            prepared.append(
+                PreparedTransform(
+                    transform,
+                    transform.prepare_composite(transform_spec, self._registry),
+                )
+            )
             is_paired = is_paired and transform.capabilities.preserves_pairing
         return tuple(prepared)
 

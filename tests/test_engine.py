@@ -351,3 +351,27 @@ def test_engine_sample_proof_mode_checks_sampled_rows() -> None:
 def test_engine_rejects_bad_proof_sample_rate(basic_config: dict) -> None:
     with pytest.raises(ValueError, match="proof_sample_rate"):
         Engine(basic_config, proof_mode="sample", proof_sample_rate=0)
+
+
+def test_engine_applies_distribution_transform() -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["ignored"],
+                "transforms": [
+                    {
+                        "type": "distribution",
+                        "choices": [
+                            {"weight": 0, "spec": {"type": "string", "values": ["no"]}},
+                            {"weight": 1, "spec": {"type": "string", "values": ["yes"]}},
+                        ],
+                    }
+                ],
+            }
+        },
+    }
+
+    assert list(Engine(config, rng=Random(0))) == ["yes"]

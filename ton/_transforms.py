@@ -50,6 +50,13 @@ class Transform(Protocol):
     def prepare(self, spec: Mapping[str, Any]) -> Any:
         """Validate and normalize a raw transform spec."""
 
+    def prepare_composite(
+        self,
+        spec: Mapping[str, Any],
+        registry: Mapping[str, Any],
+    ) -> Any:
+        """Validate specs that need access to data-type registrations."""
+
     def apply(
         self,
         prepared: Any,
@@ -75,6 +82,14 @@ class BaseTransform:
 
     def prepare(self, spec: Mapping[str, Any]) -> Any:
         return spec
+
+    def prepare_composite(
+        self,
+        spec: Mapping[str, Any],
+        registry: Mapping[str, Any],
+    ) -> Any:
+        del registry
+        return self.prepare(spec)
 
     def apply(
         self,

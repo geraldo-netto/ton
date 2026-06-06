@@ -24,6 +24,7 @@ from typing import Any
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._transforms import IdentityTransform, Transform
+from .transforms import DistributionTransform
 
 # Importing ``ton.generators`` imports every concrete-generator submodule,
 # which is what populates Generator.__subclasses__() below.
@@ -154,7 +155,12 @@ def normalize_reference(reference: str) -> str:
 
 def build_extension_catalog() -> ExtensionCatalog:
     """Return a catalog containing the built-in data types."""
-    return ExtensionCatalog(transforms={"identity": IdentityTransform()})
+    return ExtensionCatalog(
+        transforms={
+            "distribution": DistributionTransform(),
+            "identity": IdentityTransform(),
+        }
+    )
 
 
 def catalog_with_entry_points(

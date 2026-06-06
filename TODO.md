@@ -58,7 +58,6 @@ Last full rescan: 2026-06-06.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DEC-001 | open   | M      | Decouple statistical distribution logic from concrete generators. Distribution should be a transform over two-or-more candidate instances of any compatible data type, not a special generator family that duplicates type-specific behavior. |
 
 ## business/design patterns/DDD
 

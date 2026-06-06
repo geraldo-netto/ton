@@ -8,6 +8,7 @@ from random import Random
 import pytest
 
 from ton.generators.weighted import WeightedGenerator
+from ton._registry import default_registry
 
 
 def test_weighted_parallel_arrays_distribution() -> None:
@@ -80,6 +81,22 @@ def test_weighted_composite_mixes_types_via_engine() -> None:
     assert str_hits + int_hits == 200
     # 70/30 split; allow wide slack.
     assert str_hits > int_hits
+
+
+def test_weighted_composite_uses_distribution_delegate() -> None:
+    gen = WeightedGenerator()
+    prepared = gen.prepare_composite(
+        {
+            "type": "weighted",
+            "choices": [
+                {"weight": 0, "spec": {"type": "string", "values": ["never"]}},
+                {"weight": 1, "spec": {"type": "string", "values": ["always"]}},
+            ],
+        },
+        default_registry(),
+    )
+
+    assert gen.generate(prepared, Random(0)) == "always"
 
 
 def test_weighted_composite_can_nest_inside_weighted() -> None:

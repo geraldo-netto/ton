@@ -29,17 +29,12 @@ class DistributionTransform(BaseTransform):
         spec: Mapping[str, Any],
         registry: Mapping[str, Generator],
     ) -> DistributionSpec:
-        raw_choices = spec.get("choices")
-        if not isinstance(raw_choices, list) or len(raw_choices) < 2:
-            raise ValueError("distribution 'choices' must contain at least two entries")
-        weights: list[float] = []
-        children: list[tuple[Generator, Any]] = []
-        for index, choice in enumerate(raw_choices):
-            weight, child = _prepare_choice(index, choice, registry)
-            weights.append(weight)
-            children.append(child)
-        _validate_weights(weights)
-        return DistributionSpec(weights=tuple(weights), children=tuple(children))
+        return prepare_distribution(
+            spec,
+            registry,
+            label="distribution",
+            min_choices=2,
+        )
 
     def apply(
         self,
@@ -48,9 +43,27 @@ class DistributionTransform(BaseTransform):
         rng: Random,
     ) -> TransformResult:
         del value
-        index = rng.choices(range(len(prepared.children)), weights=prepared.weights, k=1)[0]
-        child_gen, child_prepared = prepared.children[index]
-        return TransformResult(child_gen.generate(child_prepared, rng))
+        return TransformResult(choose_distribution(prepared, rng))
+
+
+def prepare_distribution(
+    spec: Mapping[str, Any],
+    registry: Mapping[str, Generator],
+    *,
+    label: str,
+    min_choices: int,
+) -> DistributionSpec:
+    raw_choices = spec.get("choices")
+    if not isinstance(raw_choices, list) or len(raw_choices) < min_choices:
+        raise ValueError(_choices_error(label, min_choices))
+    weights: list[float] = []
+    children: list[tuple[Generator, Any]] = []
+    for index, choice in enumerate(raw_choices):
+        weight, child = _prepare_choice(index, choice, registry, label)
+        weights.append(weight)
+        children.append(child)
+    _validate_weights(weights, label)
+    return DistributionSpec(weights=tuple(weights), children=tuple(children))
 
 
 def choose_distribution(prepared: DistributionSpec, rng: Random) -> str:
@@ -64,12 +77,16 @@ def _prepare_choice(
     index: int,
     choice: Any,
     registry: Mapping[str, Generator],
+    label: str,
 ) -> tuple[float, tuple[Generator, Any]]:
     if not isinstance(choice, Mapping):
-        raise ValueError(f"distribution 'choices[{index}]' must be an object")
-    weight = _coerce_weight(index, choice)
+        raise ValueError(
+            f"{label} 'choices[{index}]' must be an object with "
+            "'weight' and 'spec' keys"
+        )
+    weight = _coerce_weight(index, choice, label)
     child = prepare_child_spec(
-        "distribution",
+        label,
         f"'choices[{index}].spec'",
         choice.get("spec"),
         registry,
@@ -77,17 +94,23 @@ def _prepare_choice(
     return weight, child
 
 
-def _coerce_weight(index: int, choice: Mapping[str, Any]) -> float:
+def _coerce_weight(index: int, choice: Mapping[str, Any], label: str) -> float:
     if "weight" not in choice:
         return 1.0
     try:
         return float(choice["weight"])
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"distribution 'choices[{index}].weight' must be numeric") from exc
+        raise ValueError(f"{label} 'choices[{index}].weight' must be numeric") from exc
 
 
-def _validate_weights(weights: Sequence[float]) -> None:
+def _validate_weights(weights: Sequence[float], label: str) -> None:
     if any(weight < 0 for weight in weights):
-        raise ValueError("distribution 'weights' must be non-negative")
+        raise ValueError(f"{label} 'weights' must be non-negative")
     if sum(weights) <= 0:
-        raise ValueError("distribution 'weights' must sum to a positive number")
+        raise ValueError(f"{label} 'weights' must sum to a positive number")
+
+
+def _choices_error(label: str, min_choices: int) -> str:
+    if min_choices == 1:
+        return f"{label} 'choices' must be a non-empty list"
+    return f"{label} 'choices' must contain at least {min_choices} entries"

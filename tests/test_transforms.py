@@ -69,6 +69,6 @@ def test_distribution_transform_requires_two_choices() -> None:
             default_registry(),
         )
     except ValueError as exc:
-        assert "at least two" in str(exc)
+        assert "at least 2" in str(exc)
     else:
         raise AssertionError("expected ValueError")

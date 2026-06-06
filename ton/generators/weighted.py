@@ -50,7 +50,12 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar
 
-from .base import Generator, prepare_child_spec
+from ..transforms.distribution import (
+    DistributionSpec,
+    choose_distribution,
+    prepare_distribution,
+)
+from .base import Generator
 
 
 @dataclass(frozen=True)
@@ -59,7 +64,7 @@ class WeightedSpec:
     #: Populated for the legacy ``values`` form.
     values: tuple[str, ...] | None = None
     #: Populated for the composite ``choices`` form.
-    children: tuple[tuple[Generator, Any], ...] | None = None
+    distribution: DistributionSpec | None = None
 
 
 class WeightedGenerator(Generator):
@@ -90,27 +95,20 @@ class WeightedGenerator(Generator):
             return self._prepare_legacy(spec)
         if not isinstance(raw_choices, list) or not raw_choices:
             raise ValueError("weighted 'choices' must be a non-empty list")
-        weights: list[float] = []
-        children: list[tuple[Generator, Any]] = []
-        for index, choice in enumerate(raw_choices):
-            weight, child = self._prepare_choice(index, choice, registry)
-            weights.append(weight)
-            children.append(child)
-        self._validate_weights(weights)
+        distribution = prepare_distribution(
+            _distribution_spec(spec),
+            registry,
+            label="weighted",
+            min_choices=1,
+        )
         return WeightedSpec(
-            weights=tuple(weights),
-            children=tuple(children),
+            weights=distribution.weights,
+            distribution=distribution,
         )
 
     def generate(self, prepared: WeightedSpec, rng: Random) -> str:
-        if prepared.children is not None:
-            index = rng.choices(
-                range(len(prepared.children)),
-                weights=prepared.weights,
-                k=1,
-            )[0]
-            child_gen, child_prepared = prepared.children[index]
-            return child_gen.generate(child_prepared, rng)
+        if prepared.distribution is not None:
+            return choose_distribution(prepared.distribution, rng)
         # Legacy string-only form.
         return rng.choices(prepared.values, weights=prepared.weights, k=1)[0]  # type: ignore[arg-type]
 
@@ -120,36 +118,6 @@ class WeightedGenerator(Generator):
             raise ValueError("weighted 'values' must be non-empty")
         self._validate_weights(weights)
         return WeightedSpec(values=values, weights=weights)
-
-    def _prepare_choice(
-        self,
-        index: int,
-        choice: Any,
-        registry: Mapping[str, Generator],
-    ) -> tuple[float, tuple[Generator, Any]]:
-        if not isinstance(choice, Mapping):
-            raise ValueError(
-                f"weighted 'choices[{index}]' must be an object with "
-                "'weight' and 'spec' keys"
-            )
-        if "weight" in choice:
-            try:
-                weight = float(choice["weight"])
-            except (TypeError, ValueError) as exc:
-                raise ValueError(
-                    f"weighted 'choices[{index}].weight' must be numeric"
-                ) from exc
-        else:
-            # Default: uniform weighting. Caller didn't supply a number,
-            # so every choice contributes the same probability mass.
-            weight = 1.0
-        child = prepare_child_spec(
-            "weighted",
-            f"'choices[{index}].spec'",
-            choice.get("spec"),
-            registry,
-        )
-        return weight, child
 
     @staticmethod
     def _validate_weights(weights: Sequence[float]) -> None:
@@ -188,3 +156,7 @@ def _coerce(spec: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[float, ...]
         tuple(str(v) for v in raw_values),
         tuple(float(w) for w in weights),
     )
+
+
+def _distribution_spec(spec: Mapping[str, Any]) -> dict[str, Any]:
+    return {"type": "distribution", "choices": spec["choices"]}

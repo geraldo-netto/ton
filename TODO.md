@@ -68,7 +68,6 @@ Last full rescan: 2026-06-06.
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| PLUG-003 | open   | L      | Implement generic transform plugins, starting with a statistical distribution transform that can weight or choose among two-or-more prepared instances of any compatible data type. Existing `weighted` behavior should migrate or delegate to this transform without breaking configs. |
 
 ## CLI / option integrity
 

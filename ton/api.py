@@ -46,7 +46,8 @@ from ._logging import LogEvent, configure_stderr, logger
 from ._registry import (
     ExtensionCatalog,
     RegistryError,
-    build_extension_catalog,
+    build_extension_catalog as _build_extension_catalog,
+    catalog_with_entry_points,
     default_registry,
     normalize_reference,
     registry_with_entry_points,
@@ -95,6 +96,17 @@ def build_registry(
     if include_entry_points:
         return registry_with_entry_points(allowed_names=allowed_entry_points)
     return default_registry()
+
+
+def build_extension_catalog(
+    include_entry_points: bool = False,
+    *,
+    allowed_entry_points: Container[str] | None = None,
+) -> ExtensionCatalog:
+    """Return a catalog for data types, transforms, and validators."""
+    if include_entry_points:
+        return catalog_with_entry_points(allowed_names=allowed_entry_points)
+    return _build_extension_catalog()
 
 
 def generate(

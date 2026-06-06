@@ -12,6 +12,7 @@ import pytest
 from ton._registry import (
     RegistryError,
     build_extension_catalog,
+    catalog_with_entry_points,
     clear_default_registry_cache,
     default_registry,
     discover_generator_classes,
@@ -192,3 +193,75 @@ def test_normalize_reference_defaults_to_core_namespace() -> None:
     assert normalize_reference("plugin.integer") == "plugin.integer"
     with pytest.raises(RegistryError):
         normalize_reference("bad-name")
+
+
+def test_catalog_entry_points_load_separate_plugin_kinds() -> None:
+    class CustomGenerator(Generator):
+        type_name = "custom"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "custom"
+
+    class CustomTransform(BaseTransform):
+        type_name = "trim"
+
+    generator_ep = mock.Mock()
+    generator_ep.name = "acme.custom"
+    generator_ep.value = "pkg:Generator"
+    generator_ep.load.return_value = CustomGenerator
+    transform_ep = mock.Mock()
+    transform_ep.name = "acme.trim"
+    transform_ep.value = "pkg:Transform"
+    transform_ep.load.return_value = CustomTransform
+    validator_ep = mock.Mock()
+    validator_ep.name = "acme.custom"
+    validator_ep.value = "pkg:Validator"
+    validator_ep.load.return_value = lambda: object()
+
+    def _entry_points(group: str):
+        return {
+            "ton.generators": [generator_ep],
+            "ton.transforms": [transform_ep],
+            "ton.validators": [validator_ep],
+        }[group]
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points()
+
+    assert "acme.custom" in catalog.list_data_types()
+    assert "acme.trim" in catalog.list_transforms()
+    assert "acme.custom" in catalog.list_validators()
+
+
+def test_catalog_entry_points_honor_allowlist() -> None:
+    allowed = mock.Mock()
+    allowed.name = "acme.trim"
+    allowed.value = "pkg:Transform"
+    allowed.load.return_value = BaseTransform
+    skipped = mock.Mock()
+    skipped.name = "acme.skip"
+    skipped.value = "pkg:Skip"
+
+    def _entry_points(group: str):
+        return [allowed, skipped] if group == "ton.transforms" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points(allowed_names={"acme.trim"})
+
+    assert "acme.trim" in catalog.list_transforms()
+    skipped.load.assert_not_called()
+
+
+def test_catalog_entry_points_skip_wrong_plugin_kind() -> None:
+    bad = mock.Mock()
+    bad.name = "acme.bad"
+    bad.value = "pkg:Bad"
+    bad.load.return_value = lambda: object()
+
+    def _entry_points(group: str):
+        return [bad] if group == "ton.transforms" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points()
+
+    assert "acme.bad" not in catalog.list_transforms()

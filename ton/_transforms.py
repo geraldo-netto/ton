@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, ClassVar, Protocol
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,7 @@ class TransformProof:
     reason: str = ""
 
 
+@runtime_checkable
 class Transform(Protocol):
     """Protocol implemented by value transforms.
 
@@ -74,6 +75,15 @@ class BaseTransform:
 
     def prepare(self, spec: Mapping[str, Any]) -> Any:
         return spec
+
+    def apply(
+        self,
+        prepared: Any,
+        value: TransformResult,
+        rng: Random,
+    ) -> TransformResult:
+        del prepared, rng
+        return value
 
     def prove(
         self,

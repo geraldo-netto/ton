@@ -34,6 +34,8 @@ from .generators import BUILTIN_GENERATOR_CLASSES, Generator
 #: the loaded object must be a callable returning a Generator (typically
 #: the Generator subclass itself).
 ENTRY_POINT_GROUP = "ton.generators"
+TRANSFORM_ENTRY_POINT_GROUP = "ton.transforms"
+VALIDATOR_ENTRY_POINT_GROUP = "ton.validators"
 CORE_NAMESPACE = "core"
 
 #: Allowlist of built-in ``type_name`` strings. Used by
@@ -149,6 +151,103 @@ def normalize_reference(reference: str) -> str:
 def build_extension_catalog() -> ExtensionCatalog:
     """Return a catalog containing the built-in data types."""
     return ExtensionCatalog()
+
+
+def catalog_with_entry_points(
+    *,
+    allowed_names: Container[str] | None = None,
+) -> ExtensionCatalog:
+    """Return a catalog merged with trusted plugin entry points."""
+    catalog = build_extension_catalog()
+    _load_catalog_entry_points(
+        catalog,
+        group=ENTRY_POINT_GROUP,
+        kind="data_type",
+        allowed_names=allowed_names,
+    )
+    _load_catalog_entry_points(
+        catalog,
+        group=TRANSFORM_ENTRY_POINT_GROUP,
+        kind="transform",
+        allowed_names=allowed_names,
+    )
+    _load_catalog_entry_points(
+        catalog,
+        group=VALIDATOR_ENTRY_POINT_GROUP,
+        kind="validator",
+        allowed_names=allowed_names,
+    )
+    return catalog
+
+
+def _load_catalog_entry_points(
+    catalog: ExtensionCatalog,
+    *,
+    group: str,
+    kind: str,
+    allowed_names: Container[str] | None,
+) -> None:
+    loaded = 0
+    failed = 0
+    for ep in entry_points(group=group):
+        if allowed_names is not None and ep.name not in allowed_names:
+            continue
+        try:
+            plugin = ep.load()()
+            namespace, name = _entry_point_namespace_name(ep.name)
+            _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
+        except Exception as exc:  # noqa: BLE001 - per-entry sandbox
+            failed += 1
+            _log_entry_point_failed(ep, exc)
+            continue
+        loaded += 1
+        _log_entry_point_loaded(ep)
+    if loaded or failed:
+        _logger.info(
+            "entry_points_summary loaded=%d failed=%d",
+            loaded,
+            failed,
+            extra={
+                "event": LogEvent.ENTRY_POINTS_SUMMARY.value,
+                "loaded": loaded,
+                "failed": failed,
+                "group": group,
+            },
+        )
+
+
+def _register_entry_point_plugin(
+    catalog: ExtensionCatalog,
+    kind: str,
+    namespace: str,
+    name: str,
+    plugin: Any,
+) -> None:
+    if kind == "data_type":
+        if not isinstance(plugin, Generator):
+            raise TypeError("data type entry point must return a Generator")
+        catalog.register_data_type(namespace, name, plugin)
+        return
+    if kind == "transform":
+        if not _is_transform(plugin):
+            raise TypeError("transform entry point must return a Transform")
+        catalog.register_transform(namespace, name, plugin)
+        return
+    catalog.register_validator(namespace, name, plugin)
+
+
+def _is_transform(plugin: Any) -> bool:
+    return all(callable(getattr(plugin, name, None)) for name in ("prepare", "apply", "prove"))
+
+
+def _entry_point_namespace_name(entry_point_name: str) -> tuple[str, str]:
+    if "." in entry_point_name:
+        namespace, name = entry_point_name.split(".", 1)
+        _validate_identifier("namespace", namespace)
+        _validate_identifier("name", name)
+        return namespace, name
+    _validate_identifier("name", entry_point_name)
+    return "plugin", entry_point_name
 
 
 def _validate_reference(reference: str) -> None:
@@ -349,6 +448,46 @@ def registry_with_entry_points(
             },
         )
     return registry
+
+
+def _log_entry_point_failed(ep: object, exc: Exception) -> None:
+    safe_name = _sanitize_for_log(getattr(ep, "name", ""))
+    safe_value = _sanitize_for_log(getattr(ep, "value", ""))
+    dist_name, dist_version = _entry_point_dist(ep)
+    _logger.warning(
+        "entry_point_failed name=%s value=%s error=%s",
+        safe_name,
+        safe_value,
+        exc,
+        extra={
+            "event": LogEvent.ENTRY_POINT_FAILED.value,
+            "ep_name": safe_name,
+            "value": safe_value,
+            "dist_name": dist_name,
+            "dist_version": dist_version,
+            "error": f"{type(exc).__name__}: {exc}",
+        },
+    )
+
+
+def _log_entry_point_loaded(ep: object) -> None:
+    safe_name = _sanitize_for_log(getattr(ep, "name", ""))
+    safe_value = _sanitize_for_log(getattr(ep, "value", ""))
+    dist_name, dist_version = _entry_point_dist(ep)
+    _logger.info(
+        "entry_point_loaded name=%s value=%s dist=%s version=%s",
+        safe_name,
+        safe_value,
+        dist_name,
+        dist_version,
+        extra={
+            "event": LogEvent.ENTRY_POINT_LOADED.value,
+            "ep_name": safe_name,
+            "value": safe_value,
+            "dist_name": dist_name,
+            "dist_version": dist_version,
+        },
+    )
 
 
 def _sanitize_for_log(value: object) -> str:

@@ -1,0 +1,206 @@
+"""Proof-check collaborator extracted from the engine (ARCH-001).
+
+:class:`ProofChecker` owns everything the engine used to inline for
+``--proof-check``: mode/sample-rate validation, the audit failure list,
+the per-row sampling decision, building :class:`~ton._proof.ProofFailure`
+records from generator and transform proofs, and the structured logging.
+
+The engine keeps only a thin seam: it feeds each rendered field's
+source/transform trace to :meth:`ProofChecker.evaluate` and raises
+``ProofError`` when a strict-mode failure is returned. Keeping the raise
+in the engine avoids a circular import (``ProofError`` subclasses the
+engine's ``TemplateError``).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
+
+from ._logging import LogEvent
+from ._logging import logger as _logger
+from ._proof import ProofFailure
+from ._transforms import TransformResult
+
+if TYPE_CHECKING:
+    from ._engine import PreparedField, TransformStep
+
+
+class ProofChecker:
+    """Own the proof-check state and failure-building for one engine."""
+
+    def __init__(self, *, mode: str, sample_rate: int, seed: int | None) -> None:
+        self.mode = validate_proof_mode(mode)
+        self.sample_rate = validate_proof_sample_rate(sample_rate)
+        self.seed = seed
+        self.failures: list[ProofFailure] = []
+
+    @property
+    def enabled(self) -> bool:
+        return self.mode != "off"
+
+    def reset(self) -> None:
+        """Clear collected audit failures before a fresh iteration."""
+        self.failures.clear()
+
+    def should_check(self, rows_emitted: int) -> bool:
+        if self.mode == "off":
+            return False
+        if self.mode == "sample":
+            return rows_emitted % self.sample_rate == 0
+        return True
+
+    def evaluate(
+        self,
+        type_key: str,
+        field: PreparedField,
+        source_result: TransformResult,
+        steps: tuple[TransformStep, ...],
+        *,
+        rows_emitted: int,
+        spec: Mapping[str, Any],
+    ) -> ProofFailure | None:
+        """Record proof failures for one rendered field.
+
+        Returns the failure the engine should raise on (strict ``all``/
+        ``sample`` modes); in ``audit`` mode failures are collected and
+        ``None`` is returned so iteration continues.
+        """
+        if not self.should_check(rows_emitted):
+            return None
+        failures = self.build_failures(
+            type_key, field, source_result, steps, row=rows_emitted + 1, spec=spec
+        )
+        if not failures:
+            return None
+        if self.mode == "audit":
+            self.failures.extend(failures)
+            for failure in failures:
+                self._log_failure(failure)
+            return None
+        self._log_failure(failures[0])
+        return failures[0]
+
+    def build_failures(
+        self,
+        type_key: str,
+        field: PreparedField,
+        source_result: TransformResult,
+        steps: tuple[TransformStep, ...],
+        *,
+        row: int = 0,
+        spec: Mapping[str, Any] | None = None,
+    ) -> tuple[ProofFailure, ...]:
+        """Return every proof failure for a field's source + transform trace."""
+        failures = list(self._source_failures(type_key, field, source_result, row, spec))
+        for step in steps:
+            proof = step.prepared.transform.prove(
+                step.prepared.prepared,
+                step.before,
+                step.after,
+            )
+            if not proof.ok:
+                failures.append(
+                    self._make_failure(
+                        type_key=type_key,
+                        stage="transform",
+                        reference=step.prepared.transform.type_name,
+                        reason=proof.reason,
+                        result=step.after,
+                        row=row,
+                        spec=spec,
+                    )
+                )
+        return tuple(failures)
+
+    def log_summary(self) -> None:
+        """Emit the end-of-run proof summary when checking is enabled."""
+        if not self.enabled:
+            return
+        _logger.info(
+            "proof_check_summary mode=%s failures=%d",
+            self.mode,
+            len(self.failures),
+            extra={
+                "event": LogEvent.PROOF_CHECK_SUMMARY.value,
+                "mode": self.mode,
+                "failures": len(self.failures),
+            },
+        )
+
+    def _source_failures(
+        self,
+        type_key: str,
+        field: PreparedField,
+        source_result: TransformResult,
+        row: int,
+        spec: Mapping[str, Any] | None,
+    ) -> tuple[ProofFailure, ...]:
+        proof = field.generator.prove(field.source_prepared, source_result)
+        if proof.ok:
+            return ()
+        return (
+            self._make_failure(
+                type_key=type_key,
+                stage="source",
+                reference=field.generator.type_name,
+                reason=proof.reason,
+                result=source_result,
+                row=row,
+                spec=spec,
+            ),
+        )
+
+    def _make_failure(
+        self,
+        *,
+        type_key: str,
+        stage: str,
+        reference: str,
+        reason: str,
+        result: TransformResult,
+        row: int,
+        spec: Mapping[str, Any] | None,
+    ) -> ProofFailure:
+        return ProofFailure(
+            row=row,
+            type_key=type_key,
+            stage=stage,
+            reference=reference,
+            reason=reason,
+            value=result.value,
+            id_value=result.id_value,
+            seed=self.seed,
+            spec=dict(spec) if spec is not None else None,
+        )
+
+    @staticmethod
+    def _log_failure(failure: ProofFailure) -> None:
+        _logger.warning(
+            "proof_check_failed row=%d type_key=%s stage=%s reference=%s",
+            failure.row,
+            failure.type_key,
+            failure.stage,
+            failure.reference,
+            extra={
+                "event": LogEvent.PROOF_CHECK_FAILED.value,
+                "row": failure.row,
+                "type_key": failure.type_key,
+                "stage": failure.stage,
+                "reference": failure.reference,
+                "reason": failure.reason,
+            },
+        )
+
+
+def validate_proof_mode(proof_mode: str) -> str:
+    if proof_mode not in {"off", "sample", "all", "audit"}:
+        raise ValueError("proof_mode must be 'off', 'sample', 'all', or 'audit'")
+    return proof_mode
+
+
+def validate_proof_sample_rate(proof_sample_rate: int) -> int:
+    parsed = int(proof_sample_rate)
+    if parsed < 1:
+        raise ValueError("proof_sample_rate must be >= 1")
+    return parsed

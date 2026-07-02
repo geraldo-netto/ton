@@ -6,100 +6,131 @@ Open review findings tracked per the categories defined in
 Status values: `open`, `in-progress`.
 Effort values: `S` (<=1h), `M` (1-4h), `L` (>4h).
 
-Last full rescan: 2026-06-06.
+Last full rescan: 2026-07-02.
 
 ## security
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| SEC-001 | open | M | Nested regex repeats bypass the `MAX_LITERAL_REPEAT` guard: `_reject_oversized_repeats` (`ton/generators/regex.py:92-104`) validates each `{n}` node independently against the 10,000 cap but never accounts for multiplicative nesting. `(?:a{5000}){5000}` passes yet `_emit_repeat` (`regex.py:161-167`) materializes ~25M chars/row; deeper nesting yields billions — config-driven memory-exhaustion DoS. |
 
 ## code complexity
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| CX-001 | open | S | `_category_pool` (`ton/generators/regex.py:214`) is a 6-branch if/return ladder over category constants, CC 13 (>10 rule). The file already uses dispatch tables (`_EMIT_HANDLERS`, `_FLATTEN_HANDLERS`); a `{CATEGORY_*: pool}` dict collapses it to a lookup. |
+| CX-002 | open | M | `_coerce` (`ton/generators/weighted.py:128`) handles three input shapes (record form, parallel-array uniform default, parallel-array explicit weights) in one nested-branch function, CC 13 (>10 rule). Split per-shape. |
 
 ## code duplication
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| DUP-001 | open | S | `WeightedGenerator._validate_weights` (`ton/generators/weighted.py:120`) and `_validate_weights` (`ton/transforms/distribution.py:105`) are byte-for-byte identical (non-negative + positive-sum). Factor one shared helper. |
+| DUP-002 | open | M | `HashGenerator`/`HashSpec` (`ton/generators/hash.py:31,56`) and `LMHashGenerator`/`LMHashSpec` (`ton/generators/lmhash.py:41,63`) share an identical `pairs` spec and identical `generate_pair` (`rng.choice(prepared.pairs)`). Extract a shared paired word-pool base. |
+| DUP-003 | open | S | The composite `prepare()` guard raising "requires the engine's composite preparation path" is triplicated in `weighted.py:80`, `one_of.py:44`, `sequence_of.py:55`. Provide it as a base default for `is_composite` generators. |
+| DUP-004 | open | S | Token extraction (`wants_id`/`key` from the regex match) is duplicated between `_parse_cached` (`ton/_template.py:66-69`) and `split_segments` (`ton/_template.py:108-111`). |
+| DUP-005 | open | S | `date.py:45-57` and `timestamp_unix.py:42-59` repeat the ISO-bounds-parse + `span_seconds` + `randint(0, span)` offset idiom; a shared "uniform instant in [lo,hi]" helper removes it. |
 
 ## reliability/correctness
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| REL-001 | open | M | Proof-check never validates composite/nested generator output. `_source_proof_failures` (`ton/_engine.py:537`) only calls the top-level generator's `prove`, which for `oneOf`/`weighted`/`sequence_of` is the permissive default `ProofResult(ok=True)`; child generators are never asked to prove. `--proof-check=all/audit` reports "all values passed" while composite outputs are unchecked (false assurance). Compounded by `DistributionTransform.apply` discarding the source value (`ton/transforms/distribution.py:44-46`), so the proven source draw is thrown away and the emitted value is unproven. |
 
 ## performance
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| PERF-001 | open | M | Regex character-class pools are rebuilt on every emission instead of at prepare time. `_pick_in` does `list(items)` + `_flatten_in` expanding ranges into a fresh char list each call (`ton/generators/regex.py:170-204`), and `_pick_excluding` filters the 95-char ASCII table per call (`regex.py:207-211`). For `[a-z]{20}` or `[^x]{100}` this recomputes the pool per character, per row. |
+| PERF-002 | open | S | `PreparedField.is_paired` is a property recomputed on every access (`ton/_engine.py:46-51`); called per-token per-row in the hot path `_resolve` (`_engine.py:399`) whenever any paired type exists, despite the dataclass being frozen. Cache it. |
+| PERF-003 | open | S | `ExtensionCatalog._flatten` rebuilds the entire flattened dict on every `.generators()`/`.transforms()` call (`ton/_registry.py:117-125`); `_config._validate_transforms` calls both inside the per-field/per-transform loop (`ton/_config.py:163,168`), making config validation O(fields × transforms × catalog size). Cache or pass the flattened maps in. |
 
 ## scalability
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| SCAL-001 | open | M | Audit proof mode grows `_proof_failures_audit` without bound — one `ProofFailure` appended per failing row (`ton/_engine.py:457`), each copying the full spec dict (`spec=dict(self._types[type_key])`, `_engine.py:568`). A long run with systematic failures accumulates unbounded memory in a list that could be streamed/counted. |
 
 ## concurrency
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| CONC-001 | open | S | `_ensure_default_classes` double-checked locking is unsafe. The fast path `if _DEFAULT_CLASSES: return` (`ton/_registry.py:339`) reads the module-global dict without the lock while the lock holder populates it incrementally in place (`_registry.py:344-345`). A concurrent caller can observe a non-empty-but-partial registry and get spurious "Unknown type" errors. Fix: build a local dict and publish atomically. |
 
 ## robustness/recovery
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| ROB-001 | open | S | Atomic overwrite silently drops the target file's permissions. `_open_atomic_output` writes via `NamedTemporaryFile` (mode 0600) then `os.replace` over the destination (`ton/cli.py:402-414`), so overwriting an existing 0644 file leaves it 0600, and new files ignore the process umask. Original mode/ownership is not preserved across the replace. |
 
 ## architecture/modularity/SOLID
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
+| ARCH-002 | open | S | `Engine.provenance` (`ton/_engine.py:200-225`) re-reads the raw config via `self._types[type_key]["type"]`/`["transforms"]` instead of the already-built `PreparedField`, duplicating the source of truth (leaky, drift-prone). |
+| ARCH-003 | open | S | `render()` (`ton/_template.py:117-132`) is dead production code: the engine renders via `split_segments` + join (`_render_row`), never `render`. Kept alive only by tests and parallels the real render path — duplicate rendering logic that can silently drift. |
 
 ## decoupling
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| DEC-001 | open | M | The engine option set (`registry, transforms, proof_mode, proof_sample_rate, milestone_rows, seed/rng`) is threaded verbatim through six signatures: `api.generate` (`api.py:157`), `api.generate_from_file` (`api.py:181`), `Engine.from_config`/`from_file` (`_engine.py:116,147`), `concurrency.fork_engine` (`concurrency.py:71`), `cli._build_engine` (`cli.py:326`). Adding one option is a 6-site change; a shared options value object decouples it. |
+| DEC-002 | open | S | The RNG-construction idiom `Random(seed) if seed is not None else Random()` is duplicated in `Engine.from_config` (`_engine.py:135`) and `cli._build_engine` (`cli.py:327`); the CLI builds `rng` and passes `seed` redundantly (from_config would derive rng itself), coupling CLI to engine internals. |
 
 ## business/design patterns/DDD
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| PAT-001 | open | M | "Weighted choice" is an implicit domain concept scattered across `DistributionSpec` (`ton/transforms/distribution.py:16`), composite `WeightedSpec` (`ton/generators/weighted.py:61`), and two copies of weight validation (DUP-001). A single `WeightedChoiceSet` value object (weights + prepared children + validation + `choose`) would unify `weighted`/`distribution`/`oneOf`. |
 
 ## plugin extensibility
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
+| PLUG-001 | open | M | Validators are a dead extension point: `register_validator` (`ton/_registry.py:85`), the `ton.validators` entry-point group (`_registry.py:38`, loaded at `_registry.py:184`) and `list_validators()` all exist and load, but nothing consumes a validator — configs can't reference one, the Engine never invokes them, and `--list-namespaces` (`ton/cli.py:350-354`) doesn't print them. A third party can register a validator that does nothing. |
+| PLUG-002 | open | S | `registry_with_entry_points` docstring claims "Entry-point names override built-ins with the same key" (`ton/_registry.py:399-400`) and its example registers `uuid`, but `ExtensionCatalog._register` forbids replacing core (`_registry.py:136-137`) and unqualified entry points land in the `plugin` namespace, so a `uuid` entry point resolves to `plugin.uuid` and never shadows the built-in. Documented override behavior does not occur. |
 
 ## CLI / option integrity
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| CLI-001 | open | M | `--validate` gives false confidence: `_validate_config` → `validate_with_catalog` (`ton/cli.py:211`, `ton/_config.py:72`) only checks structure + type/transform references, never calling `Generator.prepare`, so per-field validation (bounds, value lists, caps) is skipped. A config with `integer minValue=100 maxValue=1` prints `ton: config valid` (exit 0) under `--validate` but the real run exits 2 (`Invalid spec ... maxValue (1) must be >= minValue (100)`). Help text ("Validate the config and exit") does not convey this deferral. |
 
 ## configuration discoverability
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| CFG-001 | open | S | The top-level `encoding` key appears in the README config example (`README.md:242`) and every bundled example (`examples/hwmetrics.json:2`, `dna.json:2`, `winhash.json:2`), but is absent from `_REQUIRED_TOP_LEVEL` (`ton/_config.py:26`), never validated, never read by the Engine, and not listed in the README config-format field bullets (`README.md:252-254`). It looks authoritative (implies configurable output encoding) yet is silently ignored. |
 
 ## data governance
 
 | id     | status | effort | description |
 |--------|--------|--------|-------------|
 | DG-002 | open | M | Define redaction controls for proof failure records before exposing them to logs, manifests, or audit exports. `ProofFailure` currently stores raw generated `value`, `id_value`, and full field spec, which can include sensitive synthetic identifiers or source value pools. |
+| DG-003 | open | S | `uuid` type with `version:1` calls `uuid.uuid1()` (`ton/generators/uuid.py:54`), which embeds the host machine's real MAC address and clock into the "synthetic" output, leaking host hardware/network identifiers. Only the version-4 path is seed-reproducible/synthetic. |
 
 ## dependency
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| DEP-001 | open | M | Regex generator depends on undocumented CPython internals: it imports private `sre_parse`/`sre_constants`, falling back to the equally-private `re._parser`/`re._constants` on 3.13+ (`ton/generators/regex.py:33-42`), and consumes their internal AST opcodes throughout. These carry no compatibility guarantee and can change/disappear between Python releases, silently breaking the `regex` type on a future supported interpreter. |
 
 ## platform
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| PLAT-001 | open | S | `datetime.fromisoformat()` parses user `minValue`/`maxValue` in `ton/generators/date.py:46-47` and `timestamp_unix.py:43-44`. On Python 3.10 (declared-supported; pyproject `requires-python >=3.10`) this parser rejects common ISO 8601 forms that 3.11+ accepts (trailing `Z`, basic `YYYYMMDD`, `+HH` offsets), so a config working on 3.11+ raises on 3.10. |
+| PLAT-002 | open | S | The date generator passes the user-supplied `format` straight to `datetime.strftime` (`ton/generators/date.py:58`). `strftime` directive support is platform-dependent — `%-d`/`%-m` are glibc-only and fail on Windows, `%Y` padding for years <1000 differs by libc — so identical configs produce divergent/erroring output across the supported OS matrix. |
 
 ## observability
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| OBS-001 | open | M | `ProvenanceRecord.plugin_package` / `plugin_version` (`ton/_proof.py:42-43`), public and re-exported via `ton.api`, are always `None`: `Engine.provenance` never sets them (`ton/_engine.py:214-224`). Plugin-provided types get no provenance attribution despite the fields advertising it; the distribution metadata gathered at entry-point load (`_entry_point_dist`) is never threaded through. |
+| OBS-002 | open | S | The `proof_check_summary` event is emitted with two payload schemas for one discriminator: the Engine emits `{mode, failures}` (`ton/_engine.py:372-378`) while the CLI audit summary emits `{failures}` with no `mode` (`ton/cli.py:297-301`), so a consumer keying on `event="proof_check_summary"` sees inconsistent fields. |
 
 ## documentation
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| DOC-001 | open | S | The README observability event table (`README.md:848-863`) omits 5 events actually emitted from the `LogEvent` enum (`ton/_logging.py:59-63`): `plugin_registered`, `transform_prepared`, `config_validated`, `proof_check_failed`, `proof_check_summary`. The table presents itself as the event catalog but is incomplete. |

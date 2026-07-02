@@ -60,5 +60,5 @@ def test_fork_engine_threads_worker_seed_and_proof_options() -> None:
         proof_sample_rate=3,
     )
     assert engine._seed == derive_seed(parent_seed=5, worker_id=1)
-    assert engine._proof_mode == "audit"
-    assert engine._proof_sample_rate == 3
+    assert engine._proof.mode == "audit"
+    assert engine._proof.sample_rate == 3

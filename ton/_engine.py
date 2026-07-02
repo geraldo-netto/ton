@@ -17,6 +17,7 @@ from . import _config
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import ProofFailure, ProvenanceRecord
+from ._proofcheck import ProofChecker
 from ._registry import build_extension_catalog, make_registry, normalize_reference
 from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
 from ._transforms import Transform, TransformResult
@@ -80,10 +81,8 @@ class Engine:
         self._registry = self._resolve_registry(registry)
         self._transforms = dict(transforms or build_extension_catalog().transforms())
         self._rng = rng if rng is not None else Random()
-        self._proof_mode = _validate_proof_mode(proof_mode)
-        self._proof_sample_rate = _validate_proof_sample_rate(proof_sample_rate)
+        self._proof = ProofChecker(mode=proof_mode, sample_rate=proof_sample_rate, seed=seed)
         self._seed = seed
-        self._proof_failures_audit: list[ProofFailure] = []
         self._validate()
         # Each referenced type spec is parsed once via Generator.prepare;
         # the per-row hot path just looks up the prepared spec by name.
@@ -194,7 +193,7 @@ class Engine:
     @property
     def proof_failures(self) -> tuple[ProofFailure, ...]:
         """Proof failures collected in audit mode."""
-        return tuple(self._proof_failures_audit)
+        return tuple(self._proof.failures)
 
     @property
     def provenance(self) -> tuple[ProvenanceRecord, ...]:
@@ -207,9 +206,7 @@ class Engine:
                 continue
             seen.add(type_key)
             spec = self._types[type_key]
-            failures = sum(
-                1 for failure in self._proof_failures_audit if failure.type_key == type_key
-            )
+            failures = sum(1 for failure in self._proof.failures if failure.type_key == type_key)
             records.append(
                 ProvenanceRecord(
                     type_key=type_key,
@@ -217,8 +214,8 @@ class Engine:
                     transforms=tuple(
                         str(transform["type"]) for transform in spec.get("transforms", [])
                     ),
-                    proof_mode=self._proof_mode,
-                    proof_sample_rate=self._proof_sample_rate,
+                    proof_mode=self._proof.mode,
+                    proof_sample_rate=self._proof.sample_rate,
                     proof_failures=failures,
                 )
             )
@@ -342,7 +339,7 @@ class Engine:
         try:
             milestone = self._milestone_rows
             self._rows_emitted = 0
-            self._proof_failures_audit.clear()
+            self._proof.reset()
             for _ in range(self._rows):
                 yield self._render_row()
                 self._rows_emitted += 1
@@ -365,17 +362,7 @@ class Engine:
                     "rows": self._rows_emitted,
                 },
             )
-            if self._proof_mode != "off":
-                _logger.info(
-                    "proof_check_summary mode=%s failures=%d",
-                    self._proof_mode,
-                    len(self._proof_failures_audit),
-                    extra={
-                        "event": LogEvent.PROOF_CHECK_SUMMARY.value,
-                        "mode": self._proof_mode,
-                        "failures": len(self._proof_failures_audit),
-                    },
-                )
+            self._proof.log_summary()
         finally:
             self._iteration_lock.release()
 
@@ -448,47 +435,19 @@ class Engine:
         source_result: TransformResult,
         steps: tuple[TransformStep, ...],
     ) -> None:
-        if not self._should_check_proof():
-            return
-        failures = self._proof_failures(type_key, field, source_result, steps)
-        if not failures:
-            return
-        if self._proof_mode == "audit":
-            self._proof_failures_audit.extend(failures)
-            for failure in failures:
-                self._log_proof_failure(failure)
-            return
-        failure = failures[0]
-        self._log_proof_failure(failure)
-        raise ProofError(
-            f"Proof failed at row {failure.row} for {failure.type_key!r} "
-            f"{failure.stage} {failure.reference!r}: {failure.reason}"
+        failure = self._proof.evaluate(
+            type_key,
+            field,
+            source_result,
+            steps,
+            rows_emitted=self._rows_emitted,
+            spec=self._types[type_key],
         )
-
-    @staticmethod
-    def _log_proof_failure(failure: ProofFailure) -> None:
-        _logger.warning(
-            "proof_check_failed row=%d type_key=%s stage=%s reference=%s",
-            failure.row,
-            failure.type_key,
-            failure.stage,
-            failure.reference,
-            extra={
-                "event": LogEvent.PROOF_CHECK_FAILED.value,
-                "row": failure.row,
-                "type_key": failure.type_key,
-                "stage": failure.stage,
-                "reference": failure.reference,
-                "reason": failure.reason,
-            },
-        )
-
-    def _should_check_proof(self) -> bool:
-        if self._proof_mode == "off":
-            return False
-        if self._proof_mode == "sample":
-            return self._rows_emitted % self._proof_sample_rate == 0
-        return True
+        if failure is not None:
+            raise ProofError(
+                f"Proof failed at row {failure.row} for {failure.type_key!r} "
+                f"{failure.stage} {failure.reference!r}: {failure.reason}"
+            )
 
     def _apply_transforms_with_trace(
         self,
@@ -501,72 +460,6 @@ class Engine:
             result = prepared.transform.apply(prepared.prepared, before, self._rng)
             steps.append(TransformStep(prepared=prepared, before=before, after=result))
         return result, tuple(steps)
-
-    def _proof_failures(
-        self,
-        type_key: str,
-        field: PreparedField,
-        source_result: TransformResult,
-        steps: tuple[TransformStep, ...],
-    ) -> tuple[ProofFailure, ...]:
-        failures = list(self._source_proof_failures(type_key, field, source_result))
-        for step in steps:
-            proof = step.prepared.transform.prove(
-                step.prepared.prepared,
-                step.before,
-                step.after,
-            )
-            if not proof.ok:
-                failures.append(
-                    self._make_proof_failure(
-                        type_key=type_key,
-                        stage="transform",
-                        reference=step.prepared.transform.type_name,
-                        reason=proof.reason,
-                        result=step.after,
-                    )
-                )
-        return tuple(failures)
-
-    def _source_proof_failures(
-        self,
-        type_key: str,
-        field: PreparedField,
-        source_result: TransformResult,
-    ) -> tuple[ProofFailure, ...]:
-        proof = field.generator.prove(field.source_prepared, source_result)
-        if proof.ok:
-            return ()
-        return (
-            self._make_proof_failure(
-                type_key=type_key,
-                stage="source",
-                reference=field.generator.type_name,
-                reason=proof.reason,
-                result=source_result,
-            ),
-        )
-
-    def _make_proof_failure(
-        self,
-        *,
-        type_key: str,
-        stage: str,
-        reference: str,
-        reason: str,
-        result: TransformResult,
-    ) -> ProofFailure:
-        return ProofFailure(
-            row=self._rows_emitted + 1,
-            type_key=type_key,
-            stage=stage,
-            reference=reference,
-            reason=reason,
-            value=result.value,
-            id_value=result.id_value,
-            seed=self._seed,
-            spec=dict(self._types[type_key]),
-        )
 
 
 def _collect_nested_types(spec: Mapping[str, Any], needed: set[str]) -> None:
@@ -601,16 +494,3 @@ def _runtime_type_name(type_name: object) -> str:
     if isinstance(type_name, str) and type_name.startswith("core."):
         return type_name.split(".", 1)[1]
     return str(type_name)
-
-
-def _validate_proof_mode(proof_mode: str) -> str:
-    if proof_mode not in {"off", "sample", "all", "audit"}:
-        raise ValueError("proof_mode must be 'off', 'sample', 'all', or 'audit'")
-    return proof_mode
-
-
-def _validate_proof_sample_rate(proof_sample_rate: int) -> int:
-    parsed = int(proof_sample_rate)
-    if parsed < 1:
-        raise ValueError("proof_sample_rate must be >= 1")
-    return parsed

@@ -243,7 +243,7 @@ def test_engine_collects_source_proof_failure() -> None:
     engine = Engine(config, registry={"proving": ProvingGenerator()})
     field = engine._prepared["v"]
 
-    failures = engine._proof_failures("v", field, TransformResult("bad"), ())
+    failures = engine._proof.build_failures("v", field, TransformResult("bad"), ())
 
     assert failures[0].stage == "source"
     assert failures[0].reference == "proving"
@@ -279,7 +279,7 @@ def test_engine_collects_transform_proof_failure() -> None:
     source = TransformResult("x")
     _, steps = engine._apply_transforms_with_trace(field, source)
 
-    failures = engine._proof_failures("v", field, source, steps)
+    failures = engine._proof.build_failures("v", field, source, steps)
 
     assert failures[0].stage == "transform"
     assert failures[0].reference == "failproof"

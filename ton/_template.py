@@ -1,4 +1,4 @@
-"""Template parser and row renderer.
+"""Template parser and segment splitter.
 
 A template is a string with variables wrapped in ``$``::
 
@@ -17,7 +17,7 @@ sequence ``$$`` is consumed by the parser and rendered as a single
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -118,21 +118,3 @@ def split_segments(template: str) -> tuple[list[str], list[Token]]:
         last_end = match.end()
     literals.append(template[last_end:].replace(_LITERAL_DOLLAR, "$"))
     return literals, tokens
-
-
-def render(template: str, values: Mapping[str, str]) -> str:
-    """Substitute placeholders in ``template`` using a single regex pass.
-
-    ``values`` is keyed by the literal placeholder text (``$name$`` or
-    ``$name[id]$``). ``$$`` is rendered as a single ``$``. Unknown
-    placeholders are left in place. One regex pass replaces every
-    match, so the cost is O(template_length) per row.
-    """
-
-    def _sub(match: re.Match[str]) -> str:
-        if match.group(0) == _LITERAL_DOLLAR:
-            return "$"
-        placeholder = match.group(0)
-        return values.get(placeholder, placeholder)
-
-    return _TOKEN_RE.sub(_sub, template)

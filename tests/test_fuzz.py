@@ -23,7 +23,6 @@ from ton._template import (
     Token,
     UndeclaredVariableError,
     parse,
-    render,
     validate_against,
 )
 
@@ -353,35 +352,6 @@ def test_random_templates_validate_round_trip() -> None:
             short = [n for n in set(used) if n != used[0]]
             with pytest.raises(UndeclaredVariableError):
                 validate_against(template, short)
-
-
-def test_render_terminates_on_random_templates() -> None:
-    """Smoke property: render() must never raise or loop on a legal template."""
-    for seed in range(100):
-        rng = Random(seed)
-        template, _ = _random_template(rng)
-        rendered = render(template, {})
-        assert isinstance(rendered, str)
-
-
-def test_parsed_tokens_round_trip_through_render() -> None:
-    """Substituting every parsed token leaves no *un-replaced* placeholder.
-
-    After render, the placeholder-bearing values are gone. Re-parsing
-    the output may still find tokens if the substituted value happens
-    to sit between literal dollar chars from the escape rule -- that
-    is a re-introduction, not a leftover -- so we assert only that
-    every original placeholder literal is absent from the output.
-    """
-    for seed in range(100):
-        rng = Random(seed)
-        template, _ = _random_template(rng)
-        tokens = parse(template)
-        values = {t.placeholder: "X" for t in tokens}
-        out = render(template, values)
-        # Every literal placeholder from the input is gone from the output.
-        for placeholder in {t.placeholder for t in tokens}:
-            assert placeholder not in out
 
 
 def test_token_placeholder_round_trips_through_parse() -> None:

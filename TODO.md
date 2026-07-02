@@ -62,7 +62,6 @@ Last full rescan: 2026-07-02.
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| ARCH-003 | open | S | `render()` (`ton/_template.py:117-132`) is dead production code: the engine renders via `split_segments` + join (`_render_row`), never `render`. Kept alive only by tests and parallels the real render path — duplicate rendering logic that can silently drift. |
 
 ## decoupling
 

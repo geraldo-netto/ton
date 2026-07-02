@@ -1,4 +1,4 @@
-"""Unit tests for the template parser and renderer."""
+"""Unit tests for the template parser and segment splitter."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from ton._template import (
     Token,
     UndeclaredVariableError,
     parse,
-    render,
     validate_against,
 )
 
@@ -35,35 +34,13 @@ def test_token_placeholder_round_trip() -> None:
     assert Token("x", wants_id=True).placeholder == "$x[id]$"
 
 
-def test_render_substitutes_known_placeholders() -> None:
-    out = render("$a$/$b$", {"$a$": "1", "$b$": "2"})
-    assert out == "1/2"
-
-
-def test_render_leaves_unknown_placeholders_untouched() -> None:
-    out = render("$a$/$b$", {"$a$": "1"})
-    assert out == "1/$b$"
-
-
 def test_parse_skips_dollar_escape() -> None:
     assert parse("cost: $$5 and $price$") == [Token("price", wants_id=False)]
-
-
-def test_render_unescapes_dollar() -> None:
-    out = render("cost: $$5 and $price$", {"$price$": "99"})
-    assert out == "cost: $5 and 99"
-
-
-def test_render_double_escape_round_trip() -> None:
-    out = render("$$$$", {})
-    assert out == "$$"
 
 
 def test_parse_handles_escape_around_placeholder() -> None:
     tokens = parse("$$$name$$$")
     assert tokens == [Token("name", wants_id=False)]
-    out = render("$$$name$$$", {"$name$": "X"})
-    assert out == "$X$"
 
 
 def test_validate_against_accepts_declared() -> None:

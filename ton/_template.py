@@ -57,16 +57,25 @@ def parse(template: str) -> list[Token]:
     return list(_parse_cached(template))
 
 
+def _token_from_match(match: re.Match[str]) -> Token:
+    """Build a :class:`Token` from a placeholder match (DUP-004).
+
+    Shared by :func:`_parse_cached` and :func:`split_segments` so the
+    ``[id]``-suffix stripping lives in one place.
+    """
+    raw = match.group(1)
+    wants_id = raw.endswith(_ID_SUFFIX)
+    key = raw[: -len(_ID_SUFFIX)] if wants_id else raw
+    return Token(type_key=key, wants_id=wants_id)
+
+
 @lru_cache(maxsize=256)
 def _parse_cached(template: str) -> tuple[Token, ...]:
     tokens: list[Token] = []
     for match in _TOKEN_RE.finditer(template):
         if match.group(0) == _LITERAL_DOLLAR:
             continue
-        raw = match.group(1)
-        wants_id = raw.endswith(_ID_SUFFIX)
-        key = raw[: -len(_ID_SUFFIX)] if wants_id else raw
-        tokens.append(Token(type_key=key, wants_id=wants_id))
+        tokens.append(_token_from_match(match))
     return tuple(tokens)
 
 
@@ -105,10 +114,7 @@ def split_segments(template: str) -> tuple[list[str], list[Token]]:
         if match.group(0) == _LITERAL_DOLLAR:
             continue
         literals.append(template[last_end : match.start()].replace(_LITERAL_DOLLAR, "$"))
-        raw = match.group(1)
-        wants_id = raw.endswith(_ID_SUFFIX)
-        key = raw[: -len(_ID_SUFFIX)] if wants_id else raw
-        tokens.append(Token(type_key=key, wants_id=wants_id))
+        tokens.append(_token_from_match(match))
         last_end = match.end()
     literals.append(template[last_end:].replace(_LITERAL_DOLLAR, "$"))
     return literals, tokens

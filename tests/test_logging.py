@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from random import Random
 from typing import Any
 from unittest import mock
@@ -11,7 +12,7 @@ import pytest
 
 from ton import api
 from ton._engine import Engine
-from ton._logging import LOGGER_NAME, configure_stderr, logger
+from ton._logging import LOGGER_NAME, LogEvent, configure_stderr, logger
 from ton._proof import ProofResult
 from ton._registry import clear_default_registry_cache, default_registry
 from ton._transforms import TransformResult
@@ -180,6 +181,14 @@ def test_cli_audit_summary_event_carries_mode(
     # one carries a mode field so consumers see a consistent schema (OBS-002).
     assert summaries
     assert all(getattr(r, "mode", None) == "audit" for r in summaries)
+
+
+def test_readme_documents_every_log_event() -> None:
+    # The README observability table is the public event catalog; keep it
+    # complete so it cannot silently drift from the enum (DOC-001).
+    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
+    missing = [event.value for event in LogEvent if f"`{event.value}`" not in readme]
+    assert missing == [], f"README event table is missing: {missing}"
 
 
 def test_catalog_validation_emits_summary(caplog: pytest.LogCaptureFixture) -> None:

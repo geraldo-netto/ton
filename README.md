@@ -854,7 +854,12 @@ Library code emits structured INFO events on a single logger named `ton`. Attach
 | `engine_completed`                    | iterator exhausted                                  |
 | `engine_forked`                       | `fork_engine` produced a worker Engine              |
 | `prepare_failed` / `generate_failed`  | a Generator raised during prepare / generate        |
+| `transform_prepared`                  | a field's transform was prepared at construction    |
+| `config_validated`                    | `validate_config` passed catalog-aware checks       |
+| `proof_check_failed`                  | a value failed its proof check (per-row detail)     |
+| `proof_check_summary`                 | end-of-run proof summary (`mode`, `failures`)       |
 | `registry_discovered`                 | built-in registry built (once per process)          |
+| `plugin_registered`                   | a namespaced plugin was registered in the catalog   |
 | `entry_point_loaded`                  | third-party plugin instantiated                     |
 | `entry_point_failed`                  | third-party plugin raised on load — entry skipped   |
 | `entry_points_summary`                | per-process summary of loaded / failed entries      |

@@ -102,4 +102,3 @@ Last full rescan: 2026-07-02.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-001 | open | S | The README observability event table (`README.md:848-863`) omits 5 events actually emitted from the `LogEvent` enum (`ton/_logging.py:59-63`): `plugin_registered`, `transform_prepared`, `config_validated`, `proof_check_failed`, `proof_check_summary`. The table presents itself as the event catalog but is incomplete. |

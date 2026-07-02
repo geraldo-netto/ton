@@ -96,7 +96,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| PLAT-001 | open | S | `datetime.fromisoformat()` parses user `minValue`/`maxValue` in `ton/generators/date.py:46-47` and `timestamp_unix.py:43-44`. On Python 3.10 (declared-supported; pyproject `requires-python >=3.10`) this parser rejects common ISO 8601 forms that 3.11+ accepts (trailing `Z`, basic `YYYYMMDD`, `+HH` offsets), so a config working on 3.11+ raises on 3.10. |
 | PLAT-002 | open | S | The date generator passes the user-supplied `format` straight to `datetime.strftime` (`ton/generators/date.py:58`). `strftime` directive support is platform-dependent — `%-d`/`%-m` are glibc-only and fail on Windows, `%Y` padding for years <1000 differs by libc — so identical configs produce divergent/erroring output across the supported OS matrix. |
 
 ## observability

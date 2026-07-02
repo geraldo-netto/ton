@@ -50,7 +50,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| ROB-001 | open | S | Atomic overwrite silently drops the target file's permissions. `_open_atomic_output` writes via `NamedTemporaryFile` (mode 0600) then `os.replace` over the destination (`ton/cli.py:402-414`), so overwriting an existing 0644 file leaves it 0600, and new files ignore the process umask. Original mode/ownership is not preserved across the replace. |
 
 ## architecture/modularity/SOLID
 

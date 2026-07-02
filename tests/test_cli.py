@@ -307,6 +307,27 @@ def test_cli_atomic_output_keeps_existing_file_on_failure(
     assert list(tmp_path.glob(".out.txt.*.tmp")) == []
 
 
+def test_cli_atomic_output_preserves_existing_file_mode(write_config, tmp_path: Path) -> None:
+    config = write_config()
+    out_file = tmp_path / "out.txt"
+    out_file.write_text("old\n", encoding="utf-8")
+    os.chmod(out_file, 0o644)
+
+    assert main([str(config), "-o", str(out_file), "--seed", "0"]) == 0
+    assert stat.S_IMODE(os.stat(out_file).st_mode) == 0o644
+
+
+def test_cli_atomic_output_new_file_respects_umask(write_config, tmp_path: Path) -> None:
+    config = write_config()
+    out_file = tmp_path / "fresh.txt"
+    old_umask = os.umask(0o022)
+    try:
+        assert main([str(config), "-o", str(out_file), "--seed", "0"]) == 0
+    finally:
+        os.umask(old_umask)
+    assert stat.S_IMODE(os.stat(out_file).st_mode) == 0o644
+
+
 def test_cli_entry_point_allowlist_option_still_generates_rows(
     write_config, capsys: pytest.CaptureFixture[str]
 ) -> None:

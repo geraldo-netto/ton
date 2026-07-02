@@ -410,12 +410,30 @@ def _open_atomic_output(path: str) -> Iterator[TextIO]:
             yield cast(TextIO, fh)
             fh.flush()
             os.fsync(fh.fileno())
+        # NamedTemporaryFile creates the temp at 0600; without this the
+        # atomic replace would silently narrow an existing 0644 file to
+        # 0600 and ignore the umask for new files (ROB-001).
+        os.chmod(tmp_name, _target_mode(path))
         os.replace(tmp_name, path)
         tmp_name = ""
     finally:
         if tmp_name:
             with suppress(FileNotFoundError):
                 os.unlink(tmp_name)
+
+
+def _target_mode(path: str) -> int:
+    """Mode the replaced file should end up with (ROB-001).
+
+    Preserves an existing destination's permission bits; for a new file
+    applies the process umask to the 0666 default the way ``open`` would.
+    """
+    try:
+        return stat.S_IMODE(os.stat(path).st_mode)
+    except FileNotFoundError:
+        current = os.umask(0)
+        os.umask(current)
+        return 0o666 & ~current
 
 
 def _stream(

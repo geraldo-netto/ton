@@ -58,3 +58,52 @@ def test_unbounded_repeat_terminates() -> None:
     # 'a+' would loop forever if uncapped; we cap at MAX_UNBOUNDED_REPEAT.
     value = _draw("a+", seed=0)
     assert re.match(r"^a+$", value)
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "a{2,}",  # open-ended brace
+        "a+?",  # lazy quantifier
+        "a*?",
+        "x{2,5}?",
+        "\\w{3}",
+        "\\S{2}",
+    ],
+)
+def test_vendored_parser_matches_reference(pattern: str) -> None:
+    matcher = re.compile(f"^{pattern}$")
+    for seed in range(20):
+        value = _draw(pattern, seed=seed)
+        assert matcher.match(value), f"seed={seed}: {value!r} !~ {pattern!r}"
+
+
+def test_bare_brace_is_literal() -> None:
+    # '{' not forming a valid quantifier is a literal char.
+    assert _draw("a{") == "a{"
+
+
+def test_class_backspace_escape() -> None:
+    assert _draw("[\\b]") == "\b"
+
+
+def test_control_and_literal_escapes() -> None:
+    assert _draw("a\\n") == "a\n"
+    assert _draw("a\\@") == "a@"
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "*a",  # nothing to repeat
+        "a{5,2}",  # min > max
+        "(?=x)",  # unsupported group extension
+        "(abc",  # missing close paren
+        "[a-\\d]",  # bad character range
+        "a\\",  # trailing backslash
+        "a)",  # leftover close paren
+    ],
+)
+def test_vendored_parser_rejects_bad_patterns(pattern: str) -> None:
+    with pytest.raises(ValueError):
+        RegexGenerator().prepare({"pattern": pattern})

@@ -90,7 +90,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DEP-001 | open | M | Regex generator depends on undocumented CPython internals: it imports private `sre_parse`/`sre_constants`, falling back to the equally-private `re._parser`/`re._constants` on 3.13+ (`ton/generators/regex.py:33-42`), and consumes their internal AST opcodes throughout. These carry no compatibility guarantee and can change/disappear between Python releases, silently breaking the `regex` type on a future supported interpreter. |
 
 ## platform
 

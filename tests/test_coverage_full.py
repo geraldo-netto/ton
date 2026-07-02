@@ -540,7 +540,7 @@ def _regex_internals():
 def test_regex_emit_category_top_level_dispatch() -> None:
     mod = _regex_internals()
     out: list[str] = []
-    mod._emit_category(mod.sre_constants.CATEGORY_DIGIT, Random(0), out)
+    mod._emit_category(mod.rx.CATEGORY_DIGIT, Random(0), out)
     assert out and out[0].isdigit()
 
 
@@ -585,7 +585,7 @@ def test_regex_negated_class_excluding_all_rejected() -> None:
 
 def test_regex_category_space_pool_returned() -> None:
     mod = _regex_internals()
-    assert mod._category_pool(mod.sre_constants.CATEGORY_SPACE) == mod._SPACE
+    assert mod._category_pool(mod.rx.CATEGORY_SPACE) == mod._SPACE
 
 
 def test_regex_unsupported_category_rejected() -> None:

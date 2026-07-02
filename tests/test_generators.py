@@ -233,6 +233,12 @@ def test_date_rejects_non_portable_format_directive() -> None:
         DateGenerator().prepare(spec)
 
 
+def test_date_rejects_non_string_format() -> None:
+    spec = {"minValue": "2000-01-01", "maxValue": "2000-12-31", "format": 123}
+    with pytest.raises(ValueError, match="must be a string"):
+        DateGenerator().prepare(spec)
+
+
 def test_date_allows_literal_percent_before_flag() -> None:
     # '%%-d' renders a literal '%-d', not the non-portable %- flag.
     spec = {"minValue": "2000-01-01", "maxValue": "2000-01-01", "format": "%%-d"}

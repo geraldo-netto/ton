@@ -159,6 +159,24 @@ def test_validate_config_lists_available_types_for_unknown_type() -> None:
         api.validate_config(payload)
 
 
+def test_validate_config_prepares_composite_field() -> None:
+    # Exercises the composite prepare path in per-field validation (CLI-001):
+    # a valid oneOf passes, and a bad nested spec is rejected here.
+    payload = _valid_payload()
+    payload["types"]["a"] = {
+        "type": "oneOf",
+        "choices": [
+            {"type": "string", "values": ["x"]},
+            {"type": "integer", "minValue": 0, "maxValue": 9},
+        ],
+    }
+    api.validate_config(payload)
+
+    payload["types"]["a"]["choices"][1] = {"type": "integer", "minValue": 9, "maxValue": 0}
+    with pytest.raises(ConfigError, match="Invalid spec"):
+        api.validate_config(payload)
+
+
 def test_validate_config_reports_unknown_namespace() -> None:
     payload = _valid_payload()
     payload["types"]["a"] = {"type": "other.string"}

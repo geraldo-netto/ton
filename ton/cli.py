@@ -324,7 +324,9 @@ def _report_proof_audit(engine: Engine) -> None:
     _logger.info(
         "cli_proof_audit_summary failures=%d",
         count,
-        extra={"event": LogEvent.PROOF_CHECK_SUMMARY.value, "failures": count},
+        # Mirror the engine's proof_check_summary payload shape so a
+        # consumer keying on the event sees a consistent schema (OBS-002).
+        extra={"event": LogEvent.PROOF_CHECK_SUMMARY.value, "mode": "audit", "failures": count},
     )
     if count == 0:
         print("ton: proof-check audit: all generated values passed", file=sys.stderr)

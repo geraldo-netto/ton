@@ -97,7 +97,6 @@ Last full rescan: 2026-07-02.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| OBS-002 | open | S | The `proof_check_summary` event is emitted with two payload schemas for one discriminator: the Engine emits `{mode, failures}` (`ton/_engine.py:372-378`) while the CLI audit summary emits `{failures}` with no `mode` (`ton/cli.py:297-301`), so a consumer keying on `event="proof_check_summary"` sees inconsistent fields. |
 
 ## documentation
 

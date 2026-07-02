@@ -162,6 +162,24 @@ def test_proof_failure_logs_identifier_without_value(
     assert failures[0].type_key == "v"  # type: ignore[attr-defined]
     assert not any("secret-value" in record.getMessage() for record in caplog.records)
     assert summaries[0].failures == 1  # type: ignore[attr-defined]
+    # proof_check_summary always carries a mode field (OBS-002).
+    assert summaries[0].mode == "audit"  # type: ignore[attr-defined]
+
+
+def test_cli_audit_summary_event_carries_mode(
+    caplog: pytest.LogCaptureFixture, write_config
+) -> None:
+    from ton.cli import main
+
+    config = write_config()
+    with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
+        main([str(config), "--proof-check", "audit", "--seed", "0"])
+
+    summaries = [r for r in caplog.records if getattr(r, "event", None) == "proof_check_summary"]
+    # Both the engine and the CLI audit summary emit the same event; every
+    # one carries a mode field so consumers see a consistent schema (OBS-002).
+    assert summaries
+    assert all(getattr(r, "mode", None) == "audit" for r in summaries)
 
 
 def test_catalog_validation_emits_summary(caplog: pytest.LogCaptureFixture) -> None:

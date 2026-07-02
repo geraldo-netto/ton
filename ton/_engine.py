@@ -10,6 +10,7 @@ from __future__ import annotations
 import threading
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from functools import cached_property
 from random import Random
 from typing import Any
 
@@ -65,8 +66,12 @@ class PreparedField:
     source_prepared: Any
     transforms: tuple[PreparedTransform, ...]
 
-    @property
+    @cached_property
     def is_paired(self) -> bool:
+        # Cached because _resolve reads it per token per row on the hot
+        # path; the value is fixed once the field is prepared (PERF-002).
+        # cached_property writes through __dict__, so it works on this
+        # frozen dataclass.
         if not self.transforms:
             return self.generator.is_paired
         last = self.transforms[-1].transform

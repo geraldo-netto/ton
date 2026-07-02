@@ -25,7 +25,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-001 | open | S | `WeightedGenerator._validate_weights` (`ton/generators/weighted.py:120`) and `_validate_weights` (`ton/transforms/distribution.py:105`) are byte-for-byte identical (non-negative + positive-sum). Factor one shared helper. |
 | DUP-002 | open | M | `HashGenerator`/`HashSpec` (`ton/generators/hash.py:31,56`) and `LMHashGenerator`/`LMHashSpec` (`ton/generators/lmhash.py:41,63`) share an identical `pairs` spec and identical `generate_pair` (`rng.choice(prepared.pairs)`). Extract a shared paired word-pool base. |
 | DUP-003 | open | S | The composite `prepare()` guard raising "requires the engine's composite preparation path" is triplicated in `weighted.py:80`, `one_of.py:44`, `sequence_of.py:55`. Provide it as a base default for `is_composite` generators. |
 | DUP-004 | open | S | Token extraction (`wants_id`/`key` from the regex match) is duplicated between `_parse_cached` (`ton/_template.py:66-69`) and `split_segments` (`ton/_template.py:108-111`). |
@@ -77,7 +76,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| PAT-001 | open | M | "Weighted choice" is an implicit domain concept scattered across `DistributionSpec` (`ton/transforms/distribution.py:16`), composite `WeightedSpec` (`ton/generators/weighted.py:61`), and two copies of weight validation (DUP-001). A single `WeightedChoiceSet` value object (weights + prepared children + validation + `choose`) would unify `weighted`/`distribution`/`oneOf`. |
 
 ## plugin extensibility
 

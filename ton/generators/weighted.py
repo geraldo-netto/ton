@@ -51,9 +51,9 @@ from random import Random
 from typing import Any, ClassVar
 
 from ..transforms.distribution import (
-    DistributionSpec,
-    choose_distribution,
+    WeightedChoiceSet,
     prepare_distribution,
+    validate_weights,
 )
 from .base import Generator
 
@@ -64,7 +64,7 @@ class WeightedSpec:
     #: Populated for the legacy ``values`` form.
     values: tuple[str, ...] | None = None
     #: Populated for the composite ``choices`` form.
-    distribution: DistributionSpec | None = None
+    distribution: WeightedChoiceSet | None = None
 
 
 class WeightedGenerator(Generator):
@@ -106,7 +106,7 @@ class WeightedGenerator(Generator):
 
     def generate(self, prepared: WeightedSpec, rng: Random) -> str:
         if prepared.distribution is not None:
-            return choose_distribution(prepared.distribution, rng)
+            return prepared.distribution.choose(rng)
         # Legacy string-only form.
         return rng.choices(prepared.values, weights=prepared.weights, k=1)[0]  # type: ignore[arg-type]
 
@@ -114,15 +114,8 @@ class WeightedGenerator(Generator):
         values, weights = _coerce(spec)
         if not values:
             raise ValueError("weighted 'values' must be non-empty")
-        self._validate_weights(weights)
+        validate_weights(weights, "weighted")
         return WeightedSpec(values=values, weights=weights)
-
-    @staticmethod
-    def _validate_weights(weights: Sequence[float]) -> None:
-        if any(w < 0 for w in weights):
-            raise ValueError("weighted 'weights' must be non-negative")
-        if sum(weights) <= 0:
-            raise ValueError("weighted 'weights' must sum to a positive number")
 
 
 def _coerce(spec: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[float, ...]]:

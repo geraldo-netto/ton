@@ -13,9 +13,26 @@ from ..generators.base import prepare_child_spec
 
 
 @dataclass(frozen=True)
-class DistributionSpec:
+class WeightedChoiceSet:
+    """Weights paired with prepared child generators (PAT-001).
+
+    The single value object behind every weighted-choice concept
+    (``distribution`` transform and the composite ``weighted``
+    generator): it carries the weights and their prepared children and
+    knows how to :meth:`choose` one child proportional to weight and
+    generate from it. Weight validation lives in :func:`validate_weights`
+    so the legacy string-only ``weighted`` form can share it too
+    (DUP-001).
+    """
+
     weights: tuple[float, ...]
     children: tuple[tuple[Generator, Any], ...]
+
+    def choose(self, rng: Random) -> str:
+        """Return one generated value drawn proportional to the weights."""
+        index = rng.choices(range(len(self.children)), weights=self.weights, k=1)[0]
+        child_gen, child_prepared = self.children[index]
+        return child_gen.generate(child_prepared, rng)
 
 
 class DistributionTransform(BaseTransform):
@@ -28,7 +45,7 @@ class DistributionTransform(BaseTransform):
         self,
         spec: Mapping[str, Any],
         registry: Mapping[str, Generator],
-    ) -> DistributionSpec:
+    ) -> WeightedChoiceSet:
         return prepare_distribution(
             spec,
             registry,
@@ -38,12 +55,12 @@ class DistributionTransform(BaseTransform):
 
     def apply(
         self,
-        prepared: DistributionSpec,
+        prepared: WeightedChoiceSet,
         value: TransformResult,
         rng: Random,
     ) -> TransformResult:
         del value
-        return TransformResult(choose_distribution(prepared, rng))
+        return TransformResult(prepared.choose(rng))
 
 
 def prepare_distribution(
@@ -52,7 +69,7 @@ def prepare_distribution(
     *,
     label: str,
     min_choices: int,
-) -> DistributionSpec:
+) -> WeightedChoiceSet:
     raw_choices = spec.get("choices")
     if not isinstance(raw_choices, list) or len(raw_choices) < min_choices:
         raise ValueError(_choices_error(label, min_choices))
@@ -62,15 +79,8 @@ def prepare_distribution(
         weight, child = _prepare_choice(index, choice, registry, label)
         weights.append(weight)
         children.append(child)
-    _validate_weights(weights, label)
-    return DistributionSpec(weights=tuple(weights), children=tuple(children))
-
-
-def choose_distribution(prepared: DistributionSpec, rng: Random) -> str:
-    """Return one generated value from ``prepared``."""
-    index = rng.choices(range(len(prepared.children)), weights=prepared.weights, k=1)[0]
-    child_gen, child_prepared = prepared.children[index]
-    return child_gen.generate(child_prepared, rng)
+    validate_weights(weights, label)
+    return WeightedChoiceSet(weights=tuple(weights), children=tuple(children))
 
 
 def _prepare_choice(
@@ -102,7 +112,12 @@ def _coerce_weight(index: int, choice: Mapping[str, Any], label: str) -> float:
         raise ValueError(f"{label} 'choices[{index}].weight' must be numeric") from exc
 
 
-def _validate_weights(weights: Sequence[float], label: str) -> None:
+def validate_weights(weights: Sequence[float], label: str) -> None:
+    """Reject negative weights or a non-positive sum (DUP-001).
+
+    Shared by :func:`prepare_distribution` and the legacy string-only
+    ``weighted`` form so the two rules stay in one place.
+    """
     if any(weight < 0 for weight in weights):
         raise ValueError(f"{label} 'weights' must be non-negative")
     if sum(weights) <= 0:

@@ -159,6 +159,31 @@ def test_validate_config_lists_available_types_for_unknown_type() -> None:
         api.validate_config(payload)
 
 
+def test_encoding_accepts_known_codec() -> None:
+    payload = _valid_payload()
+    payload["encoding"] = "latin-1"
+    api.validate_config(payload)
+    assert api.output_encoding(payload) == "latin-1"
+
+
+def test_encoding_defaults_to_utf8() -> None:
+    assert api.output_encoding(_valid_payload()) == "utf-8"
+
+
+def test_encoding_rejects_unknown_codec(tmp_path: Path) -> None:
+    payload = _valid_payload()
+    payload["encoding"] = "not-a-codec"
+    with pytest.raises(ConfigError, match="not a known codec"):
+        api.load_config(str(_write(tmp_path, payload)))
+
+
+def test_encoding_rejects_non_string(tmp_path: Path) -> None:
+    payload = _valid_payload()
+    payload["encoding"] = 42
+    with pytest.raises(ConfigError, match="'encoding' must be a string"):
+        api.load_config(str(_write(tmp_path, payload)))
+
+
 def test_validate_config_prepares_composite_field() -> None:
     # Exercises the composite prepare path in per-field validation (CLI-001):
     # a valid oneOf passes, and a bad nested spec is rejected here.

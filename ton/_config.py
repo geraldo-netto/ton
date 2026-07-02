@@ -9,6 +9,7 @@ validation surfaces cannot drift (TODO REL-011).
 
 from __future__ import annotations
 
+import codecs
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -102,6 +103,26 @@ def _validate(data: Any) -> None:
     _validate_format(data["format"])
     _validate_types(data["types"])
     _validate_template_references(data["format"], data["types"])
+    _validate_encoding(data)
+
+
+def _validate_encoding(data: dict[str, Any]) -> None:
+    """Validate the optional top-level ``encoding`` output codec (CFG-001)."""
+    if "encoding" not in data:
+        return
+    encoding = data["encoding"]
+    if not isinstance(encoding, str):
+        raise ConfigError("'encoding' must be a string.")
+    try:
+        codecs.lookup(encoding)
+    except LookupError as exc:
+        raise ConfigError(f"'encoding' is not a known codec: {encoding!r}") from exc
+
+
+def output_encoding(data: Mapping[str, Any]) -> str:
+    """Return the configured output encoding, defaulting to UTF-8 (CFG-001)."""
+    encoding = data.get("encoding", "utf-8")
+    return encoding if isinstance(encoding, str) else "utf-8"
 
 
 def _validate_root(data: Any) -> None:

@@ -45,6 +45,7 @@ from typing import Any
 
 from . import _config
 from ._config import ConfigError
+from ._config import output_encoding as _output_encoding
 from ._engine import Engine, EngineOptions, ProofError, TemplateError
 from ._logging import LogEvent, configure_stderr, logger
 from ._proof import ProvenanceRecord
@@ -84,6 +85,7 @@ __all__ = [
     "load_config",
     "logger",
     "normalize_reference",
+    "output_encoding",
     "validate_config",
 ]
 
@@ -91,6 +93,11 @@ __all__ = [
 def load_config(path: str) -> dict[str, Any]:
     """Read, parse, and validate a JSON config file."""
     return _config.load(path)
+
+
+def output_encoding(config: Mapping[str, Any]) -> str:
+    """Return the config's output encoding, defaulting to UTF-8 (CFG-001)."""
+    return _output_encoding(config)
 
 
 def validate_config(

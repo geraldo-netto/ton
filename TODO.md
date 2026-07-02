@@ -79,7 +79,6 @@ Last full rescan: 2026-07-02.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CFG-001 | open | S | The top-level `encoding` key appears in the README config example (`README.md:242`) and every bundled example (`examples/hwmetrics.json:2`, `dna.json:2`, `winhash.json:2`), but is absent from `_REQUIRED_TOP_LEVEL` (`ton/_config.py:26`), never validated, never read by the Engine, and not listed in the README config-format field bullets (`README.md:252-254`). It looks authoritative (implies configurable output encoding) yet is silently ignored. |
 
 ## data governance
 

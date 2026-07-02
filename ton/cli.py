@@ -215,7 +215,8 @@ def _run_inner(args: argparse.Namespace) -> int:
     built = _prepare_engine(args)
     if isinstance(built, int):
         return built
-    return _execute(built, args)
+    engine, encoding = built
+    return _execute(engine, args, encoding)
 
 
 def _validate_config(args: argparse.Namespace) -> int:
@@ -240,10 +241,15 @@ def _validate_config(args: argparse.Namespace) -> int:
     return 0
 
 
-def _prepare_engine(args: argparse.Namespace) -> Engine | int:
-    """Build the Engine or return a non-zero exit code on config errors."""
+def _prepare_engine(args: argparse.Namespace) -> tuple[Engine, str] | int:
+    """Build the Engine + resolve output encoding, or return an exit code.
+
+    Loads the config once so the engine and the output encoding
+    (CFG-001) share a single parse.
+    """
     try:
-        return _build_engine(args)
+        config = api.load_config(args.config)
+        return _build_engine(args, config), api.output_encoding(config)
     except FileNotFoundError as exc:
         print(f"ton: {exc}", file=sys.stderr)
         return 1
@@ -252,7 +258,7 @@ def _prepare_engine(args: argparse.Namespace) -> Engine | int:
         return 2
 
 
-def _execute(engine: Engine, args: argparse.Namespace) -> int:
+def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
     if args.resume_from >= engine.total_rows and engine.total_rows > 0:
         # REL-018: a value that skips past every row produces a silent
         # empty file. Surface this through both stderr and the logger
@@ -274,7 +280,7 @@ def _execute(engine: Engine, args: argparse.Namespace) -> int:
         )
     started = time.perf_counter()
     try:
-        with _open_output(args.output, no_clobber=args.no_clobber) as stream:
+        with _open_output(args.output, no_clobber=args.no_clobber, encoding=encoding) as stream:
             rows_written = _stream(
                 engine,
                 stream,
@@ -333,8 +339,7 @@ def _catalog_from_args(args: argparse.Namespace) -> api.ExtensionCatalog:
     )
 
 
-def _build_engine(args: argparse.Namespace) -> Engine:
-    config = api.load_config(args.config)
+def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine:
     registry = None
     transforms = None
     if args.entry_points or args.entry_point_allowlist:
@@ -366,7 +371,12 @@ def _print_namespaces(args: argparse.Namespace) -> None:
 
 
 @contextmanager
-def _open_output(path: str | None, *, no_clobber: bool = False) -> Iterator[TextIO]:
+def _open_output(
+    path: str | None,
+    *,
+    no_clobber: bool = False,
+    encoding: str = "utf-8",
+) -> Iterator[TextIO]:
     if path is None:
         yield sys.stdout
         return
@@ -397,22 +407,22 @@ def _open_output(path: str | None, *, no_clobber: bool = False) -> Iterator[Text
             extra={"event": LogEvent.OUTPUT_OVERWRITE.value, "path": path},
         )
     if exists and stat.S_ISFIFO(os.stat(path).st_mode):
-        with open(path, "w", encoding="utf-8") as fh:
+        with open(path, "w", encoding=encoding) as fh:
             yield fh
         return
-    with _open_atomic_output(path) as stream:
+    with _open_atomic_output(path, encoding=encoding) as stream:
         yield stream
 
 
 @contextmanager
-def _open_atomic_output(path: str) -> Iterator[TextIO]:
+def _open_atomic_output(path: str, *, encoding: str = "utf-8") -> Iterator[TextIO]:
     directory = os.path.dirname(os.path.abspath(path)) or "."
     basename = os.path.basename(path)
     tmp_name = ""
     try:
         with tempfile.NamedTemporaryFile(
             "w",
-            encoding="utf-8",
+            encoding=encoding,
             dir=directory,
             prefix=f".{basename}.",
             suffix=".tmp",

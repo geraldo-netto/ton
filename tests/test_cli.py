@@ -31,6 +31,16 @@ def test_cli_writes_rows_to_output_file(write_config, tmp_path: Path) -> None:
     assert len(out_file.read_text().strip().splitlines()) == 4
 
 
+def test_cli_output_uses_configured_encoding(write_config, tmp_path: Path) -> None:
+    config = write_config({"encoding": "utf-16"})
+    out_file = tmp_path / "out.txt"
+    assert main([str(config), "-o", str(out_file), "--seed", "0"]) == 0
+    raw = out_file.read_bytes()
+    # utf-16 encodes ASCII digits with a null high byte and a BOM.
+    assert b"\x00" in raw
+    assert out_file.read_text(encoding="utf-16").strip().splitlines() != []
+
+
 def test_cli_seed_is_reproducible(write_config, capsys: pytest.CaptureFixture[str]) -> None:
     config = write_config()
     main([str(config), "--seed", "42"])
@@ -210,7 +220,7 @@ def test_cli_proof_audit_reports_failure_count(
         registry={"failing": FailingGenerator()},
         proof_mode="audit",
     )
-    monkeypatch.setattr(cli, "_build_engine", lambda args: engine)
+    monkeypatch.setattr(cli, "_build_engine", lambda args, config: engine)
     config = write_config()
     exit_code = main([str(config), "--proof-check", "audit"])
     captured = capsys.readouterr()
@@ -280,7 +290,7 @@ def test_cli_build_engine_preserves_seed_for_proof_context(write_config) -> None
             "audit",
         ]
     )
-    engine = cli._build_engine(args)
+    engine = cli._build_engine(args, cli.api.load_config(str(config)))
 
     assert engine._seed == 7
 

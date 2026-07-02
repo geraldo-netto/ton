@@ -205,15 +205,13 @@ class Engine:
             if type_key in seen:
                 continue
             seen.add(type_key)
-            spec = self._types[type_key]
+            field = self._prepared[type_key]
             failures = sum(1 for failure in self._proof.failures if failure.type_key == type_key)
             records.append(
                 ProvenanceRecord(
                     type_key=type_key,
-                    source_type=str(spec["type"]),
-                    transforms=tuple(
-                        str(transform["type"]) for transform in spec.get("transforms", [])
-                    ),
+                    source_type=field.generator.type_name,
+                    transforms=tuple(prepared.transform.type_name for prepared in field.transforms),
                     proof_mode=self._proof.mode,
                     proof_sample_rate=self._proof.sample_rate,
                     proof_failures=failures,

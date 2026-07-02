@@ -78,11 +78,7 @@ class WeightedGenerator(Generator):
         # access the engine's registry; legacy specs are routed here
         # directly so callers that bypass the engine still work.
         if "choices" in spec:
-            raise ValueError(
-                "weighted 'choices' form requires the engine's composite "
-                "preparation path; call Engine.prepare_composite via the "
-                "engine instead of WeightedGenerator.prepare directly"
-            )
+            raise self._composite_path_error()
         return self._prepare_legacy(spec)
 
     def prepare_composite(

@@ -51,12 +51,6 @@ class SequenceOfGenerator(Generator):
     type_name = "sequence_of"
     is_composite: ClassVar[bool] = True
 
-    def prepare(self, spec: Mapping[str, Any]) -> SequenceOfSpec:
-        raise ValueError(
-            "sequence_of requires the engine's composite preparation path; "
-            "call Engine instead of SequenceOfGenerator.prepare directly"
-        )
-
     def prepare_composite(
         self,
         spec: Mapping[str, Any],

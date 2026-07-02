@@ -62,8 +62,23 @@ class Generator(ABC):
         so that :meth:`generate` becomes a pure draw + format step.
         The default passes the dict through, preserving the legacy
         contract for third-party generators that take a raw dict.
+
+        Composite generators (``is_composite = True``) must be prepared
+        via :meth:`prepare_composite` so they can resolve nested specs
+        against the registry; the default therefore refuses the direct
+        path for them (DUP-003). Composite subclasses that also accept a
+        non-composite legacy form override this method.
         """
+        if self.is_composite:
+            raise self._composite_path_error()
         return spec
+
+    def _composite_path_error(self) -> ValueError:
+        """Return the standard "use the engine's composite path" error (DUP-003)."""
+        return ValueError(
+            f"{self.type_name!r} requires the engine's composite preparation path; "
+            "build an Engine instead of calling prepare() directly"
+        )
 
     def prepare_composite(
         self,

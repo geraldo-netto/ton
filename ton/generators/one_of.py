@@ -40,12 +40,6 @@ class OneOfGenerator(Generator):
     type_name = "oneOf"
     is_composite: ClassVar[bool] = True
 
-    def prepare(self, spec: Mapping[str, Any]) -> OneOfSpec:
-        raise ValueError(
-            "oneOf 'choices' requires the engine's composite preparation "
-            "path; call Engine instead of OneOfGenerator.prepare directly"
-        )
-
     def prepare_composite(
         self,
         spec: Mapping[str, Any],

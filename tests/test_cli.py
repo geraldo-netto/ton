@@ -150,6 +150,20 @@ def test_cli_validate_reports_unknown_type_with_catalog_diagnostics(
     assert "Available types" in captured.err
 
 
+def test_cli_validate_rejects_bad_field_bounds(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # --validate must run prepare so bad bounds fail here, not only at
+    # generation time (CLI-001).
+    config = write_config(
+        {"format": "$x$", "types": {"x": {"type": "integer", "minValue": 100, "maxValue": 1}}}
+    )
+    exit_code = main([str(config), "--validate"])
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "invalid config" in captured.err
+
+
 def test_cli_validate_missing_config_returns_1(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -10,6 +10,7 @@ validation surfaces cannot drift (TODO REL-011).
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -70,11 +71,19 @@ def load(path: str | Path) -> dict[str, Any]:
 
 
 def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> None:
-    """Validate type and transform references against ``catalog``."""
+    """Validate type and transform references against ``catalog``.
+
+    Also runs each field's ``Generator.prepare`` so per-spec errors
+    (bounds, value lists, output caps) surface here rather than only at
+    generation time -- otherwise ``--validate`` reports a bad-bounds
+    config as valid and the real run fails (CLI-001).
+    """
     _validate(data)
+    generators = catalog.generators()
     for field_name, spec in data["types"].items():
         _validate_type_reference(field_name, spec["type"], catalog)
         _validate_transforms(field_name, spec, catalog)
+        _validate_field_spec(field_name, spec, generators)
     _logger.info(
         "config_validated types=%d",
         len(data["types"]),
@@ -174,6 +183,22 @@ def _validate_transforms(
                 f"Transform {reference!r} for {field_name!r} does not accept paired input."
             )
         is_paired = is_paired and transform.capabilities.preserves_pairing
+
+
+def _validate_field_spec(
+    field_name: str,
+    spec: dict[str, Any],
+    generators: Mapping[str, Any],
+) -> None:
+    """Run the generator's prepare so per-spec errors surface (CLI-001)."""
+    generator = generators[_normalize_config_reference(spec["type"])]
+    try:
+        if generator.is_composite:
+            generator.prepare_composite(spec, generators)
+        else:
+            generator.prepare(spec)
+    except Exception as exc:  # noqa: BLE001 - boundary; normalized to ConfigError
+        raise ConfigError(f"Invalid spec for {field_name!r}: {exc}") from exc
 
 
 def _normalize_config_reference(reference: str) -> str:

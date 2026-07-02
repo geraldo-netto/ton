@@ -74,7 +74,6 @@ Last full rescan: 2026-07-02.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CLI-001 | open | M | `--validate` gives false confidence: `_validate_config` → `validate_with_catalog` (`ton/cli.py:211`, `ton/_config.py:72`) only checks structure + type/transform references, never calling `Generator.prepare`, so per-field validation (bounds, value lists, caps) is skipped. A config with `integer minValue=100 maxValue=1` prints `ton: config valid` (exit 0) under `--validate` but the real run exits 2 (`Invalid spec ... maxValue (1) must be >= minValue (100)`). Help text ("Validate the config and exit") does not convey this deferral. |
 
 ## configuration discoverability
 

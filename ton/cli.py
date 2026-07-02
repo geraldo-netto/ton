@@ -91,7 +91,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--validate",
         action="store_true",
-        help="Validate the config and exit without generating rows.",
+        help=(
+            "Validate the config (structure, type/transform references, and "
+            "per-field specs) and exit without generating rows."
+        ),
     )
     parser.add_argument(
         "--proof-check",

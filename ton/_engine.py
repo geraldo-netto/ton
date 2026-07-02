@@ -52,6 +52,7 @@ class EngineOptions:
     proof_sample_rate: int = 1
     seed: int | None = None
     milestone_rows: int = 0
+    redact_proof_failures: bool = False
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ class Engine:
         proof_sample_rate: int = 1,
         seed: int | None = None,
         milestone_rows: int = 0,
+        redact_proof_failures: bool = False,
     ) -> None:
         self._template: str = config["format"]
         self._types: Mapping[str, Mapping[str, Any]] = config["types"]
@@ -107,7 +109,12 @@ class Engine:
         self._registry = self._resolve_registry(registry)
         self._transforms = dict(transforms or build_extension_catalog().transforms())
         self._rng = rng if rng is not None else Random()
-        self._proof = ProofChecker(mode=proof_mode, sample_rate=proof_sample_rate, seed=seed)
+        self._proof = ProofChecker(
+            mode=proof_mode,
+            sample_rate=proof_sample_rate,
+            seed=seed,
+            redact=redact_proof_failures,
+        )
         self._seed = seed
         self._validate()
         # Each referenced type spec is parsed once via Generator.prepare;
@@ -157,6 +164,7 @@ class Engine:
             proof_sample_rate=options.proof_sample_rate,
             seed=options.seed,
             milestone_rows=options.milestone_rows,
+            redact_proof_failures=options.redact_proof_failures,
         )
 
     @classmethod
@@ -171,6 +179,7 @@ class Engine:
         proof_mode: str = "off",
         proof_sample_rate: int = 1,
         milestone_rows: int = 0,
+        redact_proof_failures: bool = False,
     ) -> Engine:
         """Build an Engine, deriving the RNG from ``seed`` when ``rng`` is None.
 
@@ -187,6 +196,7 @@ class Engine:
                 proof_sample_rate=proof_sample_rate,
                 seed=seed,
                 milestone_rows=milestone_rows,
+                redact_proof_failures=redact_proof_failures,
             ),
         )
 

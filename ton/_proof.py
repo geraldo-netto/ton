@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
+
+#: Placeholder substituted for sensitive proof-failure fields (DG-002).
+REDACTED = "<redacted>"
 
 
 @dataclass(frozen=True)
@@ -27,6 +30,22 @@ class ProofFailure:
     id_value: str | None = None
     seed: int | None = None
     spec: dict[str, Any] | None = None
+
+    def redacted(self) -> ProofFailure:
+        """Return a copy with the sensitive fields masked (DG-002).
+
+        The generated ``value`` / ``id_value`` and the full field ``spec``
+        can carry synthetic identifiers or source value pools, so records
+        destined for manifests or audit exports should be redacted first.
+        The diagnostic fields (row, type_key, stage, reference, reason)
+        are preserved.
+        """
+        return replace(
+            self,
+            value=REDACTED,
+            id_value=REDACTED if self.id_value is not None else None,
+            spec=None,
+        )
 
 
 @dataclass(frozen=True)

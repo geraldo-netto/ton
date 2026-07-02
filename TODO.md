@@ -85,7 +85,6 @@ Last full rescan: 2026-07-02.
 
 | id     | status | effort | description |
 |--------|--------|--------|-------------|
-| DG-002 | open | M | Define redaction controls for proof failure records before exposing them to logs, manifests, or audit exports. `ProofFailure` currently stores raw generated `value`, `id_value`, and full field spec, which can include sensitive synthetic identifiers or source value pools. |
 
 ## dependency
 

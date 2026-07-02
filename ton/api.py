@@ -163,6 +163,7 @@ def generate(
     proof_mode: str = "off",
     proof_sample_rate: int = 1,
     milestone_rows: int = 0,
+    redact_proof_failures: bool = False,
 ) -> Iterator[str]:
     """Yield generated rows for an in-memory config mapping."""
     return iter(
@@ -175,6 +176,7 @@ def generate(
                 proof_sample_rate=proof_sample_rate,
                 seed=seed,
                 milestone_rows=milestone_rows,
+                redact_proof_failures=redact_proof_failures,
             ),
         )
     )
@@ -189,6 +191,7 @@ def generate_from_file(
     proof_mode: str = "off",
     proof_sample_rate: int = 1,
     milestone_rows: int = 0,
+    redact_proof_failures: bool = False,
 ) -> Iterator[str]:
     """Yield generated rows for a config loaded from ``path``."""
     return generate(
@@ -199,4 +202,5 @@ def generate_from_file(
         proof_mode=proof_mode,
         proof_sample_rate=proof_sample_rate,
         milestone_rows=milestone_rows,
+        redact_proof_failures=redact_proof_failures,
     )

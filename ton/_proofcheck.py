@@ -36,10 +36,19 @@ MAX_AUDIT_SAMPLE = 1000
 class ProofChecker:
     """Own the proof-check state and failure-building for one engine."""
 
-    def __init__(self, *, mode: str, sample_rate: int, seed: int | None) -> None:
+    def __init__(
+        self,
+        *,
+        mode: str,
+        sample_rate: int,
+        seed: int | None,
+        redact: bool = False,
+    ) -> None:
         self.mode = validate_proof_mode(mode)
         self.sample_rate = validate_proof_sample_rate(sample_rate)
         self.seed = seed
+        #: When set, retained audit records are masked (DG-002).
+        self.redact = redact
         #: Bounded sample of detailed failures (see MAX_AUDIT_SAMPLE).
         self.failures: list[ProofFailure] = []
         #: Total audit failures seen, independent of the sample cap.
@@ -100,7 +109,7 @@ class ProofChecker:
         self.failure_count += 1
         self.failure_counts[failure.type_key] = self.failure_counts.get(failure.type_key, 0) + 1
         if len(self.failures) < MAX_AUDIT_SAMPLE:
-            self.failures.append(failure)
+            self.failures.append(failure.redacted() if self.redact else failure)
 
     def build_failures(
         self,

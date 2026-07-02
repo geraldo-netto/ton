@@ -415,11 +415,15 @@ def registry_with_entry_points(
     Third-party packages can register additional generators by declaring::
 
         [project.entry-points."ton.generators"]
-        uuid = "my_pkg.generators:UuidGenerator"
+        widget = "my_pkg.generators:WidgetGenerator"
 
-    Entry-point names override built-ins with the same key. When
-    ``allowed_names`` is provided, only matching entry-point names are
-    loaded; all others are ignored without importing their target.
+    Entry-point generators cannot shadow built-ins (PLUG-002): an
+    unqualified entry-point name lands in the ``plugin`` namespace
+    (``plugin.widget``) and is also promoted to the bare key ``widget``
+    only when no built-in already claims it. Core registrations are never
+    replaced. When ``allowed_names`` is provided, only matching
+    entry-point names are loaded; all others are ignored without
+    importing their target.
     """
     catalog = catalog_with_entry_points(allowed_names=allowed_names)
     # Copy the cached flattened view before mutating it: catalog.generators()

@@ -67,7 +67,6 @@ Last full rescan: 2026-07-02.
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| PLUG-002 | open | S | `registry_with_entry_points` docstring claims "Entry-point names override built-ins with the same key" (`ton/_registry.py:399-400`) and its example registers `uuid`, but `ExtensionCatalog._register` forbids replacing core (`_registry.py:136-137`) and unqualified entry points land in the `plugin` namespace, so a `uuid` entry point resolves to `plugin.uuid` and never shadows the built-in. Documented override behavior does not occur. |
 
 ## CLI / option integrity
 

@@ -292,7 +292,7 @@ def _report_proof_audit(engine: Engine) -> None:
     failed its proof. Surface the count and point at the structured
     ``proof_check_failed`` log events that carry the per-row detail.
     """
-    count = len(engine.proof_failures)
+    count = engine.proof_failure_count
     _logger.info(
         "cli_proof_audit_summary failures=%d",
         count,

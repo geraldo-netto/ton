@@ -239,8 +239,13 @@ class Engine:
 
     @property
     def proof_failures(self) -> tuple[ProofFailure, ...]:
-        """Proof failures collected in audit mode."""
+        """Detailed audit proof failures (bounded sample; see SCAL-001)."""
         return tuple(self._proof.failures)
+
+    @property
+    def proof_failure_count(self) -> int:
+        """Total audit proof failures seen, independent of the sample cap."""
+        return self._proof.failure_count
 
     @property
     def provenance(self) -> tuple[ProvenanceRecord, ...]:
@@ -254,7 +259,7 @@ class Engine:
             seen.add(type_key)
             field = self._prepared[type_key]
             generator = field.generator
-            failures = sum(1 for failure in self._proof.failures if failure.type_key == type_key)
+            failures = self._proof.failure_counts.get(type_key, 0)
             records.append(
                 ProvenanceRecord(
                     type_key=type_key,

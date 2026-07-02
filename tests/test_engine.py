@@ -359,6 +359,35 @@ def test_engine_audit_proof_failures_reset_between_iterations() -> None:
     assert len(engine.proof_failures) == 1
 
 
+def test_engine_audit_proof_failures_bounded_but_counted(monkeypatch: Any) -> None:
+    import ton._proofcheck as proofcheck
+
+    class FailingGenerator(Generator):
+        type_name = "failing"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "bad"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared, result
+            return ProofResult(ok=False, reason="bad value")
+
+    monkeypatch.setattr(proofcheck, "MAX_AUDIT_SAMPLE", 2)
+    config = {"rows": 5, "format": "$v$", "types": {"v": {"type": "failing"}}}
+    engine = Engine.from_config(
+        config,
+        registry={"failing": FailingGenerator()},
+        proof_mode="audit",
+    )
+
+    list(engine)
+    # Detail retained is capped, but the total count and provenance
+    # per-type tally stay accurate (SCAL-001).
+    assert len(engine.proof_failures) == 2
+    assert engine.proof_failure_count == 5
+    assert engine.provenance[0].proof_failures == 5
+
+
 def test_engine_provenance_reports_source_transforms_and_proof_state() -> None:
     config = {
         "rows": 1,

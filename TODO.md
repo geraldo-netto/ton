@@ -38,7 +38,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SCAL-001 | open | M | Audit proof mode grows `_proof_failures_audit` without bound — one `ProofFailure` appended per failing row (`ton/_engine.py:457`), each copying the full spec dict (`spec=dict(self._types[type_key])`, `_engine.py:568`). A long run with systematic failures accumulates unbounded memory in a list that could be streamed/counted. |
 
 ## concurrency
 

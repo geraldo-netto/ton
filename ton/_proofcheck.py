@@ -25,6 +25,13 @@ from ._transforms import TransformResult
 if TYPE_CHECKING:
     from ._engine import PreparedField, TransformStep
 
+#: Upper bound on the number of detailed audit failures retained in
+#: memory. Beyond this the total count and per-type tallies keep
+#: growing, but no further full ProofFailure records (with their copied
+#: spec dicts) are stored, so a long run with systematic failures cannot
+#: exhaust memory (SCAL-001).
+MAX_AUDIT_SAMPLE = 1000
+
 
 class ProofChecker:
     """Own the proof-check state and failure-building for one engine."""
@@ -33,7 +40,12 @@ class ProofChecker:
         self.mode = validate_proof_mode(mode)
         self.sample_rate = validate_proof_sample_rate(sample_rate)
         self.seed = seed
+        #: Bounded sample of detailed failures (see MAX_AUDIT_SAMPLE).
         self.failures: list[ProofFailure] = []
+        #: Total audit failures seen, independent of the sample cap.
+        self.failure_count = 0
+        #: Per-type total audit failures, for provenance attribution.
+        self.failure_counts: dict[str, int] = {}
 
     @property
     def enabled(self) -> bool:
@@ -42,6 +54,8 @@ class ProofChecker:
     def reset(self) -> None:
         """Clear collected audit failures before a fresh iteration."""
         self.failures.clear()
+        self.failure_count = 0
+        self.failure_counts.clear()
 
     def should_check(self, rows_emitted: int) -> bool:
         if self.mode == "off":
@@ -74,12 +88,19 @@ class ProofChecker:
         if not failures:
             return None
         if self.mode == "audit":
-            self.failures.extend(failures)
             for failure in failures:
+                self._record_audit(failure)
                 self._log_failure(failure)
             return None
         self._log_failure(failures[0])
         return failures[0]
+
+    def _record_audit(self, failure: ProofFailure) -> None:
+        """Tally an audit failure, retaining detail only up to the cap (SCAL-001)."""
+        self.failure_count += 1
+        self.failure_counts[failure.type_key] = self.failure_counts.get(failure.type_key, 0) + 1
+        if len(self.failures) < MAX_AUDIT_SAMPLE:
+            self.failures.append(failure)
 
     def build_failures(
         self,
@@ -120,11 +141,11 @@ class ProofChecker:
         _logger.info(
             "proof_check_summary mode=%s failures=%d",
             self.mode,
-            len(self.failures),
+            self.failure_count,
             extra={
                 "event": LogEvent.PROOF_CHECK_SUMMARY.value,
                 "mode": self.mode,
-                "failures": len(self.failures),
+                "failures": self.failure_count,
             },
         )
 

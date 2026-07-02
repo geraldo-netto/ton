@@ -37,11 +37,14 @@ def test_uuid_uppercase_flag() -> None:
     assert value == value.upper()
 
 
-def test_uuid1_supported_but_not_seeded() -> None:
+def test_uuid1_is_synthetic_and_seed_deterministic() -> None:
+    # v1 is now built from the seeded RNG (DG-003): reproducible and free
+    # of the host MAC/clock.
     gen = UUIDGenerator()
     prepared = gen.prepare({"version": 1})
     value = gen.generate(prepared, Random(0))
     assert uuid.UUID(value).version == 1
+    assert gen.generate(prepared, Random(7)) == gen.generate(prepared, Random(7))
 
 
 def test_uuid_rejects_unsupported_version() -> None:

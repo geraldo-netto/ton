@@ -10,9 +10,11 @@ Spec fields::
 
 Notes:
 
-* UUID4 is drawn from the spec's :class:`random.Random` so the engine
-  remains seed-reproducible. UUID1 uses the host clock + node id and
-  is *not* reproducible -- the seed has no effect for that variant.
+* Both versions are built from 16 bytes drawn from the spec's
+  :class:`random.Random`, so output stays seed-reproducible. The version
+  1 variant is therefore *synthetic*: it carries a random node/clock
+  rather than the host's real MAC address and clock, so generated data
+  never leaks host hardware/network identifiers (DG-003).
 """
 
 from __future__ import annotations
@@ -46,11 +48,9 @@ class UUIDGenerator(Generator):
         return UUIDSpec(version=version, uppercase=bool(spec.get("uppercase", False)))
 
     def generate(self, prepared: UUIDSpec, rng: Random) -> str:
-        if prepared.version == 4:
-            # Build a UUID4 from 16 random bytes drawn from the seeded RNG
-            # so output stays reproducible.
-            value = uuid.UUID(bytes=rng.randbytes(16), version=4)
-        else:
-            value = uuid.uuid1()
+        # Both versions are built from 16 bytes drawn from the seeded RNG:
+        # output stays reproducible and the v1 variant carries a random
+        # node/clock instead of the host MAC + real clock (DG-003).
+        value = uuid.UUID(bytes=rng.randbytes(16), version=prepared.version)
         text = str(value)
         return text.upper() if prepared.uppercase else text

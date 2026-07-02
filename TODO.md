@@ -86,7 +86,6 @@ Last full rescan: 2026-07-02.
 | id     | status | effort | description |
 |--------|--------|--------|-------------|
 | DG-002 | open | M | Define redaction controls for proof failure records before exposing them to logs, manifests, or audit exports. `ProofFailure` currently stores raw generated `value`, `id_value`, and full field spec, which can include sensitive synthetic identifiers or source value pools. |
-| DG-003 | open | S | `uuid` type with `version:1` calls `uuid.uuid1()` (`ton/generators/uuid.py:54`), which embeds the host machine's real MAC address and clock into the "synthetic" output, leaking host hardware/network identifiers. Only the version-4 path is seed-reproducible/synthetic. |
 
 ## dependency
 

@@ -34,7 +34,6 @@ Last full rescan: 2026-07-02.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-001 | open | M | Regex character-class pools are rebuilt on every emission instead of at prepare time. `_pick_in` does `list(items)` + `_flatten_in` expanding ranges into a fresh char list each call (`ton/generators/regex.py:170-204`), and `_pick_excluding` filters the 95-char ASCII table per call (`regex.py:207-211`). For `[a-z]{20}` or `[^x]{100}` this recomputes the pool per character, per row. |
 | PERF-002 | open | S | `PreparedField.is_paired` is a property recomputed on every access (`ton/_engine.py:46-51`); called per-token per-row in the hot path `_resolve` (`_engine.py:399`) whenever any paired type exists, despite the dataclass being frozen. Cache it. |
 
 ## scalability

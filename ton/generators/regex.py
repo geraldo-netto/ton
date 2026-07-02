@@ -27,6 +27,7 @@ import string
 import warnings
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from functools import lru_cache
 from random import Random
 from typing import Any, cast
 
@@ -55,6 +56,8 @@ _PRINTABLE_ASCII = tuple(chr(c) for c in range(0x20, 0x7F))
 _DIGITS = tuple(string.digits)
 _WORD = tuple(string.ascii_letters + string.digits + "_")
 _SPACE = tuple(" \t\n\r\f\v")
+#: Pool for ``.`` (any char except newline); computed once (PERF-001).
+_ANY_POOL = tuple(c for c in _PRINTABLE_ASCII if c != "\n")
 
 
 @dataclass(frozen=True)
@@ -128,11 +131,11 @@ def _emit_literal(arg: Any, rng: Random, out: list[str]) -> None:
 
 
 def _emit_not_literal(arg: Any, rng: Random, out: list[str]) -> None:
-    out.append(_pick_excluding({chr(arg)}, rng))
+    out.append(rng.choice(_excluding_pool(frozenset((chr(arg),)))))
 
 
 def _emit_any(arg: Any, rng: Random, out: list[str]) -> None:
-    out.append(_pick_excluding({"\n"}, rng))
+    out.append(rng.choice(_ANY_POOL))
 
 
 def _emit_branch(arg: Any, rng: Random, out: list[str]) -> None:
@@ -168,17 +171,25 @@ def _emit_repeat(arg: tuple[int, int, Any], rng: Random, out: list[str]) -> None
 
 
 def _pick_in(items: Iterable[tuple[Any, Any]], rng: Random, out: list[str]) -> None:
+    out.append(rng.choice(_in_pool(tuple(items))))
+
+
+@lru_cache(maxsize=256)
+def _in_pool(items: tuple[tuple[Any, Any], ...]) -> tuple[str, ...]:
+    """Resolve a character-class node to its concrete pool once (PERF-001).
+
+    Ranges and categories are expanded a single time per distinct class
+    and the result is memoized, so ``[a-z]{20}`` / ``[^x]{100}`` no
+    longer rebuild the pool per character, per row.
+    """
     item_list = list(items)
-    negate = item_list and item_list[0][0] is sre_constants.NEGATE
+    negate = bool(item_list) and item_list[0][0] is sre_constants.NEGATE
     if negate:
-        item_list = item_list[1:]
+        return _excluding_pool(frozenset(_flatten_in(item_list[1:])))
     pool = _flatten_in(item_list)
-    if negate:
-        out.append(_pick_excluding(set(pool), rng))
-        return
     if not pool:
         raise ValueError("regex generator: empty character class")
-    out.append(rng.choice(pool))
+    return tuple(pool)
 
 
 def _flatten_literal(arg: Any) -> list[str]:
@@ -204,11 +215,13 @@ def _flatten_in(items: Iterable[tuple[Any, Any]]) -> list[str]:
     return pool
 
 
-def _pick_excluding(excluded: set[str], rng: Random) -> str:
-    pool = [c for c in _PRINTABLE_ASCII if c not in excluded]
+@lru_cache(maxsize=256)
+def _excluding_pool(excluded: frozenset[str]) -> tuple[str, ...]:
+    """Printable-ASCII pool minus ``excluded``, memoized (PERF-001)."""
+    pool = tuple(c for c in _PRINTABLE_ASCII if c not in excluded)
     if not pool:
         raise ValueError("regex generator: cannot satisfy negated class")
-    return rng.choice(pool)
+    return pool
 
 
 def _negated_pool(included: tuple[str, ...]) -> tuple[str, ...]:

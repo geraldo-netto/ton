@@ -578,9 +578,9 @@ def test_regex_empty_character_class_rejected() -> None:
 
 def test_regex_negated_class_excluding_all_rejected() -> None:
     mod = _regex_internals()
-    excluded = set(mod._PRINTABLE_ASCII)
+    excluded = frozenset(mod._PRINTABLE_ASCII)
     with pytest.raises(ValueError, match="cannot satisfy negated class"):
-        mod._pick_excluding(excluded, Random(0))
+        mod._excluding_pool(excluded)
 
 
 def test_regex_category_space_pool_returned() -> None:

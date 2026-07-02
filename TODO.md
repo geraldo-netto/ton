@@ -19,7 +19,6 @@ Last full rescan: 2026-07-02.
 | id | status | effort | description |
 |----|--------|--------|-------------|
 | CX-001 | open | S | `_category_pool` (`ton/generators/regex.py:214`) is a 6-branch if/return ladder over category constants, CC 13 (>10 rule). The file already uses dispatch tables (`_EMIT_HANDLERS`, `_FLATTEN_HANDLERS`); a `{CATEGORY_*: pool}` dict collapses it to a lookup. |
-| CX-002 | open | M | `_coerce` (`ton/generators/weighted.py:128`) handles three input shapes (record form, parallel-array uniform default, parallel-array explicit weights) in one nested-branch function, CC 13 (>10 rule). Split per-shape. |
 
 ## code duplication
 

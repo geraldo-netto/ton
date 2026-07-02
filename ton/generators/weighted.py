@@ -45,7 +45,7 @@ entry). Three spec shapes are accepted; pick whichever reads best:
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar
@@ -119,22 +119,33 @@ def _coerce(spec: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[float, ...]
     if not isinstance(raw_values, list):
         raise ValueError("weighted 'values' must be a list")
     if raw_values and isinstance(raw_values[0], dict):
-        # Record form: [{value, weight}, ...]. ``weight`` defaults to 1.0
-        # so a list of bare ``{"value": ...}`` records still works -- the
-        # generator falls back to uniform weighting.
-        return (
-            tuple(str(item["value"]) for item in raw_values),
-            tuple(float(item.get("weight", 1.0)) for item in raw_values),
-        )
+        return _coerce_record(raw_values)
+    return _coerce_parallel(spec, raw_values)
+
+
+def _coerce_record(raw_values: list[Any]) -> tuple[tuple[str, ...], tuple[float, ...]]:
+    # Record form: [{value, weight}, ...]. ``weight`` defaults to 1.0 so a
+    # list of bare ``{"value": ...}`` records still works -- the generator
+    # falls back to uniform weighting.
+    return (
+        tuple(str(item["value"]) for item in raw_values),
+        tuple(float(item.get("weight", 1.0)) for item in raw_values),
+    )
+
+
+def _coerce_parallel(
+    spec: Mapping[str, Any],
+    raw_values: list[Any],
+) -> tuple[tuple[str, ...], tuple[float, ...]]:
     # Parallel-array form. Missing ``weights`` defaults to uniform so
-    # ``{"values": [...]}`` is equivalent to picking with equal
-    # probability (1/N per entry).
+    # ``{"values": [...]}`` is equivalent to picking with equal probability
+    # (1/N per entry).
     if "weights" not in spec:
         return (
             tuple(str(v) for v in raw_values),
             tuple(1.0 for _ in raw_values),
         )
-    weights: Sequence[Any] = spec["weights"]
+    weights = spec["weights"]
     if not isinstance(weights, list) or len(weights) != len(raw_values):
         raise ValueError("weighted 'weights' must be a list the same length as 'values'")
     return (

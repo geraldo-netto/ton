@@ -15,7 +15,15 @@ from contextlib import contextmanager, suppress
 from typing import TextIO, cast
 
 from . import __version__, api
-from .api import ConfigError, Engine, LogEvent, ProofError, TemplateError, configure_stderr
+from .api import (
+    ConfigError,
+    Engine,
+    LogEvent,
+    ProofError,
+    TemplateError,
+    ValidationError,
+    configure_stderr,
+)
 from .api import logger as _logger
 
 _LOG_LEVELS = {
@@ -294,6 +302,9 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
     except ProofError as exc:
         print(f"ton: proof failed: {exc}", file=sys.stderr)
         return 2
+    except ValidationError as exc:
+        print(f"ton: validation failed: {exc}", file=sys.stderr)
+        return 2
     if args.verbose:
         _report(rows_written, time.perf_counter() - started)
     if args.proof_check == "audit":
@@ -342,10 +353,12 @@ def _catalog_from_args(args: argparse.Namespace) -> api.ExtensionCatalog:
 def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine:
     registry = None
     transforms = None
+    validators = None
     if args.entry_points or args.entry_point_allowlist:
         catalog = _catalog_from_args(args)
         registry = catalog.generators()
         transforms = catalog.transforms()
+        validators = catalog.validators()
     # Pass only --seed; from_config derives the RNG from it so the
     # Random(seed)-or-Random() idiom lives solely in the engine (DEC-002).
     # --progress already prints JSON; reuse the same interval as the
@@ -355,6 +368,7 @@ def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine
         config,
         registry=registry,
         transforms=transforms,
+        validators=validators,
         seed=args.seed,
         proof_mode=args.proof_check,
         proof_sample_rate=args.proof_sample_rate,
@@ -368,6 +382,7 @@ def _print_namespaces(args: argparse.Namespace) -> None:
     print("namespaces:", ", ".join(catalog.namespaces()))
     print("data types:", ", ".join(catalog.list_data_types()))
     print("transforms:", ", ".join(catalog.list_transforms()))
+    print("validators:", ", ".join(catalog.list_validators()))
 
 
 @contextmanager

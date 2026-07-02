@@ -84,6 +84,7 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
     for field_name, spec in data["types"].items():
         _validate_type_reference(field_name, spec["type"], catalog)
         _validate_transforms(field_name, spec, catalog)
+        _validate_field_validators(field_name, spec, catalog)
         _validate_field_spec(field_name, spec, generators)
     _logger.info(
         "config_validated types=%d",
@@ -204,6 +205,23 @@ def _validate_transforms(
                 f"Transform {reference!r} for {field_name!r} does not accept paired input."
             )
         is_paired = is_paired and transform.capabilities.preserves_pairing
+
+
+def _validate_field_validators(
+    field_name: str,
+    spec: dict[str, Any],
+    catalog: ExtensionCatalog,
+) -> None:
+    """Validate a field's ``validators`` references against ``catalog`` (PLUG-001)."""
+    references = spec.get("validators", [])
+    if not isinstance(references, list):
+        raise ConfigError(f"Type spec {field_name!r} 'validators' must be a list.")
+    available = catalog.validators()
+    for reference in references:
+        if not isinstance(reference, str):
+            raise ConfigError(f"Type spec {field_name!r} validator refs must be strings.")
+        if _normalize_config_reference(reference) not in available:
+            _raise_unknown_reference("validator", field_name, reference, catalog.list_validators())
 
 
 def _validate_field_spec(

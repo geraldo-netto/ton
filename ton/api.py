@@ -62,6 +62,7 @@ from ._registry import (
 )
 from ._template import UndeclaredVariableError
 from ._transforms import Transform
+from ._validation import ValidationError, Validator
 from .generators import Generator, PairedGenerator
 
 __all__ = [
@@ -76,6 +77,8 @@ __all__ = [
     "TemplateError",
     "Transform",
     "UndeclaredVariableError",
+    "ValidationError",
+    "Validator",
     "ExtensionCatalog",
     "build_extension_catalog",
     "build_registry",
@@ -167,6 +170,7 @@ def generate(
     seed: int | None = None,
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
+    validators: Mapping[str, Validator] | None = None,
     proof_mode: str = "off",
     proof_sample_rate: int = 1,
     milestone_rows: int = 0,
@@ -179,6 +183,7 @@ def generate(
             EngineOptions(
                 registry=registry,
                 transforms=transforms,
+                validators=validators,
                 proof_mode=proof_mode,
                 proof_sample_rate=proof_sample_rate,
                 seed=seed,
@@ -195,6 +200,7 @@ def generate_from_file(
     seed: int | None = None,
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
+    validators: Mapping[str, Validator] | None = None,
     proof_mode: str = "off",
     proof_sample_rate: int = 1,
     milestone_rows: int = 0,
@@ -206,6 +212,7 @@ def generate_from_file(
         seed=seed,
         registry=registry,
         transforms=transforms,
+        validators=validators,
         proof_mode=proof_mode,
         proof_sample_rate=proof_sample_rate,
         milestone_rows=milestone_rows,

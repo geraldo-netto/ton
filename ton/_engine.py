@@ -22,6 +22,7 @@ from ._proofcheck import ProofChecker
 from ._registry import build_extension_catalog, make_registry, normalize_reference
 from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
 from ._transforms import Transform, TransformResult
+from ._validation import ValidationError, Validator
 from .generators import Generator
 
 
@@ -47,6 +48,7 @@ class EngineOptions:
 
     registry: Mapping[str, Generator] | None = None
     transforms: Mapping[str, Transform] | None = None
+    validators: Mapping[str, Validator] | None = None
     rng: Random | None = None
     proof_mode: str = "off"
     proof_sample_rate: int = 1
@@ -66,6 +68,7 @@ class PreparedField:
     generator: Generator
     source_prepared: Any
     transforms: tuple[PreparedTransform, ...]
+    validators: tuple[Validator, ...] = ()
 
     @cached_property
     def is_paired(self) -> bool:
@@ -94,6 +97,7 @@ class Engine:
         config: Mapping[str, Any],
         registry: Mapping[str, Generator] | None = None,
         transforms: Mapping[str, Transform] | None = None,
+        validators: Mapping[str, Validator] | None = None,
         rng: Random | None = None,
         *,
         proof_mode: str = "off",
@@ -108,6 +112,9 @@ class Engine:
         self._tokens = parse(self._template)
         self._registry = self._resolve_registry(registry)
         self._transforms = dict(transforms or build_extension_catalog().transforms())
+        self._validators = dict(
+            validators if validators is not None else build_extension_catalog().validators()
+        )
         self._rng = rng if rng is not None else Random()
         self._proof = ProofChecker(
             mode=proof_mode,
@@ -159,6 +166,7 @@ class Engine:
             config,
             registry=options.registry,
             transforms=options.transforms,
+            validators=options.validators,
             rng=engine_rng,
             proof_mode=options.proof_mode,
             proof_sample_rate=options.proof_sample_rate,
@@ -175,6 +183,7 @@ class Engine:
         seed: int | None = None,
         registry: Mapping[str, Generator] | None = None,
         transforms: Mapping[str, Transform] | None = None,
+        validators: Mapping[str, Validator] | None = None,
         rng: Random | None = None,
         proof_mode: str = "off",
         proof_sample_rate: int = 1,
@@ -191,6 +200,7 @@ class Engine:
             EngineOptions(
                 registry=registry,
                 transforms=transforms,
+                validators=validators,
                 rng=rng,
                 proof_mode=proof_mode,
                 proof_sample_rate=proof_sample_rate,
@@ -329,6 +339,7 @@ class Engine:
                     generator=generator,
                     source_prepared=source_prepared,
                     transforms=self._prepare_transforms(token.type_key, spec, generator),
+                    validators=self._resolve_validators(token.type_key, spec),
                 )
             except Exception as exc:  # noqa: BLE001 - boundary; re-raised below
                 # Surface the failing spec to log handlers before
@@ -396,6 +407,16 @@ class Engine:
             return self._transforms[reference]
         raise TemplateError(f"Unknown transform {reference!r} for variable {type_key!r}")
 
+    def _resolve_validators(self, type_key: str, spec: Mapping[str, Any]) -> tuple[Validator, ...]:
+        resolved: list[Validator] = []
+        for reference in spec.get("validators", []):
+            normalized = normalize_reference(reference)
+            validator = self._validators.get(normalized) or self._validators.get(reference)
+            if validator is None:
+                raise TemplateError(f"Unknown validator {reference!r} for variable {type_key!r}")
+            resolved.append(validator)
+        return tuple(resolved)
+
     def __iter__(self) -> Iterator[str]:
         if not self._iteration_lock.acquire(blocking=False):
             raise RuntimeError("Engine instances cannot be iterated concurrently")
@@ -453,7 +474,7 @@ class Engine:
                     paired_cache[token.type_key] = pair
                 return pair[0] if token.wants_id else pair[1]
             return self._generate_single(token.type_key, field)
-        except ProofError:
+        except (ProofError, ValidationError):
             raise
         except Exception as exc:  # noqa: BLE001 - boundary; re-raised below
             # A generator that raises mid-iteration would otherwise hit
@@ -483,13 +504,23 @@ class Engine:
         source = TransformResult(value=pair[1], id_value=pair[0])
         transformed, steps = self._apply_transforms_with_trace(field, source)
         self._handle_proof_failures(type_key, field, source, steps)
+        self._run_validators(type_key, field, transformed.value)
         return (transformed.id_value or "", transformed.value)
 
     def _generate_single(self, type_key: str, field: PreparedField) -> str:
         source = TransformResult(field.generator.generate(field.source_prepared, self._rng))
         transformed, steps = self._apply_transforms_with_trace(field, source)
         self._handle_proof_failures(type_key, field, source, steps)
+        self._run_validators(type_key, field, transformed.value)
         return transformed.value
+
+    def _run_validators(self, type_key: str, field: PreparedField, value: str) -> None:
+        for validator in field.validators:
+            if not validator.validate(value):
+                raise ValidationError(
+                    f"Value {value!r} for variable {type_key!r} failed "
+                    f"validator {validator.type_name!r}"
+                )
 
     def _handle_proof_failures(
         self,

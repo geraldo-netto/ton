@@ -63,6 +63,10 @@ class ExtensionCatalog:
         }
         self._transforms: dict[str, dict[str, Transform]] = {CORE_NAMESPACE: dict(transforms or {})}
         self._validators: dict[str, dict[str, Any]] = {CORE_NAMESPACE: dict(validators or {})}
+        # Flattened views are rebuilt only when a registration mutates a
+        # store (PERF-003); catalog reads during config validation hit
+        # the cache instead of re-running _flatten per field/transform.
+        self._flat_cache: dict[str, dict[str, Any]] = {}
 
     def register_data_type(
         self,
@@ -87,13 +91,13 @@ class ExtensionCatalog:
         _log_plugin_registered("validator", namespace, name)
 
     def generators(self) -> dict[str, Generator]:
-        return self._flatten(self._generators)
+        return self._flattened("generators", self._generators)
 
     def transforms(self) -> dict[str, Transform]:
-        return self._flatten(self._transforms)
+        return self._flattened("transforms", self._transforms)
 
     def validators(self) -> dict[str, Any]:
-        return self._flatten(self._validators)
+        return self._flattened("validators", self._validators)
 
     def list_data_types(self) -> tuple[str, ...]:
         return tuple(sorted(self.generators()))
@@ -114,6 +118,13 @@ class ExtensionCatalog:
     def get_transform(self, reference: str) -> Transform:
         return self.transforms()[normalize_reference(reference)]
 
+    def _flattened(self, key: str, store: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+        cached = self._flat_cache.get(key)
+        if cached is None:
+            cached = self._flatten(store)
+            self._flat_cache[key] = cached
+        return cached
+
     @staticmethod
     def _flatten(store: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
         flattened: dict[str, Any] = {}
@@ -124,8 +135,8 @@ class ExtensionCatalog:
                     flattened.setdefault(name, value)
         return flattened
 
-    @staticmethod
     def _register(
+        self,
         store: dict[str, dict[str, Any]],
         namespace: str,
         name: str,
@@ -139,6 +150,9 @@ class ExtensionCatalog:
         if name in bucket:
             raise RegistryError(f"registration {namespace}.{name} already exists")
         bucket[name] = value
+        # Registration mutated a store; drop cached flattened views so
+        # the next read reflects the new plugin (PERF-003).
+        self._flat_cache.clear()
 
 
 def normalize_reference(reference: str) -> str:
@@ -401,7 +415,10 @@ def registry_with_entry_points(
     loaded; all others are ignored without importing their target.
     """
     catalog = catalog_with_entry_points(allowed_names=allowed_names)
-    registry = catalog.generators()
+    # Copy the cached flattened view before mutating it: catalog.generators()
+    # returns the shared cache (PERF-003), so promoting plugin names to bare
+    # keys must not scribble on it.
+    registry = dict(catalog.generators())
     for qualified, generator in list(registry.items()):
         if "." not in qualified:
             continue

@@ -12,7 +12,6 @@ import tempfile
 import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager, suppress
-from random import Random
 from typing import TextIO, cast
 
 from . import __version__, api
@@ -324,7 +323,6 @@ def _catalog_from_args(args: argparse.Namespace) -> api.ExtensionCatalog:
 
 
 def _build_engine(args: argparse.Namespace) -> Engine:
-    rng = Random(args.seed) if args.seed is not None else Random()
     config = api.load_config(args.config)
     registry = None
     transforms = None
@@ -332,6 +330,8 @@ def _build_engine(args: argparse.Namespace) -> Engine:
         catalog = _catalog_from_args(args)
         registry = catalog.generators()
         transforms = catalog.transforms()
+    # Pass only --seed; from_config derives the RNG from it so the
+    # Random(seed)-or-Random() idiom lives solely in the engine (DEC-002).
     # --progress already prints JSON; reuse the same interval as the
     # engine's logger milestone so structured handlers see the same
     # boundaries.
@@ -340,7 +340,6 @@ def _build_engine(args: argparse.Namespace) -> Engine:
         registry=registry,
         transforms=transforms,
         seed=args.seed,
-        rng=rng,
         proof_mode=args.proof_check,
         proof_sample_rate=args.proof_sample_rate,
         milestone_rows=args.progress,

@@ -72,7 +72,6 @@ Last full rescan: 2026-07-02.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DEC-002 | open | S | The RNG-construction idiom `Random(seed) if seed is not None else Random()` is duplicated in `Engine.from_config` (`_engine.py:135`) and `cli._build_engine` (`cli.py:327`); the CLI builds `rng` and passes `seed` redundantly (from_config would derive rng itself), coupling CLI to engine internals. |
 
 ## business/design patterns/DDD
 

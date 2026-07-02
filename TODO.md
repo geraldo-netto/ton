@@ -25,7 +25,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-005 | open | S | `date.py:45-57` and `timestamp_unix.py:42-59` repeat the ISO-bounds-parse + `span_seconds` + `randint(0, span)` offset idiom; a shared "uniform instant in [lo,hi]" helper removes it. |
 
 ## reliability/correctness
 

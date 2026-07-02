@@ -18,11 +18,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from random import Random
 from typing import Any
 
-from .base import Generator, require_min_le_max
+from ._datetime import duration_seconds, parse_iso_bounds, uniform_offset_seconds
+from .base import Generator
 
 _UNIT_MULTIPLIERS = {"seconds": 1, "millis": 1000}
 
@@ -40,9 +40,7 @@ class TimestampUnixGenerator(Generator):
     type_name = "timestamp_unix"
 
     def prepare(self, spec: Mapping[str, Any]) -> TimestampUnixSpec:
-        lo = _to_utc(datetime.fromisoformat(spec["minValue"]))
-        hi = _to_utc(datetime.fromisoformat(spec["maxValue"]))
-        require_min_le_max("timestamp_unix", lo, hi)
+        lo, hi = parse_iso_bounds("timestamp_unix", spec, as_utc=True)
         unit = str(spec.get("unit", "seconds"))
         if unit not in _UNIT_MULTIPLIERS:
             raise ValueError(
@@ -50,18 +48,11 @@ class TimestampUnixGenerator(Generator):
             )
         return TimestampUnixSpec(
             lo_epoch_seconds=int(lo.timestamp()),
-            span_seconds=int((hi - lo).total_seconds()),
+            span_seconds=duration_seconds(lo, hi),
             multiplier=_UNIT_MULTIPLIERS[unit],
         )
 
     def generate(self, prepared: TimestampUnixSpec, rng: Random) -> str:
-        offset = rng.randint(0, prepared.span_seconds) if prepared.span_seconds > 0 else 0
+        offset = uniform_offset_seconds(rng, prepared.span_seconds)
         epoch_seconds = prepared.lo_epoch_seconds + offset
         return str(epoch_seconds * prepared.multiplier)
-
-
-def _to_utc(value: datetime) -> datetime:
-    """Treat naive datetimes as UTC so epoch math is consistent."""
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value

@@ -23,7 +23,8 @@ from datetime import datetime, timedelta
 from random import Random
 from typing import Any
 
-from .base import Generator, require_min_le_max
+from ._datetime import duration_seconds, parse_iso_bounds, uniform_offset_seconds
+from .base import Generator
 
 _DEFAULT_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -43,16 +44,14 @@ class DateGenerator(Generator):
     type_name = "date"
 
     def prepare(self, spec: Mapping[str, Any]) -> DateSpec:
-        lo = datetime.fromisoformat(spec["minValue"])
-        hi = datetime.fromisoformat(spec["maxValue"])
-        require_min_le_max("date", lo, hi)
+        lo, hi = parse_iso_bounds("date", spec)
         return DateSpec(
             lo=lo,
-            span_seconds=int((hi - lo).total_seconds()),
+            span_seconds=duration_seconds(lo, hi),
             fmt=spec.get("format", _DEFAULT_FORMAT),
         )
 
     def generate(self, prepared: DateSpec, rng: Random) -> str:
-        offset = rng.randint(0, prepared.span_seconds) if prepared.span_seconds > 0 else 0
+        offset = uniform_offset_seconds(rng, prepared.span_seconds)
         moment = prepared.lo + timedelta(seconds=offset)
         return moment.strftime(prepared.fmt)

@@ -25,7 +25,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-002 | open | M | `HashGenerator`/`HashSpec` (`ton/generators/hash.py:31,56`) and `LMHashGenerator`/`LMHashSpec` (`ton/generators/lmhash.py:41,63`) share an identical `pairs` spec and identical `generate_pair` (`rng.choice(prepared.pairs)`). Extract a shared paired word-pool base. |
 | DUP-003 | open | S | The composite `prepare()` guard raising "requires the engine's composite preparation path" is triplicated in `weighted.py:80`, `one_of.py:44`, `sequence_of.py:55`. Provide it as a base default for `is_composite` generators. |
 | DUP-004 | open | S | Token extraction (`wants_id`/`key` from the regex match) is duplicated between `_parse_cached` (`ton/_template.py:66-69`) and `split_segments` (`ton/_template.py:108-111`). |
 | DUP-005 | open | S | `date.py:45-57` and `timestamp_unix.py:42-59` repeat the ISO-bounds-parse + `span_seconds` + `randint(0, span)` offset idiom; a shared "uniform instant in [lo,hi]" helper removes it. |

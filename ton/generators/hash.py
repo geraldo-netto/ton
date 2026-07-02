@@ -12,11 +12,9 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
-from random import Random
 from typing import Any
 
-from .base import PairedGenerator, coerce_int, require_string_tuple
+from .base import PairedWordPoolGenerator, WordPairSpec, coerce_int, require_string_tuple
 
 _HASHERS: dict[str, Callable[[bytes], str]] = {
     "md5": lambda data: hashlib.md5(data, usedforsecurity=False).hexdigest(),
@@ -28,17 +26,12 @@ _ALGORITHMS = tuple(sorted((*_HASHERS, "bcrypt")))
 _BCRYPT_ALPHABET = b"./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 
-@dataclass(frozen=True)
-class HashSpec:
-    pairs: tuple[tuple[str, str], ...]
-
-
-class HashGenerator(PairedGenerator):
+class HashGenerator(PairedWordPoolGenerator):
     """Generate ``(plaintext, digest)`` pairs from a fixed word list."""
 
     type_name = "hash"
 
-    def prepare(self, spec: Mapping[str, Any]) -> HashSpec:
+    def prepare(self, spec: Mapping[str, Any]) -> WordPairSpec:
         words = require_string_tuple(spec)
         algorithm = str(spec.get("algorithm", "sha256")).lower()
         if algorithm not in _ALGORITHMS:
@@ -49,13 +42,9 @@ class HashGenerator(PairedGenerator):
             rounds = coerce_int(spec, "rounds", type_name="hash", default=12)
             if not 4 <= rounds <= 31:
                 raise ValueError("hash 'rounds' must be between 4 and 31")
-            return HashSpec(pairs=tuple((word, _bcrypt_digest(word, rounds)) for word in words))
+            return WordPairSpec(pairs=tuple((word, _bcrypt_digest(word, rounds)) for word in words))
         hash_one = _HASHERS[algorithm]
-        return HashSpec(pairs=tuple((word, hash_one(word.encode("utf-8"))) for word in words))
-
-    def generate_pair(self, prepared: HashSpec, rng: Random) -> tuple[str, str]:
-        """Return ``(plaintext, digest)`` drawn from the precomputed pool."""
-        return rng.choice(prepared.pairs)
+        return WordPairSpec(pairs=tuple((word, hash_one(word.encode("utf-8"))) for word in words))
 
 
 def _bcrypt_digest(plaintext: str, rounds: int) -> str:

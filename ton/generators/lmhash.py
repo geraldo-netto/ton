@@ -13,12 +13,10 @@ from __future__ import annotations
 import binascii
 import hashlib
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
-from random import Random
 from typing import Any
 
 from ._md4 import md4 as _pure_md4
-from .base import PairedGenerator, require_string_tuple
+from .base import PairedWordPoolGenerator, WordPairSpec, require_string_tuple
 
 
 def _select_md4_backend() -> Callable[[bytes], bytes]:
@@ -38,31 +36,14 @@ def _select_md4_backend() -> Callable[[bytes], bytes]:
 _MD4: Callable[[bytes], bytes] = _select_md4_backend()
 
 
-@dataclass(frozen=True)
-class LMHashSpec:
-    """Precomputed ``(plaintext, hash)`` pairs.
-
-    Hashing happens once at :meth:`LMHashGenerator.prepare` time
-    instead of per-row -- the row hot path is a single ``rng.choice``
-    against the precomputed tuple, with no cache eviction risk on
-    long-running jobs with large word lists (TODO PERF-009).
-    """
-
-    pairs: tuple[tuple[str, str], ...]
-
-
-class LMHashGenerator(PairedGenerator):
+class LMHashGenerator(PairedWordPoolGenerator):
     """Generate (plaintext, NT-hash) pairs from a fixed word list."""
 
     type_name = "lmhash"
 
-    def prepare(self, spec: Mapping[str, Any]) -> LMHashSpec:
+    def prepare(self, spec: Mapping[str, Any]) -> WordPairSpec:
         words = require_string_tuple(spec)
-        return LMHashSpec(pairs=tuple((w, self._nt_hash(w)) for w in words))
-
-    def generate_pair(self, prepared: LMHashSpec, rng: Random) -> tuple[str, str]:
-        """Return ``(plaintext, hash)`` drawn from the precomputed pool."""
-        return rng.choice(prepared.pairs)
+        return WordPairSpec(pairs=tuple((w, self._nt_hash(w)) for w in words))
 
     @staticmethod
     def _nt_hash(plaintext: str) -> str:

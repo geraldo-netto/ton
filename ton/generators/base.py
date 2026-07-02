@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
+from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar
 
@@ -136,6 +137,32 @@ class PairedGenerator(Generator):
         """
         id_value, primary = self.generate_pair(prepared, rng)
         return id_value if self.generate_returns_id else primary
+
+
+@dataclass(frozen=True)
+class WordPairSpec:
+    """Precomputed ``(plaintext, digest)`` pairs for word-pool generators.
+
+    Hashing happens once at prepare time; the row hot path is a single
+    ``rng.choice`` against this tuple. Shared by the ``hash`` and
+    ``lmhash`` generators (DUP-002).
+    """
+
+    pairs: tuple[tuple[str, str], ...]
+
+
+class PairedWordPoolGenerator(PairedGenerator):
+    """Paired generator backed by a precomputed ``(plaintext, digest)`` pool.
+
+    Subclasses build a :class:`WordPairSpec` in ``prepare`` (hashing each
+    word once) and inherit the shared draw. Extracted so ``hash`` and
+    ``lmhash`` no longer duplicate the identical ``generate_pair`` /
+    ``pairs`` spec (DUP-002).
+    """
+
+    def generate_pair(self, prepared: WordPairSpec, rng: Random) -> tuple[str, str]:
+        """Return ``(plaintext, digest)`` drawn from the precomputed pool."""
+        return rng.choice(prepared.pairs)
 
 
 def pad_with_zero(value: str, width: int) -> str:

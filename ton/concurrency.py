@@ -41,7 +41,7 @@ from collections.abc import Mapping
 from random import Random
 from typing import Any
 
-from ._engine import Engine
+from ._engine import Engine, EngineOptions
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._transforms import Transform
@@ -92,15 +92,17 @@ def fork_engine(
     rng = Random(seed)
     if rows is not None:
         config = {**config, "rows": rows}
-    engine = Engine.from_config(
+    engine = Engine.from_options(
         config,
-        registry=registry,
-        transforms=transforms,
-        rng=rng,
-        seed=seed,
-        proof_mode=proof_mode,
-        proof_sample_rate=proof_sample_rate,
-        milestone_rows=milestone_rows,
+        EngineOptions(
+            registry=registry,
+            transforms=transforms,
+            rng=rng,
+            seed=seed,
+            proof_mode=proof_mode,
+            proof_sample_rate=proof_sample_rate,
+            milestone_rows=milestone_rows,
+        ),
     )
     _logger.info(
         "engine_forked worker_id=%d parent_seed=%d rows=%d",

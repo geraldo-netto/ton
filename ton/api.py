@@ -45,7 +45,7 @@ from typing import Any
 
 from . import _config
 from ._config import ConfigError
-from ._engine import Engine, ProofError, TemplateError
+from ._engine import Engine, EngineOptions, ProofError, TemplateError
 from ._logging import LogEvent, configure_stderr, logger
 from ._proof import ProvenanceRecord
 from ._registry import (
@@ -166,14 +166,16 @@ def generate(
 ) -> Iterator[str]:
     """Yield generated rows for an in-memory config mapping."""
     return iter(
-        Engine.from_config(
+        Engine.from_options(
             config,
-            seed=seed,
-            registry=registry,
-            transforms=transforms,
-            proof_mode=proof_mode,
-            proof_sample_rate=proof_sample_rate,
-            milestone_rows=milestone_rows,
+            EngineOptions(
+                registry=registry,
+                transforms=transforms,
+                proof_mode=proof_mode,
+                proof_sample_rate=proof_sample_rate,
+                seed=seed,
+                milestone_rows=milestone_rows,
+            ),
         )
     )
 

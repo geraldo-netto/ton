@@ -33,6 +33,27 @@ class ProofError(TemplateError):
 
 
 @dataclass(frozen=True)
+class EngineOptions:
+    """Bundle of engine construction options (DEC-001).
+
+    Threading these as one value object keeps the option set defined in a
+    single place: :meth:`Engine.from_options` is the one builder that
+    knows how to turn them into an engine (including deriving the RNG
+    from ``seed``), and the boundary helpers -- :func:`ton.api.generate`,
+    :func:`ton.concurrency.fork_engine`, the CLI -- construct one instead
+    of re-enumerating the same seven parameters at every call site.
+    """
+
+    registry: Mapping[str, Generator] | None = None
+    transforms: Mapping[str, Transform] | None = None
+    rng: Random | None = None
+    proof_mode: str = "off"
+    proof_sample_rate: int = 1
+    seed: int | None = None
+    milestone_rows: int = 0
+
+
+@dataclass(frozen=True)
 class PreparedTransform:
     transform: Transform
     prepared: Any
@@ -113,6 +134,27 @@ class Engine:
         )
 
     @classmethod
+    def from_options(cls, config: Mapping[str, Any], options: EngineOptions) -> Engine:
+        """Build an Engine from a config and an :class:`EngineOptions`.
+
+        The single builder that turns the bundled option set into an
+        engine, deriving the RNG from ``seed`` when ``rng`` is None so
+        that RNG-construction defaults live in exactly one place
+        (DEC-001, DEC-002).
+        """
+        engine_rng = options.rng if options.rng is not None else _rng_for_seed(options.seed)
+        return cls(
+            config,
+            registry=options.registry,
+            transforms=options.transforms,
+            rng=engine_rng,
+            proof_mode=options.proof_mode,
+            proof_sample_rate=options.proof_sample_rate,
+            seed=options.seed,
+            milestone_rows=options.milestone_rows,
+        )
+
+    @classmethod
     def from_config(
         cls,
         config: Mapping[str, Any],
@@ -127,20 +169,20 @@ class Engine:
     ) -> Engine:
         """Build an Engine, deriving the RNG from ``seed`` when ``rng`` is None.
 
-        Single entry point used by :mod:`ton.api` and
-        :mod:`ton.concurrency` so RNG-construction defaults stay in one
-        place (TODO DEC-004).
+        Thin keyword-friendly wrapper over :meth:`from_options` used by
+        :mod:`ton.api` and :mod:`ton.concurrency`.
         """
-        engine_rng = rng if rng is not None else (Random(seed) if seed is not None else Random())
-        return cls(
+        return cls.from_options(
             config,
-            registry=registry,
-            transforms=transforms,
-            rng=engine_rng,
-            proof_mode=proof_mode,
-            proof_sample_rate=proof_sample_rate,
-            seed=seed,
-            milestone_rows=milestone_rows,
+            EngineOptions(
+                registry=registry,
+                transforms=transforms,
+                rng=rng,
+                proof_mode=proof_mode,
+                proof_sample_rate=proof_sample_rate,
+                seed=seed,
+                milestone_rows=milestone_rows,
+            ),
         )
 
     @classmethod
@@ -489,6 +531,15 @@ def _walk_value_for_types(value: Any, needed: set[str]) -> None:
     if isinstance(value, list):
         for item in value:
             _walk_value_for_types(item, needed)
+
+
+def _rng_for_seed(seed: int | None) -> Random:
+    """Return a seeded ``Random`` when ``seed`` is given, else an unseeded one.
+
+    Single home for the ``Random(seed) if seed is not None else Random()``
+    idiom that was duplicated across the engine and CLI (DEC-002).
+    """
+    return Random(seed) if seed is not None else Random()
 
 
 def _runtime_type_name(type_name: object) -> str:

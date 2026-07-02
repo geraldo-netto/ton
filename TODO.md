@@ -72,7 +72,6 @@ Last full rescan: 2026-07-02.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DEC-001 | open | M | The engine option set (`registry, transforms, proof_mode, proof_sample_rate, milestone_rows, seed/rng`) is threaded verbatim through six signatures: `api.generate` (`api.py:157`), `api.generate_from_file` (`api.py:181`), `Engine.from_config`/`from_file` (`_engine.py:116,147`), `concurrency.fork_engine` (`concurrency.py:71`), `cli._build_engine` (`cli.py:326`). Adding one option is a 6-site change; a shared options value object decouples it. |
 | DEC-002 | open | S | The RNG-construction idiom `Random(seed) if seed is not None else Random()` is duplicated in `Engine.from_config` (`_engine.py:135`) and `cli._build_engine` (`cli.py:327`); the CLI builds `rng` and passes `seed` redundantly (from_config would derive rng itself), coupling CLI to engine internals. |
 
 ## business/design patterns/DDD

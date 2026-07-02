@@ -227,6 +227,19 @@ def test_date_rejects_inverted_bounds() -> None:
         DateGenerator().prepare(spec)
 
 
+def test_date_rejects_non_portable_format_directive() -> None:
+    spec = {"minValue": "2000-01-01", "maxValue": "2000-12-31", "format": "%-d/%m"}
+    with pytest.raises(ValueError, match="non-portable directive"):
+        DateGenerator().prepare(spec)
+
+
+def test_date_allows_literal_percent_before_flag() -> None:
+    # '%%-d' renders a literal '%-d', not the non-portable %- flag.
+    spec = {"minValue": "2000-01-01", "maxValue": "2000-01-01", "format": "%%-d"}
+    value = _draw(DateGenerator(), spec)
+    assert value == "%-d"
+
+
 def test_date_prepare_parses_bounds_once() -> None:
     spec = {"minValue": "2024-01-01", "maxValue": "2024-12-31"}
     prepared = DateGenerator().prepare(spec)

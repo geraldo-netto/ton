@@ -96,7 +96,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| PLAT-002 | open | S | The date generator passes the user-supplied `format` straight to `datetime.strftime` (`ton/generators/date.py:58`). `strftime` directive support is platform-dependent — `%-d`/`%-m` are glibc-only and fail on Windows, `%Y` padding for years <1000 differs by libc — so identical configs produce divergent/erroring output across the supported OS matrix. |
 
 ## observability
 

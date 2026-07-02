@@ -45,7 +45,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CONC-001 | open | S | `_ensure_default_classes` double-checked locking is unsafe. The fast path `if _DEFAULT_CLASSES: return` (`ton/_registry.py:339`) reads the module-global dict without the lock while the lock holder populates it incrementally in place (`_registry.py:344-345`). A concurrent caller can observe a non-empty-but-partial registry and get spurious "Unknown type" errors. Fix: build a local dict and publish atomically. |
 
 ## robustness/recovery
 

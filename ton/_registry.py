@@ -338,36 +338,43 @@ def clear_default_registry_cache() -> None:
 
     Useful after a test or third-party plugin has registered a new
     ``Generator`` subclass and wants it picked up by the default
-    registry.
+    registry. Rebinds to a fresh empty dict (rather than clearing in
+    place) so a concurrent reader keeps its own consistent snapshot
+    (CONC-001).
     """
+    global _DEFAULT_CLASSES
     with _DEFAULT_CLASSES_LOCK:
-        _DEFAULT_CLASSES.clear()
+        _DEFAULT_CLASSES = {}
 
 
 def _ensure_default_classes() -> dict[str, type[Generator]]:
     """Populate and return the cached ``type_name -> class`` mapping.
 
-    Thread-safe (TODO CONC-002): the first caller acquires
-    :data:`_DEFAULT_CLASSES_LOCK` and runs the subclass walk; subsequent
-    callers either find the cache populated or block briefly on the lock.
+    Thread-safe (CONC-001): the class mapping is built into a *local*
+    dict under :data:`_DEFAULT_CLASSES_LOCK` and published with a single
+    atomic rebind. The lock-free fast path therefore only ever observes
+    an empty dict or the fully-built one -- never a partially-populated
+    mapping that would raise spurious "Unknown type" errors.
     """
-    if _DEFAULT_CLASSES:
-        return _DEFAULT_CLASSES
+    global _DEFAULT_CLASSES
+    cached = _DEFAULT_CLASSES
+    if cached:
+        return cached
     with _DEFAULT_CLASSES_LOCK:
         if _DEFAULT_CLASSES:
             return _DEFAULT_CLASSES
-        for cls in discover_generator_classes():
-            _DEFAULT_CLASSES[cls.type_name] = cls
+        built = {cls.type_name: cls for cls in discover_generator_classes()}
         _logger.info(
             "registry_discovered generators=%d",
-            len(_DEFAULT_CLASSES),
+            len(built),
             extra={
                 "event": LogEvent.REGISTRY_DISCOVERED.value,
-                "generators": len(_DEFAULT_CLASSES),
-                "names": sorted(_DEFAULT_CLASSES),
+                "generators": len(built),
+                "names": sorted(built),
             },
         )
-    return _DEFAULT_CLASSES
+        _DEFAULT_CLASSES = built
+        return _DEFAULT_CLASSES
 
 
 def make_registry(type_names: Iterable[str] | None = None) -> dict[str, Generator]:

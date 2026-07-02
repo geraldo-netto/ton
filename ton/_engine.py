@@ -206,15 +206,18 @@ class Engine:
                 continue
             seen.add(type_key)
             field = self._prepared[type_key]
+            generator = field.generator
             failures = sum(1 for failure in self._proof.failures if failure.type_key == type_key)
             records.append(
                 ProvenanceRecord(
                     type_key=type_key,
-                    source_type=field.generator.type_name,
+                    source_type=generator.type_name,
                     transforms=tuple(prepared.transform.type_name for prepared in field.transforms),
                     proof_mode=self._proof.mode,
                     proof_sample_rate=self._proof.sample_rate,
                     proof_failures=failures,
+                    plugin_package=getattr(generator, "_ton_plugin_package", None),
+                    plugin_version=getattr(generator, "_ton_plugin_version", None),
                 )
             )
         return tuple(records)

@@ -380,6 +380,47 @@ def test_engine_provenance_reports_source_transforms_and_proof_state() -> None:
     assert engine.provenance[0].proof_sample_rate == 5
 
 
+def test_engine_provenance_attributes_plugin_package() -> None:
+    from types import SimpleNamespace
+    from unittest import mock
+
+    from ton._registry import catalog_with_entry_points
+
+    class WidgetGenerator(Generator):
+        type_name = "widget"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            del prepared, rng
+            return "w"
+
+    ep = mock.Mock()
+    ep.name = "acme.widget"
+    ep.value = "acme_pkg:WidgetGenerator"
+    ep.load.return_value = WidgetGenerator
+    ep.dist = SimpleNamespace(name="acme-pkg", version="9.9.9")
+
+    def _entry_points(group: str) -> list[Any]:
+        return [ep] if group == "ton.generators" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points()
+
+    config = {"rows": 1, "format": "$v$", "types": {"v": {"type": "acme.widget"}}}
+    engine = Engine(config, registry=catalog.generators())
+
+    record = engine.provenance[0]
+    assert record.source_type == "widget"
+    assert record.plugin_package == "acme-pkg"
+    assert record.plugin_version == "9.9.9"
+
+
+def test_engine_provenance_omits_plugin_package_for_builtins() -> None:
+    engine = Engine({"rows": 1, "format": "$v$", "types": {"v": {"type": "name"}}})
+
+    assert engine.provenance[0].plugin_package is None
+    assert engine.provenance[0].plugin_version is None
+
+
 def test_engine_provenance_reports_repeated_type_once() -> None:
     engine = Engine(
         {

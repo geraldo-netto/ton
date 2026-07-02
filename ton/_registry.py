@@ -204,6 +204,7 @@ def _load_catalog_entry_points(
             plugin = ep.load()()
             namespace, name = _entry_point_namespace_name(ep.name, kind, plugin)
             _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
+            _stamp_plugin_dist(plugin, ep)
         except Exception as exc:  # noqa: BLE001 - per-entry sandbox
             failed += 1
             _log_entry_point_failed(ep, exc)
@@ -480,6 +481,19 @@ def _sanitize_for_log(value: object) -> str:
     """
     raw = str(value)
     return "".join(ch if 0x20 <= ord(ch) < 0x7F else "?" for ch in raw)
+
+
+def _stamp_plugin_dist(plugin: Any, ep: object) -> None:
+    """Record the providing distribution on the plugin instance (OBS-001).
+
+    ``Engine.provenance`` reads these attributes to attribute a
+    plugin-provided data type back to its package/version. Built-in
+    generators never carry them, so provenance reports ``None`` for core
+    types.
+    """
+    name, version = _entry_point_dist(ep)
+    plugin._ton_plugin_package = name
+    plugin._ton_plugin_version = version
 
 
 def _entry_point_dist(ep: object) -> tuple[str | None, str | None]:

@@ -125,7 +125,6 @@ Last full rescan: 2026-07-02.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| OBS-001 | open | M | `ProvenanceRecord.plugin_package` / `plugin_version` (`ton/_proof.py:42-43`), public and re-exported via `ton.api`, are always `None`: `Engine.provenance` never sets them (`ton/_engine.py:214-224`). Plugin-provided types get no provenance attribution despite the fields advertising it; the distribution metadata gathered at entry-point load (`_entry_point_dist`) is never threaded through. |
 | OBS-002 | open | S | The `proof_check_summary` event is emitted with two payload schemas for one discriminator: the Engine emits `{mode, failures}` (`ton/_engine.py:372-378`) while the CLI audit summary emits `{failures}` with no `mode` (`ton/cli.py:297-301`), so a consumer keying on `event="proof_check_summary"` sees inconsistent fields. |
 
 ## documentation

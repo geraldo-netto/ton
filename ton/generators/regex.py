@@ -211,20 +211,29 @@ def _pick_excluding(excluded: set[str], rng: Random) -> str:
     return rng.choice(pool)
 
 
+def _negated_pool(included: tuple[str, ...]) -> tuple[str, ...]:
+    excluded = frozenset(included)
+    return tuple(c for c in _PRINTABLE_ASCII if c not in excluded)
+
+
+#: Category -> character pool. Negated pools are computed once at import
+#: instead of rebuilt on every draw, and the whole thing replaces the
+#: six-branch if/return ladder with an O(1) lookup (CX-001).
+_CATEGORY_POOLS = {
+    sre_constants.CATEGORY_DIGIT: _DIGITS,
+    sre_constants.CATEGORY_NOT_DIGIT: _negated_pool(_DIGITS),
+    sre_constants.CATEGORY_WORD: _WORD,
+    sre_constants.CATEGORY_NOT_WORD: _negated_pool(_WORD),
+    sre_constants.CATEGORY_SPACE: _SPACE,
+    sre_constants.CATEGORY_NOT_SPACE: _negated_pool(_SPACE),
+}
+
+
 def _category_pool(category: Any) -> tuple[str, ...]:
-    if category is sre_constants.CATEGORY_DIGIT:
-        return _DIGITS
-    if category is sre_constants.CATEGORY_NOT_DIGIT:
-        return tuple(c for c in _PRINTABLE_ASCII if c not in _DIGITS)
-    if category is sre_constants.CATEGORY_WORD:
-        return _WORD
-    if category is sre_constants.CATEGORY_NOT_WORD:
-        return tuple(c for c in _PRINTABLE_ASCII if c not in _WORD)
-    if category is sre_constants.CATEGORY_SPACE:
-        return _SPACE
-    if category is sre_constants.CATEGORY_NOT_SPACE:
-        return tuple(c for c in _PRINTABLE_ASCII if c not in _SPACE)
-    raise ValueError(f"regex generator: unsupported category {category!r}")
+    pool = _CATEGORY_POOLS.get(category)
+    if pool is None:
+        raise ValueError(f"regex generator: unsupported category {category!r}")
+    return pool
 
 
 #: Dispatch table for _emit_node. Defined after every handler so the

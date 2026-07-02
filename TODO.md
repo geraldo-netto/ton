@@ -18,7 +18,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CX-001 | open | S | `_category_pool` (`ton/generators/regex.py:214`) is a 6-branch if/return ladder over category constants, CC 13 (>10 rule). The file already uses dispatch tables (`_EMIT_HANDLERS`, `_FLATTEN_HANDLERS`); a `{CATEGORY_*: pool}` dict collapses it to a lookup. |
 
 ## code duplication
 

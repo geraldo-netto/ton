@@ -27,7 +27,6 @@ Last full rescan: 2026-07-02.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-001 | open | M | Proof-check never validates composite/nested generator output. `_source_proof_failures` (`ton/_engine.py:537`) only calls the top-level generator's `prove`, which for `oneOf`/`weighted`/`sequence_of` is the permissive default `ProofResult(ok=True)`; child generators are never asked to prove. `--proof-check=all/audit` reports "all values passed" while composite outputs are unchecked (false assurance). Compounded by `DistributionTransform.apply` discarding the source value (`ton/transforms/distribution.py:44-46`), so the proven source draw is thrown away and the emitted value is unproven. |
 
 ## performance
 

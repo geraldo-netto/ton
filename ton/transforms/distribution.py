@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar
 
-from .._transforms import BaseTransform, TransformCapabilities, TransformResult
+from .._transforms import BaseTransform, TransformCapabilities, TransformProof, TransformResult
 from ..generators import Generator
 from ..generators.base import prepare_child_spec
 
@@ -33,6 +33,15 @@ class WeightedChoiceSet:
         index = rng.choices(range(len(self.children)), weights=self.weights, k=1)[0]
         child_gen, child_prepared = self.children[index]
         return child_gen.generate(child_prepared, rng)
+
+    def accepts(self, result: TransformResult) -> bool:
+        """True if any child generator proves ``result`` valid (REL-001).
+
+        A drawn value comes from exactly one child, so it is a genuine
+        failure only when *no* child would accept it. Children with the
+        permissive default proof always accept, so this never false-fails.
+        """
+        return any(gen.prove(prepared, result).ok for gen, prepared in self.children)
 
 
 class DistributionTransform(BaseTransform):
@@ -61,6 +70,19 @@ class DistributionTransform(BaseTransform):
     ) -> TransformResult:
         del value
         return TransformResult(prepared.choose(rng))
+
+    def prove(
+        self,
+        prepared: WeightedChoiceSet,
+        before: TransformResult,
+        after: TransformResult,
+    ) -> TransformProof:
+        # apply() discards the source value and emits a child draw, so the
+        # emitted value -- not the source -- is what must be proven (REL-001).
+        del before
+        if prepared.accepts(after):
+            return TransformProof(ok=True)
+        return TransformProof(ok=False, reason="no distribution choice accepts the value")
 
 
 def prepare_distribution(

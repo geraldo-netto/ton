@@ -26,6 +26,8 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from .base import Generator, prepare_child_spec
 
 
@@ -57,3 +59,10 @@ class OneOfGenerator(Generator):
     def generate(self, prepared: OneOfSpec, rng: Random) -> str:
         child_gen, child_prepared = rng.choice(prepared.children)
         return child_gen.generate(child_prepared, rng)
+
+    def prove(self, prepared: OneOfSpec, result: TransformResult) -> ProofResult:
+        # The value came from one child, so it fails only if no child
+        # accepts it; permissive-default children never false-fail (REL-001).
+        if any(gen.prove(prep, result).ok for gen, prep in prepared.children):
+            return ProofResult(ok=True)
+        return ProofResult(ok=False, reason="no oneOf choice accepts the value")

@@ -50,6 +50,8 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from ..transforms.distribution import (
     WeightedChoiceSet,
     prepare_distribution,
@@ -105,6 +107,17 @@ class WeightedGenerator(Generator):
             return prepared.distribution.choose(rng)
         # Legacy string-only form.
         return rng.choices(prepared.values, weights=prepared.weights, k=1)[0]  # type: ignore[arg-type]
+
+    def prove(self, prepared: WeightedSpec, result: TransformResult) -> ProofResult:
+        # Composite form recurses into the drawn child; the legacy string
+        # form checks membership in the value pool (REL-001).
+        if prepared.distribution is not None:
+            if prepared.distribution.accepts(result):
+                return ProofResult(ok=True)
+            return ProofResult(ok=False, reason="no weighted choice accepts the value")
+        if result.value in (prepared.values or ()):
+            return ProofResult(ok=True)
+        return ProofResult(ok=False, reason="value is not in weighted 'values'")
 
     def _prepare_legacy(self, spec: Mapping[str, Any]) -> WeightedSpec:
         values, weights = _coerce(spec)

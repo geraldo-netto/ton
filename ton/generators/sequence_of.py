@@ -26,6 +26,8 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from .base import (
     Generator,
     assert_below_cap,
@@ -78,3 +80,20 @@ class SequenceOfGenerator(Generator):
         if prepared.separator:
             return prepared.separator.join(parts)
         return "".join(parts)
+
+    def prove(self, prepared: SequenceOfSpec, result: TransformResult) -> ProofResult:
+        # Recurse into the child for each element (REL-001). Only attempt
+        # this when a non-empty separator lets us split unambiguously into
+        # exactly ``count`` parts; otherwise stay permissive rather than
+        # risk a false failure on a separator that also occurs in output.
+        child_gen, child_prepared = prepared.child
+        if not prepared.separator:
+            return ProofResult(ok=True)
+        parts = result.value.split(prepared.separator)
+        if len(parts) != prepared.count:
+            return ProofResult(ok=True)
+        for part in parts:
+            proof = child_gen.prove(child_prepared, TransformResult(part))
+            if not proof.ok:
+                return ProofResult(ok=False, reason=f"sequence_of element failed: {proof.reason}")
+        return ProofResult(ok=True)

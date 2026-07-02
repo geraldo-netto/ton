@@ -6,7 +6,11 @@ import pytest
 
 from ton.generators.bytes import MAX_BYTES_LENGTH, BytesGenerator
 from ton.generators.char import MAX_CHAR_LENGTH, CharGenerator
-from ton.generators.regex import MAX_LITERAL_REPEAT, RegexGenerator
+from ton.generators.regex import (
+    MAX_LITERAL_REPEAT,
+    MAX_TOTAL_EXPANSION,
+    RegexGenerator,
+)
 from ton.generators.text import MAX_TEXT_COUNT, TextGenerator
 
 
@@ -54,3 +58,17 @@ def test_regex_accepts_unbounded_quantifiers_at_any_lo() -> None:
     # MAX_LITERAL_REPEAT trip the cap.
     RegexGenerator().prepare({"pattern": "a+"})
     RegexGenerator().prepare({"pattern": "a*"})
+
+
+def test_regex_rejects_nested_repeats_exceeding_total_expansion() -> None:
+    # Each node is within MAX_LITERAL_REPEAT, but nesting multiplies:
+    # 5000 * 5000 = 25M chars/row (SEC-001).
+    with pytest.raises(ValueError, match="MAX_TOTAL_EXPANSION"):
+        RegexGenerator().prepare({"pattern": "(?:a{5000}){5000}"})
+
+
+def test_regex_accepts_pattern_within_total_expansion() -> None:
+    # A single large-but-bounded repeat stays under the total cap.
+    prepared = RegexGenerator().prepare({"pattern": "a{10000}"})
+    assert prepared is not None
+    assert MAX_TOTAL_EXPANSION == 1_000_000

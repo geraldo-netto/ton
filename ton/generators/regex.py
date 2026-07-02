@@ -52,6 +52,13 @@ MAX_UNBOUNDED_REPEAT = 8
 #: (TODO SCALE-002).
 MAX_LITERAL_REPEAT = 10_000
 
+#: Upper bound on the *total* characters one row can expand to. The
+#: per-node MAX_LITERAL_REPEAT check is blind to multiplicative nesting:
+#: ``(a{5000}){5000}`` passes it node-by-node yet materializes ~25M
+#: chars/row. This cap bounds the product of nested repeats so a config
+#: cannot drive unbounded memory use (SEC-001).
+MAX_TOTAL_EXPANSION = 1_000_000
+
 _PRINTABLE_ASCII = tuple(chr(c) for c in range(0x20, 0x7F))
 _DIGITS = tuple(string.digits)
 _WORD = tuple(string.ascii_letters + string.digits + "_")
@@ -79,6 +86,11 @@ class RegexGenerator(Generator):
         except sre_constants.error as exc:
             raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
         _reject_oversized_repeats(cast(Iterable[tuple[Any, Any]], parsed))
+        if _max_expansion(cast(Iterable[tuple[Any, Any]], parsed)) > MAX_TOTAL_EXPANSION:
+            raise ValueError(
+                "regex 'pattern' can expand beyond MAX_TOTAL_EXPANSION "
+                f"({MAX_TOTAL_EXPANSION}) characters per row"
+            )
         return RegexSpec(parsed=parsed)
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:
@@ -110,6 +122,30 @@ def _reject_oversized_repeats(seq: Iterable[tuple[Any, Any]]) -> None:
                 _reject_oversized_repeats(alt)
         elif op is sre_constants.SUBPATTERN:
             _reject_oversized_repeats(arg[3])
+
+
+def _max_expansion(seq: Iterable[tuple[Any, Any]]) -> int:
+    """Return the maximum characters ``seq`` can emit for one row (SEC-001).
+
+    Repeats multiply their sub-expansion, so nested quantifiers compound
+    -- this is what the per-node :func:`_reject_oversized_repeats` check
+    cannot see.
+    """
+    return sum(_node_expansion(op, arg) for op, arg in seq)
+
+
+def _node_expansion(op: Any, arg: Any) -> int:
+    if op in (sre_constants.MAX_REPEAT, sre_constants.MIN_REPEAT):
+        lo, hi, sub = arg
+        reps = lo + MAX_UNBOUNDED_REPEAT if hi == sre_constants.MAXREPEAT else hi
+        return int(reps) * _max_expansion(sub)
+    if op is sre_constants.BRANCH:
+        return max((_max_expansion(alt) for alt in arg[1]), default=0)
+    if op is sre_constants.SUBPATTERN:
+        return _max_expansion(arg[3])
+    if op is sre_constants.AT:
+        return 0
+    return 1  # literals, classes, categories, any, range -> one char each
 
 
 def _emit_into(seq: Iterable[tuple[Any, Any]], rng: Random, out: list[str]) -> None:

@@ -12,7 +12,6 @@ Last full rescan: 2026-07-02.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SEC-001 | open | M | Nested regex repeats bypass the `MAX_LITERAL_REPEAT` guard: `_reject_oversized_repeats` (`ton/generators/regex.py:92-104`) validates each `{n}` node independently against the 10,000 cap but never accounts for multiplicative nesting. `(?:a{5000}){5000}` passes yet `_emit_repeat` (`regex.py:161-167`) materializes ~25M chars/row; deeper nesting yields billions — config-driven memory-exhaustion DoS. |
 
 ## code complexity
 

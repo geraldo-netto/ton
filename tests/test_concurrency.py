@@ -46,6 +46,14 @@ def test_derive_seed_matches_derive_rng() -> None:
     assert derive_rng(parent_seed=7, worker_id=1).random() == Random(seed).random()
 
 
+def test_derive_seed_accepts_large_python_ints() -> None:
+    large_seed = 2**100 + 123
+    assert derive_seed(parent_seed=large_seed, worker_id=1) == derive_seed(
+        parent_seed=large_seed % (1 << 64),
+        worker_id=1,
+    )
+
+
 def test_fork_engine_threads_worker_seed_and_proof_options() -> None:
     config = {
         "rows": 1,

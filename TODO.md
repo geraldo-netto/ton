@@ -48,7 +48,6 @@ Last full rescan: 2026-07-04.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CONC-004 | open | S | `concurrency.py:derive_seed` uses `struct.pack(">qq", parent_seed, worker_id)`, which raises `struct.error` for any seed outside int64 range even though `--seed`/`Random(seed)` accept arbitrary Python ints. `fork_engine` then crashes on a large seed. Reduce the seed modulo 2^64 (or hash its bytes) before packing. |
 
 ## robustness/recovery
 

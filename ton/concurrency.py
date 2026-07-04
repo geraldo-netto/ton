@@ -47,6 +47,8 @@ from ._logging import logger as _logger
 from ._transforms import Transform
 from .generators import Generator
 
+_UINT64_MODULUS = 1 << 64
+
 
 def derive_seed(parent_seed: int, worker_id: int) -> int:
     """Return the deterministic per-worker seed for ``(parent_seed, worker_id)``.
@@ -58,9 +60,13 @@ def derive_seed(parent_seed: int, worker_id: int) -> int:
     :class:`~ton._proof.ProofFailure` provenance so audit records can be
     traced back to the worker that produced them (TODO CONC-001).
     """
-    payload = struct.pack(">qq", parent_seed, worker_id)
+    payload = struct.pack(">QQ", _uint64(parent_seed), _uint64(worker_id))
     digest = hashlib.blake2b(payload, digest_size=8).digest()
     return int(struct.unpack(">Q", digest)[0])
+
+
+def _uint64(value: int) -> int:
+    return value % _UINT64_MODULUS
 
 
 def derive_rng(parent_seed: int, worker_id: int) -> Random:

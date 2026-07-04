@@ -422,7 +422,7 @@ common
 common
 ```
 
-Composite `choices` may themselves nest `weighted` / `oneOf` / `sequence_of`. Paired generators (`lmhash`) cannot be used as a composite child — the `[id]` half would be unreachable from outside the wrapper, so the engine rejects such configs at construction time.
+Composite `choices` may themselves nest `weighted` / `oneOf` / `sequence_of`. Paired generators (`hash`, `lmhash`) cannot be used as a composite child — the `[id]` half would be unreachable from outside the wrapper, so the engine rejects such configs at construction time.
 
 #### Transform chains
 

@@ -109,7 +109,6 @@ Last full rescan: 2026-07-04.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-002 | open | S | README "Flags" table omits `--redact-proof-failures` (defined in `cli.py:120-127`, threaded through `_build_engine`); every other flag is documented. Add the row. |
 | DOC-003 | open | S | `--list-namespaces` help text and README say "namespaces, data types, and transforms" but `_print_namespaces` also prints a `validators:` line. Add validators to both. |
 | DOC-004 | open | S | Built-in `identity` transform (registered in `_registry.build_extension_catalog`, surfaced by `--list-namespaces`) is undocumented; README/architecture only mention `distribution`. Describe it or note it is an internal pass-through. |
 | DOC-005 | open | S | README:424 says only `lmhash` is rejected as a composite child, but `hash` is also paired (`is_paired=True`) and equally rejected; the later "Paired references" section already says "hash and lmhash". Change to "(`hash`, `lmhash`)". |

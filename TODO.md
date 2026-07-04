@@ -49,7 +49,6 @@ Last full rescan: 2026-07-04.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| ROB-002 | open | M | `_regex_parse.py` recurses on nested groups with no depth guard; a deeply nested pattern raises an uncaught `RecursionError` instead of `RegexParseError`, escaping the config-error path. Cap nesting depth (or pattern length) in the parser. |
 
 ## architecture/modularity/SOLID
 

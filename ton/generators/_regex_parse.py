@@ -94,6 +94,7 @@ _CONTROL_ESCAPES = {
     "0": "\0",
 }
 _BRACE_RE = re.compile(r"\{(\d+)(,(\d*))?\}")
+MAX_GROUP_NESTING = 100
 
 Node = tuple[Any, Any]
 
@@ -111,6 +112,7 @@ class _Parser:
     def __init__(self, text: str) -> None:
         self.text = text
         self.pos = 0
+        self.group_depth = 0
 
     def _peek(self) -> str | None:
         return self.text[self.pos] if self.pos < len(self.text) else None
@@ -200,15 +202,21 @@ class _Parser:
 
     def _parse_group(self) -> Node:
         self.pos += 1  # consume '('
-        if self.text[self.pos : self.pos + 2] == "?:":
-            self.pos += 2
-        elif self._peek() == "?":
-            raise RegexParseError("unsupported group extension")
-        sub = self.parse_alternation()
-        if self._peek() != ")":
-            raise RegexParseError("missing ), unterminated subpattern")
-        self.pos += 1
-        return (SUBPATTERN, (None, 0, 0, sub))
+        if self.group_depth >= MAX_GROUP_NESTING:
+            raise RegexParseError(f"group nesting exceeds MAX_GROUP_NESTING ({MAX_GROUP_NESTING})")
+        self.group_depth += 1
+        try:
+            if self.text[self.pos : self.pos + 2] == "?:":
+                self.pos += 2
+            elif self._peek() == "?":
+                raise RegexParseError("unsupported group extension")
+            sub = self.parse_alternation()
+            if self._peek() != ")":
+                raise RegexParseError("missing ), unterminated subpattern")
+            self.pos += 1
+            return (SUBPATTERN, (None, 0, 0, sub))
+        finally:
+            self.group_depth -= 1
 
     def _parse_class(self) -> Node:
         self.pos += 1  # consume '['

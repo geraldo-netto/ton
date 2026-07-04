@@ -19,7 +19,7 @@ from .base import require_min_le_max
 
 #: Compact date ``YYYYMMDD`` (no separators), which 3.10 fromisoformat rejects.
 _COMPACT_DATE = re.compile(r"^(\d{4})(\d{2})(\d{2})$")
-#: Trailing timezone offset without minutes, e.g. ``+05`` / ``-0530`` tails.
+#: Trailing hour-only timezone offset without minutes, e.g. ``+05`` / ``-05``.
 _BARE_OFFSET = re.compile(r"([+-]\d{2})$")
 
 

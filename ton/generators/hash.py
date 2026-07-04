@@ -57,6 +57,9 @@ def _bcrypt_digest(plaintext: str, rounds: int) -> str:
 
 
 def _bcrypt_salt(plaintext: str, rounds: int) -> bytes:
+    # Deterministic fixture salt: this makes seeded TON output reproducible,
+    # but it is not real bcrypt per-value salting and must not be used for
+    # password storage or security-sensitive hashes.
     raw = hashlib.sha256(plaintext.encode("utf-8")).digest()[:16]
     return f"$2b${rounds:02d}$".encode("ascii") + _bcrypt_base64(raw)
 

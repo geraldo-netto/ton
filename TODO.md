@@ -12,7 +12,6 @@ Last full rescan: 2026-07-04.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SEC-010 | open | S | `hash` with `algorithm: bcrypt` derives the salt deterministically from the plaintext (`hash.py`), so identical plaintexts always yield identical digests — bcrypt's per-value salt is defeated and hashes are precomputable. Fine for fixtures but undocumented; add an explicit "not real bcrypt salting" note at the code. |
 
 ## code complexity
 

@@ -177,6 +177,14 @@ def test_encoding_rejects_unknown_codec(tmp_path: Path) -> None:
         api.load_config(str(_write(tmp_path, payload)))
 
 
+@pytest.mark.parametrize("encoding", ["base64", "hex", "rot13"])
+def test_encoding_rejects_non_text_codec(tmp_path: Path, encoding: str) -> None:
+    payload = _valid_payload()
+    payload["encoding"] = encoding
+    with pytest.raises(ConfigError, match="text codec"):
+        api.load_config(str(_write(tmp_path, payload)))
+
+
 def test_encoding_rejects_non_string(tmp_path: Path) -> None:
     payload = _valid_payload()
     payload["encoding"] = 42

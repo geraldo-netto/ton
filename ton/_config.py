@@ -115,9 +115,11 @@ def _validate_encoding(data: dict[str, Any]) -> None:
     if not isinstance(encoding, str):
         raise ConfigError("'encoding' must be a string.")
     try:
-        codecs.lookup(encoding)
+        codec = codecs.lookup(encoding)
     except LookupError as exc:
         raise ConfigError(f"'encoding' is not a known codec: {encoding!r}") from exc
+    if not getattr(codec, "_is_text_encoding", False):
+        raise ConfigError(f"'encoding' must be a text codec: {encoding!r}")
 
 
 def output_encoding(data: Mapping[str, Any]) -> str:

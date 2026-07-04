@@ -84,7 +84,6 @@ Last full rescan: 2026-07-04.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CFG-004 | open | S | Per-field `validators` config key (a list of validator references, wired by PLUG-001 in `_config.py:210-224`) is undocumented in the README type-spec reference — only the `ton.validators` entry-point group is mentioned. Document the key and its shape alongside `transforms`. |
 
 ## data governance
 

@@ -429,6 +429,14 @@ Type specs may include an ordered `transforms` list. Legacy specs such as
 `{"type": "integer"}` still work; built-ins can also be referenced with the
 explicit `core.` namespace, for example `{"type": "core.integer"}`.
 
+Type specs may also include a `validators` list of validator references.
+Validators run after source generation and transforms, and each entry is a
+built-in or namespaced validator name such as `plugin.check`:
+
+```json
+{"type": "string", "values": ["ok"], "validators": ["plugin.check"]}
+```
+
 The built-in `distribution` transform chooses among two or more prepared
 candidate type specs:
 

@@ -42,7 +42,6 @@ Last full rescan: 2026-07-04.
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SCALE-005 | open | S | `sequence.py:57` `padWidth` is uncapped while every other length knob (bytes/char/text/sequence_of) is bounded by a `MAX_*` cap; `padWidth: 10_000_000` makes each row a 10 MB `zfill`. Apply `assert_below_cap` to `padWidth`. |
 | SCALE-006 | open | M | `hash.py:41-45` precomputes a bcrypt digest for the whole word pool at prepare time with `rounds` allowed up to 31 (`2^31` iterations/word), so a tiny config stalls engine construction regardless of `rows`. Cap effective rounds lower or hash lazily. |
 
 ## concurrency

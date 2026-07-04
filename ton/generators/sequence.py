@@ -33,7 +33,10 @@ from itertools import count
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_int, pad_with_zero
+from .base import Generator, assert_below_cap, coerce_int, pad_with_zero
+
+#: Upper bound on ``padWidth`` so a bad config cannot force huge padded rows.
+MAX_SEQUENCE_PAD_WIDTH = 100_000
 
 
 @dataclass(frozen=True)
@@ -52,9 +55,17 @@ class SequenceGenerator(Generator):
         step = coerce_int(spec, "step", type_name="sequence", default=1)
         if step == 0:
             raise ValueError("sequence 'step' must be non-zero")
+        pad_width = coerce_int(spec, "padWidth", type_name="sequence", default=0)
+        assert_below_cap(
+            "sequence",
+            "padWidth",
+            pad_width,
+            MAX_SEQUENCE_PAD_WIDTH,
+            "MAX_SEQUENCE_PAD_WIDTH",
+        )
         return SequenceSpec(
             counter=count(start, step),
-            pad_width=coerce_int(spec, "padWidth", type_name="sequence", default=0),
+            pad_width=pad_width,
         )
 
     def generate(self, prepared: SequenceSpec, rng: Random) -> str:

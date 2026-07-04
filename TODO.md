@@ -109,6 +109,5 @@ Last full rescan: 2026-07-04.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-006 | open | S | `_registry.py:387` `make_registry` docstring says "the 19 generators it does not need"; there are 23 built-ins (README correctly says twenty-three). Update or make count-agnostic. |
 | DOC-007 | open | S | `_datetime.py` `_BARE_OFFSET` comment claims it normalizes offsets like `-0530`, but the regex `([+-]\d{2})$` only rewrites hour-only tails; 4-digit offsets are untouched. Fix the comment. |
 | DOC-008 | open | S | `timestamp_unix.py` `millis` unit multiplies a second-resolution epoch by 1000, so millisecond output always ends in `000` — the draw has no sub-second precision. Note the limitation (or draw true milliseconds). |

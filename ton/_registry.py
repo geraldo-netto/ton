@@ -383,7 +383,7 @@ def make_registry(type_names: Iterable[str] | None = None) -> dict[str, Generato
     When ``type_names`` is ``None`` every built-in is instantiated
     (matches :func:`default_registry`). When passed an iterable of names,
     only those generators are constructed -- the Engine uses this to
-    skip the per-construction cost of the 19 generators it does not need
+    skip the per-construction cost of generators it does not need
     (TODO PERF-012).
 
     Unknown names are silently dropped; the Engine's existing

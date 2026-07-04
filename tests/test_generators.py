@@ -19,6 +19,7 @@ from ton.generators import (
     LMHashGenerator,
     StringGenerator,
 )
+from ton.generators.base import coerce_float
 
 
 def _rng() -> Random:
@@ -84,6 +85,20 @@ def test_integer_rejects_inverted_bounds() -> None:
 def test_decimal_rejects_inverted_bounds() -> None:
     with pytest.raises(ValueError, match="maxValue"):
         DecimalGenerator().prepare({"minValue": 1.0, "maxValue": 0.0, "decimals": 2})
+
+
+def test_decimal_rejects_missing_bounds_with_friendly_error() -> None:
+    with pytest.raises(ValueError, match="decimal 'minValue' is required"):
+        DecimalGenerator().prepare({"maxValue": 1.0, "decimals": 2})
+
+
+def test_decimal_rejects_non_numeric_bounds_with_friendly_error() -> None:
+    with pytest.raises(ValueError, match="decimal 'maxValue' must be a number"):
+        DecimalGenerator().prepare({"minValue": 0.0, "maxValue": "nope", "decimals": 2})
+
+
+def test_coerce_float_uses_default_when_optional_key_is_missing() -> None:
+    assert coerce_float({}, "value", type_name="test", default=1.5) == 1.5
 
 
 def test_decimal_rejects_negative_decimals() -> None:

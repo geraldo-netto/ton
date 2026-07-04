@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_int, pad_with_zero, require_min_le_max
+from .base import Generator, coerce_float, coerce_int, pad_with_zero, require_min_le_max
 
 
 @dataclass(frozen=True)
@@ -24,8 +24,8 @@ class DecimalGenerator(Generator):
     type_name = "decimal"
 
     def prepare(self, spec: Mapping[str, Any]) -> DecimalSpec:
-        min_value = float(spec["minValue"])
-        max_value = float(spec["maxValue"])
+        min_value = coerce_float(spec, "minValue", type_name="decimal")
+        max_value = coerce_float(spec, "maxValue", type_name="decimal")
         require_min_le_max("decimal", min_value, max_value)
         decimals = coerce_int(spec, "decimals", type_name="decimal")
         if decimals < 0:

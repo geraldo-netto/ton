@@ -248,6 +248,26 @@ def coerce_int(
         raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})") from exc
 
 
+def coerce_float(
+    spec: Mapping[str, Any],
+    key: str,
+    *,
+    type_name: str,
+    default: Any = _MISSING,
+) -> float:
+    """Read ``spec[key]`` and coerce to ``float`` with a uniform error message."""
+    if default is _MISSING:
+        if key not in spec:
+            raise ValueError(f"{type_name} {key!r} is required")
+        raw = spec[key]
+    else:
+        raw = spec.get(key, default)
+    try:
+        return float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{type_name} {key!r} must be a number (got {raw!r})") from exc
+
+
 def require_min_le_max(type_name: str, lo: Any, hi: Any) -> None:
     """Raise when ``hi < lo``. Centralizes the bounds check used by the
     integer / decimal / date / timestamp_unix generators (TODO DUP-004).

@@ -29,7 +29,6 @@ Last full rescan: 2026-07-04.
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
 | REL-020 | open | M | `decimal.py:50-53` rounds `rng.uniform(min,max)` half-up, so a `maxValue` off the rounding grid overflows the range (e.g. `min=0,max=0.99,decimals=0` emits `"1"` ~half the time). Clamp the rounded result to `[min,max]`, or round endpoints inward at prepare and reject an empty range. |
-| REL-021 | open | S | `decimal.py:27-28` reads `float(spec["minValue"])` directly — a missing key raises `KeyError` and a non-numeric raises a bare `ValueError` that the config layer's translation misses, unlike every other generator. Add a `coerce_float` helper mirroring `coerce_int`. |
 | REL-022 | open | M | `regex.py` empty/unsatisfiable character classes (`[^ -~]`, reversed `[z-a]`) prepare cleanly then raise mid-`generate()` on row N. Force pool resolution for every `IN` node at `prepare` so a bad config fails at engine construction. |
 | REL-023 | open | M | `_config.py:_validate_encoding` accepts any codec `codecs.lookup` knows, including non-text ones (`base64`, `hex`, `rot13`); `--validate` reports the config valid, then the real run raises `LookupError` at `open(encoding=...)`. Reject codecs where `CodecInfo._is_text_encoding` is false. |
 

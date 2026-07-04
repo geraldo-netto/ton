@@ -1,7 +1,7 @@
 # TODO
 
-Open review findings tracked per the categories defined in
-[`AGENTS.md`](AGENTS.md). Closed items live in the commit history.
+Open review findings tracked per categories in
+[`AGENTS.md`](AGENTS.md). Closed items live in commit history.
 
 Status values: `open`, `in-progress`.
 Effort values: `S` (<=1h), `M` (1-4h), `L` (>4h).

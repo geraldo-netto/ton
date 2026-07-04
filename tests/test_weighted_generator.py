@@ -14,6 +14,7 @@ from ton.generators.weighted import WeightedGenerator
 def test_weighted_parallel_arrays_distribution() -> None:
     gen = WeightedGenerator()
     prepared = gen.prepare({"values": ["A", "B"], "weights": [9, 1]})
+    assert prepared.cum_weights == (9.0, 10.0)
     rng = Random(0)
     counts = Counter(gen.generate(prepared, rng) for _ in range(2000))
     # 90/10 split; allow generous slack.
@@ -114,6 +115,7 @@ def test_weighted_composite_uses_distribution_delegate() -> None:
         default_registry(),
     )
 
+    assert prepared.cum_weights == (0.0, 1.0)
     assert gen.generate(prepared, Random(0)) == "always"
 
 

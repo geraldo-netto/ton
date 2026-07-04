@@ -26,11 +26,12 @@ class WeightedChoiceSet:
     """
 
     weights: tuple[float, ...]
+    cum_weights: tuple[float, ...]
     children: tuple[tuple[Generator, Any], ...]
 
     def choose(self, rng: Random) -> str:
         """Return one generated value drawn proportional to the weights."""
-        index = rng.choices(range(len(self.children)), weights=self.weights, k=1)[0]
+        index = rng.choices(range(len(self.children)), cum_weights=self.cum_weights, k=1)[0]
         child_gen, child_prepared = self.children[index]
         return child_gen.generate(child_prepared, rng)
 
@@ -102,7 +103,11 @@ def prepare_distribution(
         weights.append(weight)
         children.append(child)
     validate_weights(weights, label)
-    return WeightedChoiceSet(weights=tuple(weights), children=tuple(children))
+    return WeightedChoiceSet(
+        weights=tuple(weights),
+        cum_weights=cumulative_weights(weights),
+        children=tuple(children),
+    )
 
 
 def _prepare_choice(
@@ -144,6 +149,16 @@ def validate_weights(weights: Sequence[float], label: str) -> None:
         raise ValueError(f"{label} 'weights' must be non-negative")
     if sum(weights) <= 0:
         raise ValueError(f"{label} 'weights' must sum to a positive number")
+
+
+def cumulative_weights(weights: Sequence[float]) -> tuple[float, ...]:
+    """Return cumulative weights prepared once for ``random.choices``."""
+    total = 0.0
+    cumulative: list[float] = []
+    for weight in weights:
+        total += weight
+        cumulative.append(total)
+    return tuple(cumulative)
 
 
 def _choices_error(label: str, min_choices: int) -> str:

@@ -32,7 +32,6 @@ Last full rescan: 2026-07-04.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-013 | open | M | Weighted hot path (`weighted.py:109` legacy form and `transforms/distribution.py:33` `WeightedChoiceSet.choose`) calls `rng.choices(..., weights=...)` per row, which rebuilds the cumulative-weight list every draw. Precompute `cum_weights` once at prepare time and pass `cum_weights=` (or use `bisect`) to make each draw O(log n) with no per-row allocation. |
 
 ## scalability
 

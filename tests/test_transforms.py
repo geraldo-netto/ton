@@ -50,6 +50,7 @@ def test_distribution_transform_chooses_prepared_candidate() -> None:
         default_registry(),
     )
 
+    assert prepared.cum_weights == (0.0, 1.0)
     result = transform.apply(prepared, TransformResult("ignored"), Random(0))
 
     assert result == TransformResult("always")

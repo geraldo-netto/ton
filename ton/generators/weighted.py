@@ -54,6 +54,7 @@ from .._proof import ProofResult
 from .._transforms import TransformResult
 from ..transforms.distribution import (
     WeightedChoiceSet,
+    cumulative_weights,
     prepare_distribution,
     validate_weights,
 )
@@ -63,6 +64,7 @@ from .base import Generator
 @dataclass(frozen=True)
 class WeightedSpec:
     weights: tuple[float, ...]
+    cum_weights: tuple[float, ...]
     #: Populated for the legacy ``values`` form.
     values: tuple[str, ...] | None = None
     #: Populated for the composite ``choices`` form.
@@ -99,6 +101,7 @@ class WeightedGenerator(Generator):
         )
         return WeightedSpec(
             weights=distribution.weights,
+            cum_weights=distribution.cum_weights,
             distribution=distribution,
         )
 
@@ -106,7 +109,7 @@ class WeightedGenerator(Generator):
         if prepared.distribution is not None:
             return prepared.distribution.choose(rng)
         # Legacy string-only form.
-        return rng.choices(prepared.values, weights=prepared.weights, k=1)[0]  # type: ignore[arg-type]
+        return rng.choices(prepared.values, cum_weights=prepared.cum_weights, k=1)[0]  # type: ignore[arg-type]
 
     def prove(self, prepared: WeightedSpec, result: TransformResult) -> ProofResult:
         # Composite form recurses into the drawn child; the legacy string
@@ -124,7 +127,7 @@ class WeightedGenerator(Generator):
         if not values:
             raise ValueError("weighted 'values' must be non-empty")
         validate_weights(weights, "weighted")
-        return WeightedSpec(values=values, weights=weights)
+        return WeightedSpec(values=values, weights=weights, cum_weights=cumulative_weights(weights))
 
 
 def _coerce(spec: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[float, ...]]:

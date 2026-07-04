@@ -395,7 +395,8 @@ def _open_output(
     encoding: str = "utf-8",
 ) -> Iterator[TextIO]:
     if path is None:
-        yield sys.stdout
+        with _reconfigured_stdout(encoding) as stream:
+            yield stream
         return
     exists = os.path.exists(path)
     if exists:
@@ -429,6 +430,28 @@ def _open_output(
         return
     with _open_atomic_output(path, encoding=encoding) as stream:
         yield stream
+
+
+@contextmanager
+def _reconfigured_stdout(encoding: str) -> Iterator[TextIO]:
+    stream = sys.stdout
+    reconfigure = getattr(stream, "reconfigure", None)
+    if not callable(reconfigure):
+        yield stream
+        return
+    old_encoding = stream.encoding
+    old_errors = getattr(stream, "errors", None)
+    reconfigure(encoding=encoding)
+    try:
+        yield stream
+    finally:
+        restore: dict[str, str] = {}
+        if old_encoding is not None:
+            restore["encoding"] = old_encoding
+        if old_errors is not None:
+            restore["errors"] = old_errors
+        if restore:
+            reconfigure(**restore)
 
 
 @contextmanager

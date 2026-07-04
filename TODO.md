@@ -77,7 +77,6 @@ Last full rescan: 2026-07-04.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CLI-003 | open | M | The `encoding` config key only reaches file output (`_open_output` passes it to the temp file); when writing to stdout (`args.output is None`) the CLI yields `sys.stdout` unchanged, so a non-UTF-8 `encoding` is silently ignored. Reconfigure the stdout stream (or document that `encoding` applies to `-o` only). |
 
 ## configuration discoverability
 

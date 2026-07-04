@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import stat
+import sys
 from pathlib import Path
 from unittest import mock
 
@@ -39,6 +41,33 @@ def test_cli_output_uses_configured_encoding(write_config, tmp_path: Path) -> No
     # utf-16 encodes ASCII digits with a null high byte and a BOM.
     assert b"\x00" in raw
     assert out_file.read_text(encoding="utf-16").strip().splitlines() != []
+
+
+def test_cli_stdout_uses_configured_encoding(write_config, monkeypatch) -> None:
+    config = write_config({"encoding": "utf-16"})
+    raw = io.BytesIO()
+    stdout = io.TextIOWrapper(raw, encoding="utf-8")
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    assert main([str(config), "--seed", "0"]) == 0
+
+    stdout.flush()
+    data = raw.getvalue()
+    assert b"\x00" in data
+    assert data.decode("utf-16").strip().splitlines() != []
+    assert stdout.encoding.lower().replace("_", "-") == "utf-8"
+
+
+def test_cli_stdout_without_reconfigure_still_writes(monkeypatch) -> None:
+    from ton import cli
+
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    with cli._open_output(None, encoding="utf-16") as stream:
+        stream.write("ok")
+
+    assert stdout.getvalue() == "ok"
 
 
 def test_cli_seed_is_reproducible(write_config, capsys: pytest.CaptureFixture[str]) -> None:

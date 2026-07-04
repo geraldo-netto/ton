@@ -140,10 +140,17 @@ def _coerce_record(raw_values: list[Any]) -> tuple[tuple[str, ...], tuple[float,
     # Record form: [{value, weight}, ...]. ``weight`` defaults to 1.0 so a
     # list of bare ``{"value": ...}`` records still works -- the generator
     # falls back to uniform weighting.
-    return (
-        tuple(str(item["value"]) for item in raw_values),
-        tuple(float(item.get("weight", 1.0)) for item in raw_values),
-    )
+    values: list[str] = []
+    weights: list[float] = []
+    for index, item in enumerate(raw_values):
+        if not isinstance(item, Mapping) or "value" not in item:
+            raise ValueError(
+                "weighted record values must be objects containing 'value' "
+                f"(bad entry at index {index})"
+            )
+        values.append(str(item["value"]))
+        weights.append(float(item.get("weight", 1.0)))
+    return tuple(values), tuple(weights)
 
 
 def _coerce_parallel(

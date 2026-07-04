@@ -54,7 +54,6 @@ Last full rescan: 2026-07-04.
 | id | status | effort | description |
 |----|--------|--------|-------------|
 | ROB-002 | open | M | `_regex_parse.py` recurses on nested groups with no depth guard; a deeply nested pattern raises an uncaught `RecursionError` instead of `RegexParseError`, escaping the config-error path. Cap nesting depth (or pattern length) in the parser. |
-| ROB-003 | open | S | `weighted.py:143-146` record form does `str(item["value"])` with no guard: a record missing `"value"` raises `KeyError`, and a mixed list (dict then bare string) raises `TypeError`, instead of the module's friendly `ValueError`. Validate each record is a mapping containing `"value"`. |
 
 ## architecture/modularity/SOLID
 

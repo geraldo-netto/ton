@@ -31,6 +31,18 @@ def test_weighted_record_form() -> None:
     assert all(gen.generate(prepared, rng) == "x" for _ in range(50))
 
 
+@pytest.mark.parametrize(
+    "values",
+    [
+        [{"weight": 1}],
+        [{"value": "x"}, "y"],
+    ],
+)
+def test_weighted_record_form_rejects_bad_entries(values: list[object]) -> None:
+    with pytest.raises(ValueError, match="objects containing 'value'"):
+        WeightedGenerator().prepare({"values": values})
+
+
 def test_weighted_rejects_empty_values() -> None:
     with pytest.raises(ValueError):
         WeightedGenerator().prepare({"values": [], "weights": []})

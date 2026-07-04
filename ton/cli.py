@@ -129,7 +129,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--list-namespaces",
         action="store_true",
         help=(
-            "List available built-in namespaces, data types, and transforms. "
+            "List available built-in namespaces, data types, transforms, and validators. "
             "Built-ins are always available; plugin loading is opt-in."
         ),
     )

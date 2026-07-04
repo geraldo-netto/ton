@@ -97,6 +97,11 @@ def test_decimal_rejects_non_numeric_bounds_with_friendly_error() -> None:
         DecimalGenerator().prepare({"minValue": 0.0, "maxValue": "nope", "decimals": 2})
 
 
+def test_decimal_rejects_range_without_representable_rounded_value() -> None:
+    with pytest.raises(ValueError, match="representable"):
+        DecimalGenerator().prepare({"minValue": 0.1, "maxValue": 0.9, "decimals": 0})
+
+
 def test_coerce_float_uses_default_when_optional_key_is_missing() -> None:
     assert coerce_float({}, "value", type_name="test", default=1.5) == 1.5
 
@@ -144,6 +149,17 @@ def test_decimal_keeps_trailing_zeros_in_output() -> None:
     gen = DecimalGenerator()
     prepared = gen.prepare({"minValue": 1.0, "maxValue": 1.0, "decimals": 3, "padWithZero": False})
     assert gen.generate(prepared, Random(0)) == "1.000"
+
+
+def test_decimal_rounded_output_stays_inside_bounds() -> None:
+    gen = DecimalGenerator()
+    prepared = gen.prepare({"minValue": 0.0, "maxValue": 0.99, "decimals": 0})
+    rng = Random(0)
+
+    for _ in range(100):
+        value = gen.generate(prepared, rng)
+        assert value == "0"
+        assert 0.0 <= float(value) <= 0.99
 
 
 def test_lmhash_rejects_empty_values() -> None:

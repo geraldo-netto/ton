@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
@@ -15,6 +16,9 @@ class DecimalSpec:
     min_value: float
     max_value: float
     decimals: int
+    scale: int
+    min_step: int
+    max_step: int
     pad_width: int  # 0 = no padding
 
 
@@ -30,27 +34,39 @@ class DecimalGenerator(Generator):
         decimals = coerce_int(spec, "decimals", type_name="decimal")
         if decimals < 0:
             raise ValueError(f"decimal 'decimals' must be >= 0 (got {decimals})")
+        scale = 10**decimals
+        min_step = math.ceil(min_value * scale)
+        max_step = math.floor(max_value * scale)
+        if min_step > max_step:
+            raise ValueError(
+                f"decimal range contains no value representable with {decimals} decimal place(s)"
+            )
         pad_width = 0
         if spec.get("padWithZero", False):
             # Width must cover the widest possible rendering -- include the
             # '-' sign on negative bounds and the decimal point + fraction
             # (TODO REL-014).
             pad_width = max(
-                len(f"{min_value:.{decimals}f}"),
-                len(f"{max_value:.{decimals}f}"),
+                len(f"{min_step / scale:.{decimals}f}"),
+                len(f"{max_step / scale:.{decimals}f}"),
             )
         return DecimalSpec(
             min_value=min_value,
             max_value=max_value,
             decimals=decimals,
+            scale=scale,
+            min_step=min_step,
+            max_step=max_step,
             pad_width=pad_width,
         )
 
     def generate(self, prepared: DecimalSpec, rng: Random) -> str:
         raw = rng.uniform(prepared.min_value, prepared.max_value)
+        step = round(raw * prepared.scale)
+        step = min(max(step, prepared.min_step), prepared.max_step)
         # f-string formatting keeps trailing zeros so pad_width math stays
         # consistent (str(round(1.5, 2)) drops the trailing zero).
-        value = f"{raw:.{prepared.decimals}f}"
+        value = f"{step / prepared.scale:.{prepared.decimals}f}"
         if prepared.pad_width:
             return pad_with_zero(value, prepared.pad_width)
         return value

@@ -566,6 +566,9 @@ Same bounds semantics as `date` but emits epoch seconds (or millis).
 | `maxValue`  | string | ISO 8601 (date or datetime), inclusive       |
 | `unit`      | string | `seconds` (default) or `millis`              |
 
+`millis` uses the same whole-second draw as `seconds` and multiplies by
+`1000`, so generated millisecond values always end in `000`.
+
 ```json
 {"type": "timestamp_unix", "minValue": "2024-01-01", "maxValue": "2024-12-31", "unit": "seconds"}
 ```

@@ -3,6 +3,8 @@
 Same bounds semantics as the ``date`` type but emits epoch seconds
 (or milliseconds) instead of a formatted string. Useful for log
 ingestion fixtures where the receiver expects numeric timestamps.
+``millis`` output is second-resolution epoch time multiplied by 1000,
+so generated millisecond values always end in ``000``.
 
 Spec fields::
 

@@ -91,7 +91,6 @@ Last full rescan: 2026-07-04.
 
 | id     | status | effort | description |
 |--------|--------|--------|-------------|
-| DG-004 | open | S | `base.py:coerce_int` silently truncates numerics: `int(3.9)→3`, `int(True)→1`, so `minValue: 3.9` quietly becomes `3` and masks config typos. Reject non-integral numerics. |
 
 ## dependency
 

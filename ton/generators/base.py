@@ -242,6 +242,14 @@ def coerce_int(
         raw = spec[key]
     else:
         raw = spec.get(key, default)
+    if isinstance(raw, bool):
+        raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})")
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, float):
+        if raw.is_integer():
+            return int(raw)
+        raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})")
     try:
         return int(raw)
     except (TypeError, ValueError) as exc:

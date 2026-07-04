@@ -8,11 +8,14 @@ from pathlib import Path
 from random import Random
 from typing import Any
 
+import pytest
+
 from ton._engine import Engine
 from ton._proof import REDACTED, ProofFailure
 from ton._proofcheck import ProofChecker
 from ton._transforms import TransformResult
 from ton.generators import Generator
+from ton.generators.base import coerce_int
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _SENSITIVE_ASSIGNMENTS = (
@@ -111,3 +114,13 @@ def test_proof_checker_keeps_raw_failures_by_default() -> None:
         ProofFailure(row=1, type_key="v", stage="source", reference="s", reason="r", value="raw")
     )
     assert checker.failures[0].value == "raw"
+
+
+@pytest.mark.parametrize("raw", [3.9, True])
+def test_coerce_int_rejects_non_integral_numerics(raw: object) -> None:
+    with pytest.raises(ValueError, match="integer"):
+        coerce_int({"value": raw}, "value", type_name="test")
+
+
+def test_coerce_int_accepts_integral_float() -> None:
+    assert coerce_int({"value": 3.0}, "value", type_name="test") == 3

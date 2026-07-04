@@ -107,3 +107,9 @@ def test_control_and_literal_escapes() -> None:
 def test_vendored_parser_rejects_bad_patterns(pattern: str) -> None:
     with pytest.raises(ValueError):
         RegexGenerator().prepare({"pattern": pattern})
+
+
+@pytest.mark.parametrize("pattern", ["[]", "[z-a]", "[^ -~]"])
+def test_rejects_invalid_character_classes_at_prepare(pattern: str) -> None:
+    with pytest.raises(ValueError, match="character class"):
+        RegexGenerator().prepare({"pattern": pattern})

@@ -113,6 +113,15 @@ def _reject_oversized_repeats(seq: Iterable[tuple[Any, Any]]) -> None:
                 _reject_oversized_repeats(alt)
         elif op is rx.SUBPATTERN:
             _reject_oversized_repeats(arg[3])
+        elif op is rx.IN:
+            _reject_invalid_character_class(arg)
+
+
+def _reject_invalid_character_class(items: Iterable[tuple[Any, Any]]) -> None:
+    try:
+        _in_pool(tuple(items))
+    except ValueError as exc:
+        raise ValueError(f"regex 'pattern' has invalid character class: {exc}") from exc
 
 
 def _max_expansion(seq: Iterable[tuple[Any, Any]]) -> int:

@@ -27,7 +27,6 @@ Last full rescan: 2026-07-04.
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-022 | open | M | `regex.py` empty/unsatisfiable character classes (`[^ -~]`, reversed `[z-a]`) prepare cleanly then raise mid-`generate()` on row N. Force pool resolution for every `IN` node at `prepare` so a bad config fails at engine construction. |
 
 ## performance
 

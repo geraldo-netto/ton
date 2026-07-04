@@ -24,6 +24,7 @@ _HASHERS: dict[str, Callable[[bytes], str]] = {
 }
 _ALGORITHMS = tuple(sorted((*_HASHERS, "bcrypt")))
 _BCRYPT_ALPHABET = b"./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+MAX_BCRYPT_ROUNDS = 12
 
 
 class HashGenerator(PairedWordPoolGenerator):
@@ -40,8 +41,10 @@ class HashGenerator(PairedWordPoolGenerator):
             )
         if algorithm == "bcrypt":
             rounds = coerce_int(spec, "rounds", type_name="hash", default=12)
-            if not 4 <= rounds <= 31:
-                raise ValueError("hash 'rounds' must be between 4 and 31")
+            if not 4 <= rounds <= MAX_BCRYPT_ROUNDS:
+                raise ValueError(
+                    f"hash 'rounds' must be between 4 and MAX_BCRYPT_ROUNDS ({MAX_BCRYPT_ROUNDS})"
+                )
             return WordPairSpec(pairs=tuple((word, _bcrypt_digest(word, rounds)) for word in words))
         hash_one = _HASHERS[algorithm]
         return WordPairSpec(pairs=tuple((word, hash_one(word.encode("utf-8"))) for word in words))

@@ -808,7 +808,7 @@ Generic byte-oriented digest drawn from a fixed plaintext list. **Paired**: a si
 | `algorithm` | string   | `md5`, `sha1`, `sha256` (default), `sha512`, or `bcrypt` |
 | `values`    | string[] | non-empty plaintext pool                            |
 
-`bcrypt` requires the optional `ton[bcrypt]` extra and accepts `rounds` from `4` to `31` (default `12`). TON derives a stable bcrypt salt from the plaintext so synthetic fixtures remain reproducible.
+`bcrypt` requires the optional `ton[bcrypt]` extra and accepts `rounds` from `4` to `12` (default `12`). TON derives a stable bcrypt salt from the plaintext so synthetic fixtures remain reproducible.
 
 ```json
 {

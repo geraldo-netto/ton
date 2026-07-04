@@ -64,6 +64,10 @@ candidate data-type specs. The legacy `weighted` generator delegates its
 composite choice behavior to the same distribution implementation while
 preserving existing `weighted` config shapes.
 
+The built-in `identity` transform returns values unchanged and preserves
+paired values. It provides an explicit no-op transform for configs and tests
+that need a transform stage without changing generated output.
+
 ## Proof Checking
 
 Generators and transforms can implement proof hooks that verify generated

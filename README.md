@@ -457,6 +457,10 @@ candidate type specs:
 }
 ```
 
+The built-in `identity` transform is an explicit no-op. It returns generated
+values unchanged and preserves paired values, so it is mainly useful when a
+config or test needs a transform step without changing output.
+
 Plugins register namespaced data types and transforms through the public
 catalog API or trusted entry points. A plugin-provided type can be referenced
 with its qualified name:

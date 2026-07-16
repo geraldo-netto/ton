@@ -23,6 +23,7 @@ from ton._registry import (
     discover_generator_classes,
     normalize_reference,
     registry_with_entry_points,
+    resolve_reference,
 )
 from ton._transforms import BaseTransform
 from ton.generators import Generator
@@ -74,6 +75,13 @@ EXPECTED_TYPES = {
     "uuid",
     "weighted",
 }
+
+
+def test_resolve_reference_handles_bare_and_core_qualified_catalogs() -> None:
+    value = object()
+
+    assert resolve_reference({"string": value}, "core.string") is value
+    assert resolve_reference({"core.string": value}, "string") is value
 
 
 def test_discover_returns_only_concrete_named_subclasses() -> None:

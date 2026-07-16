@@ -19,7 +19,7 @@ import inspect
 import threading
 from collections.abc import Container, Iterable, Iterator, Mapping
 from importlib.metadata import entry_points
-from typing import Any
+from typing import Any, TypeVar
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
@@ -38,6 +38,7 @@ ENTRY_POINT_GROUP = "ton.generators"
 TRANSFORM_ENTRY_POINT_GROUP = "ton.transforms"
 VALIDATOR_ENTRY_POINT_GROUP = "ton.validators"
 CORE_NAMESPACE = "core"
+_T = TypeVar("_T")
 
 #: Allowlist of built-in ``type_name`` strings. Used by
 #: :func:`discover_generator_classes` to ignore in-process subclasses
@@ -162,6 +163,16 @@ def normalize_reference(reference: str) -> str:
     if "." in reference:
         return reference
     return f"{CORE_NAMESPACE}.{reference}"
+
+
+def resolve_reference(registry: Mapping[str, _T], reference: str) -> _T | None:
+    """Resolve qualified or bare references using registry namespace rules."""
+    normalized = normalize_reference(reference)
+    return (
+        registry.get(normalized)
+        or registry.get(reference)
+        or registry.get(normalized.removeprefix(f"{CORE_NAMESPACE}."))
+    )
 
 
 def build_extension_catalog() -> ExtensionCatalog:

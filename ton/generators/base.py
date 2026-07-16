@@ -311,12 +311,12 @@ def prepare_child_spec(
     """
     if not isinstance(nested_spec, Mapping) or "type" not in nested_spec:
         raise ValueError(f"{parent_type} {location} must be an object with a 'type' field")
+    from .._registry import resolve_reference
+
     nested_type = str(nested_spec["type"])
-    if nested_type.startswith("core."):
-        nested_type = nested_type.split(".", 1)[1]
-    if nested_type not in registry:
+    child = resolve_reference(registry, nested_type)
+    if child is None:
         raise ValueError(f"{parent_type} {location} references unknown type {nested_type!r}")
-    child = registry[nested_type]
     if child.is_paired:
         raise ValueError(
             f"{parent_type} {location} uses paired type {nested_type!r}; "

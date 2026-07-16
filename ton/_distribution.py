@@ -71,9 +71,17 @@ def _prepare_child(
     type_name = raw_spec.get("type")
     if not isinstance(type_name, str) or not type_name:
         raise ValueError(f"{parent} {path} must contain a non-empty string 'type'")
-    generator = registry.get(type_name) or registry.get(type_name.removeprefix("core."))
+    from ._registry import resolve_reference
+
+    generator = resolve_reference(registry, type_name)
     if generator is None:
         raise ValueError(f"{parent} {path} references unknown type {type_name!r}")
+    if generator.is_paired:
+        raise ValueError(
+            f"{parent} {path} uses paired type {type_name!r}; "
+            "paired generators cannot be nested inside a composite generator "
+            "(the [id] half would be unreachable)"
+        )
     if generator.is_composite:
         return generator, generator.prepare_composite(raw_spec, registry)
     return generator, generator.prepare(raw_spec)

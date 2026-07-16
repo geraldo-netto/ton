@@ -17,7 +17,7 @@ Last full rescan: 2026-07-13 (all categories).
 | SEC-014 | open | S | Propagate and enforce the total-expansion budget through nested `oneOf` and `weighted` branches. |
 | SEC-015 | open | S | Add boundary and adversarial nesting tests proving composite expansion is accepted at the cap and rejected above it without materializing output. |
 | SEC-011 | open | S | `generators/hash.py:48` bcrypt-hashes every entry of an unbounded `values` list at prepare time (up to 2^12 rounds each). `--validate` runs `prepare`, so a "validate only, no rows" invocation performs unbounded KDF work (1000 words ~= minutes of CPU). Cap `values` length for bcrypt or hash lazily. |
-| SEC-012 | open | S | `cli.py:496` `_target_mode` flips the process-wide umask to 0 and restores it to read it. In an embedding/threaded process any file created in that window lands at 0666/0777. Derive the mode without mutating global umask. |
+| SEC-012 | open | S | `_output.py:85` `target_mode` flips the process-wide umask to 0 and restores it to read it. In an embedding/threaded process any file created in that window lands at 0666/0777. Derive the mode without mutating global umask. |
 
 ## code complexity
 
@@ -45,7 +45,7 @@ Last full rescan: 2026-07-13 (all categories).
 | PERF-030 | open | S | Resolve regex `NOT_LITERAL` exclusions/pools during prepare so generation performs no per-character `frozenset` allocation. |
 | PERF-031 | open | S | Add regex equivalence tests and focused benchmarks for prepared `IN` and `NOT_LITERAL` pools. |
 | PERF-022 | open | S | Per-character `rng.choice` in a genexp: `generators/char.py:37` and `generators/text.py:129`. `rng.choices(values, k=n)` is ~4x faster (`maxChar=64`: 10.2 -> 2.5 us/row). Caveat: changes the seeded RNG stream, so existing seeds stop reproducing byte-for-byte. |
-| PERF-023 | open | S | `transforms/distribution.py:34` `WeightedChoiceSet.choose` and `generators/weighted.py:112` call `rng.choices(range(n), cum_weights=..., k=1)[0]` per row -- allocates a `range` + result list and re-derives the total each draw. A direct `bisect(cum_weights, rng.random() * cum_weights[-1])` is ~4x faster (0.35 -> 0.08 us/op). |
+| PERF-023 | open | S | `_distribution.py:24` `WeightedChoiceSet.choose` calls `rng.choices(range(n), cum_weights=..., k=1)[0]` per row -- allocates a `range` + result list and re-derives the total each draw. A direct `bisect(cum_weights, rng.random() * cum_weights[-1])` is ~4x faster (0.35 -> 0.08 us/op). |
 | PERF-024 | open | S | `generators/network.py:59` `_draw_ip` constructs an `ipaddress.IPv4Address`/`IPv6Address` object per row solely to `str()` it (0.88 us/op vs ~0.5 us formatting the octets from the int). |
 | PERF-025 | open | S | `generators/identity.py:117` `PhoneGenerator.generate` walks the whole format string char-by-char and calls `rng.randint(0, 9)` per `#` on every row (3.05 us/row). Precompute the literal segments + digit count at prepare time and fill with one `rng.choices(_DIGITS, k=n)`. |
 | PERF-026 | open | S | `_proofcheck.py:195` `_make_failure` copies the entire field spec (`dict(spec)`) for every failure *before* `:111` `_record_audit` applies `MAX_AUDIT_SAMPLE`. In audit mode with a systematically failing field, every row pays a dict copy that is immediately discarded. Build the record lazily (or drop `spec` once the cap is hit). |
@@ -62,7 +62,6 @@ Last full rescan: 2026-07-13 (all categories).
 | SCAL-015 | open | S | Compute a conservative prepared worst-case width for fixed/bounded generators and reject templates whose aggregate width exceeds the configured limit. |
 | SCAL-016 | open | S | Enforce a runtime row-width guard for generators whose maximum cannot be known during prepare, before unbounded content is retained or written. |
 | SCAL-017 | open | S | Add aggregate-placeholder, composite, boundary, and unknown-width tests; document the row-width limit and error. |
-| SCAL-012 | open | S | `cli.py:522` `--resume-from` generates and discards every skipped row, so sharding an N-row job into k offset shards costs O(k*N) total generation. README:84 admits the cost, but README:83 still presents offset-sharding as a parallel recipe; point users at `fork_engine` (O(N) total) instead. |
 
 ## concurrency
 
@@ -94,7 +93,6 @@ Last full rescan: 2026-07-13 (all categories).
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
 | PLUG-010 | open | S | Reserved `core` namespace is not reserved. `_registry.py:147` only blocks *replacing* an existing core name, so an entry point named `core.foo` (or `catalog.register_data_type("core", "foo", ...)`) lands in the core namespace and `_flatten:134` promotes it to the bare alias `foo`. Verified. Contradicts `docs/architecture.md:12-31` ("plugins register additional namespaced types", built-ins isolated in `core`). Reject `core` for non-built-in registration. |
-| PLUG-011 | open | S | Validator plugins are unreachable from two of the three public builders: `concurrency.fork_engine` and `Engine.from_file` take no `validators` argument, so a config with a `validators` list raises `TemplateError: Unknown validator` in every forked worker (verified). Same root cause as ARCH-010. |
 | PLUG-012 | open | S | Generator-instance lifetime is undocumented and inconsistent. `_registry.default_registry` promises "fresh instances so per-spec state stays Engine-scoped", but `ExtensionCatalog` builds its generator dict once and hands the *same* plugin instances to every Engine built from that catalog (README's catalog example reuses one catalog). Third-party generators that keep state on `self` silently share it across engines; `generators/base.py` never states the required statelessness. |
 | PLUG-013 | open | S | The `ton.validators` extension point ships with zero reference implementation: `catalog.list_validators()` is `()` and `--list-namespaces` prints an empty `validators:` line. No built-in validator, no example plugin, no doc'd way to try the feature without authoring a distribution. |
 

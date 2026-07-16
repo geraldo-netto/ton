@@ -31,6 +31,15 @@ def test_ipv4_respects_cidr() -> None:
         assert ipaddress.IPv4Address(value) in ipaddress.IPv4Network("10.0.0.0/24")
 
 
+def test_single_address_cidrs_format_without_a_draw() -> None:
+    assert IPv4Generator().generate(
+        IPv4Generator().prepare({"cidr": "192.0.2.1/32"}), Random(0)
+    ) == ("192.0.2.1")
+    assert IPv6Generator().generate(
+        IPv6Generator().prepare({"cidr": "2001:db8::/128"}), Random(0)
+    ) == ("2001:db8::")
+
+
 def test_ipv4_rejects_ipv6_cidr() -> None:
     with pytest.raises(ValueError):
         IPv4Generator().prepare({"cidr": "::/0"})

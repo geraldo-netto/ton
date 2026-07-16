@@ -23,6 +23,7 @@ format them.
 from __future__ import annotations
 
 import ipaddress
+import socket
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
@@ -58,8 +59,10 @@ def _prepare_ip(spec: Mapping[str, Any], default_cidr: str, version: int) -> IPN
 
 def _draw_ip(prepared: IPNetworkSpec, rng: Random) -> str:
     offset = rng.randrange(prepared.size) if prepared.size > 1 else 0
-    address = ipaddress.ip_address(prepared.network_int + offset)
-    return str(address)
+    address = prepared.network_int + offset
+    if prepared.version == 4:
+        return ".".join(str(address >> shift & 0xFF) for shift in (24, 16, 8, 0))
+    return socket.inet_ntop(socket.AF_INET6, address.to_bytes(16, "big"))
 
 
 class IPv4Generator(Generator):

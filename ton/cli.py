@@ -7,9 +7,9 @@ import json
 import logging
 import sys
 import time
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from typing import TextIO
+from typing import TextIO, TypeVar
 
 from . import __version__, api
 from ._output import open_output_path
@@ -38,6 +38,7 @@ _LOG_LEVELS = {
 #: small enough to keep peak memory bounded for wide rows. Overridable
 #: via ``--batch-rows``.
 _DEFAULT_BATCH_ROWS = 1024
+_T = TypeVar("_T")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -235,15 +236,14 @@ def _validate_config(args: argparse.Namespace) -> int:
     ``--validate`` aligned with the library validation path (TODO
     CLI-002, CFG-003).
     """
-    try:
+
+    def validate() -> None:
         config = api.load_config(args.config)
         api.validate_config(config, catalog=_catalog_from_args(args))
-    except FileNotFoundError as exc:
-        print(f"ton: {exc}", file=sys.stderr)
-        return 1
-    except (ConfigError, TemplateError, json.JSONDecodeError) as exc:
-        print(f"ton: invalid config: {exc}", file=sys.stderr)
-        return 2
+
+    result = _map_config_errors(validate)
+    if isinstance(result, int):
+        return result
     print("ton: config valid", file=sys.stderr)
     return 0
 
@@ -254,9 +254,18 @@ def _prepare_engine(args: argparse.Namespace) -> tuple[Engine, str] | int:
     Loads the config once so the engine and the output encoding
     (CFG-001) share a single parse.
     """
-    try:
+
+    def prepare() -> tuple[Engine, str]:
         config = api.load_config(args.config)
         return _build_engine(args, config), api.output_encoding(config)
+
+    return _map_config_errors(prepare)
+
+
+def _map_config_errors(operation: Callable[[], _T]) -> _T | int:
+    """Run a config operation and map its domain failures to CLI exit codes."""
+    try:
+        return operation()
     except FileNotFoundError as exc:
         print(f"ton: {exc}", file=sys.stderr)
         return 1

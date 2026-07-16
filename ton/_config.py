@@ -19,6 +19,7 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._registry import ExtensionCatalog, RegistryError, normalize_reference
 from ._template import UndeclaredVariableError, validate_against
+from .generators.base import PreparationContext
 
 
 class ConfigError(ValueError):
@@ -234,10 +235,7 @@ def _validate_field_spec(
     """Run the generator's prepare so per-spec errors surface (CLI-001)."""
     generator = generators[_normalize_config_reference(spec["type"])]
     try:
-        if generator.is_composite:
-            generator.prepare_composite(spec, generators)
-        else:
-            generator.prepare(spec)
+        PreparationContext(generators).prepare_generator(generator, spec)
     except Exception as exc:  # noqa: BLE001 - boundary; normalized to ConfigError
         raise ConfigError(f"Invalid spec for {field_name!r}: {exc}") from exc
 

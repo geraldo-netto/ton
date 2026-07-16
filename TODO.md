@@ -29,7 +29,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-010 | open | S | Composite-child validation/preparation is implemented twice in `generators/base.py:prepare_child_spec` and `_distribution.py:_prepare_child`, including type lookup, paired rejection, and composite dispatch. Consolidate on the `PreparationContext` path so `oneOf`/`sequence_of` and weighted/distribution cannot drift. |
 | DUP-011 | open | M | `_config.validate_with_catalog` and `_compiler.EngineCompiler` independently resolve types/transforms/validators and prepare generator specs. The duplicate pipelines already differ in exception mapping and catalog access; extract one canonical compilation/validation service used by `--validate` and Engine construction. |
 
 ## reliability/correctness

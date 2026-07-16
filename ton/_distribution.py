@@ -34,13 +34,15 @@ def prepare_distribution(
     label: str,
     min_choices: int,
 ) -> WeightedChoiceSet:
+    from .generators.base import PreparationContext
+
     raw_choices = spec.get("choices")
     if not isinstance(raw_choices, list) or len(raw_choices) < min_choices:
         raise ValueError(_choices_error(label, min_choices))
     weights: list[float] = []
     children: list[tuple[Any, Any]] = []
     for index, choice in enumerate(raw_choices):
-        weight, child = _prepare_choice(index, choice, registry, label)
+        weight, child = _prepare_choice(index, choice, PreparationContext(registry), label)
         weights.append(weight)
         children.append(child)
     validate_weights(weights, label)
@@ -50,7 +52,7 @@ def prepare_distribution(
 def _prepare_choice(
     index: int,
     choice: Any,
-    registry: Mapping[str, Any],
+    context: Any,
     label: str,
 ) -> tuple[float, tuple[Any, Any]]:
     if not isinstance(choice, Mapping):
@@ -58,35 +60,8 @@ def _prepare_choice(
             f"{label} 'choices[{index}]' must be an object with 'weight' and 'spec' keys"
         )
     weight = _coerce_weight(index, choice, label)
-    child = _prepare_child(label, f"'choices[{index}].spec'", choice.get("spec"), registry)
+    child = context.prepare_child(label, f"'choices[{index}].spec'", choice.get("spec"))
     return weight, child
-
-
-def _prepare_child(
-    parent: str,
-    path: str,
-    raw_spec: Any,
-    registry: Mapping[str, Any],
-) -> tuple[Any, Any]:
-    if not isinstance(raw_spec, Mapping):
-        raise ValueError(f"{parent} {path} must be an object")
-    type_name = raw_spec.get("type")
-    if not isinstance(type_name, str) or not type_name:
-        raise ValueError(f"{parent} {path} must contain a non-empty string 'type'")
-    from ._registry import resolve_reference
-
-    generator = resolve_reference(registry, type_name)
-    if generator is None:
-        raise ValueError(f"{parent} {path} references unknown type {type_name!r}")
-    if generator.is_paired:
-        raise ValueError(
-            f"{parent} {path} uses paired type {type_name!r}; "
-            "paired generators cannot be nested inside a composite generator "
-            "(the [id] half would be unreachable)"
-        )
-    if generator.is_composite:
-        return generator, generator.prepare_composite(raw_spec, registry)
-    return generator, generator.prepare(raw_spec)
 
 
 def _coerce_weight(index: int, choice: Mapping[str, Any], label: str) -> float:

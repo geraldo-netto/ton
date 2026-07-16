@@ -31,7 +31,6 @@ jobs:
         run: ruff check ton tests
       - name: ruff format (check only)
         run: ruff format --check ton tests
-        continue-on-error: true
 
   typecheck:
     name: typecheck (mypy + pyright)

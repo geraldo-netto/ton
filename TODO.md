@@ -36,7 +36,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-025 | open | S | CI runs `ruff format --check` with `continue-on-error: true`, while the repository pre-commit hook treats the same check as mandatory. Formatting failures can merge despite the documented local/CI parity; make the CI step blocking or document the intentional difference. |
 
 ## performance
 

@@ -112,7 +112,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DEC-010 | open | S | Create a neutral distribution module containing `WeightedChoiceSet`, `prepare_distribution`, and `validate_weights` with no generator/transform package imports. |
 | DEC-015 | open | S | Migrate weighted generators, distribution transforms, and registry construction to the neutral distribution module; remove the deferred-import workaround. |
 | DEC-016 | open | S | Add clean-interpreter import-order tests for `ton.transforms`, `ton.transforms.distribution`, `ton.generators`, and the default registry. |
 | DEC-011 | open | S | `_registry.py:121` `ExtensionCatalog._flattened` returns the *live* cached dict from `generators()`/`transforms()`/`validators()`; any caller mutating it corrupts catalog internals. Only `registry_with_entry_points:432` avoids this, via an explicit copy plus a warning comment. Return a copy or `MappingProxyType`. |

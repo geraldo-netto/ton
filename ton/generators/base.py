@@ -69,6 +69,7 @@ class Generator(ABC):
 
     #: JSON ``type`` discriminator handled by this generator.
     type_name: str = ""
+    config_keys: ClassVar[frozenset[str] | None] = None
 
     #: True when the generator can return a (primary, id) pair within a row.
     #: The engine reads this flag instead of doing ``isinstance`` checks so

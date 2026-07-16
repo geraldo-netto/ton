@@ -342,3 +342,30 @@ def test_common_field_key_typo_is_rejected() -> None:
 
     with pytest.raises(ConfigError, match="types.a.transform.*Did you mean 'transforms'"):
         api.validate_config(payload)
+
+
+def test_builtin_generator_rejects_unknown_owned_key() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["value"] = ["x"]
+
+    with pytest.raises(ConfigError, match="types.a.value.*Did you mean 'values'"):
+        api.validate_config(payload)
+
+
+def test_plugin_generator_may_own_custom_keys() -> None:
+    from random import Random
+    from typing import Any
+
+    from ton.generators import Generator
+
+    class PluginGenerator(Generator):
+        type_name = "plugin"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return str(prepared["custom"])
+
+    payload = {"rows": 1, "format": "$a$", "types": {"a": {"type": "plugin.x", "custom": 1}}}
+    catalog = api.build_extension_catalog()
+    catalog.register_data_type("plugin", "x", PluginGenerator())
+
+    api.validate_config(payload, catalog=catalog)

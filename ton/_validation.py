@@ -12,7 +12,7 @@ referenced from a field spec's ``validators`` list.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import ClassVar, Protocol, runtime_checkable
 
 
 class ValidationError(ValueError):
@@ -23,6 +23,7 @@ class NonEmptyValidator:
     """Reference validator accepting values containing at least one character."""
 
     type_name = "non_empty"
+    config_keys: ClassVar[frozenset[str] | None] = frozenset()
 
     def validate(self, value: str) -> bool:
         return bool(value)

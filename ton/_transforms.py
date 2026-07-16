@@ -67,6 +67,7 @@ class Transform(Protocol):
 
     type_name: ClassVar[str]
     capabilities: ClassVar[TransformCapabilities]
+    config_keys: ClassVar[frozenset[str] | None]
 
     def prepare(self, spec: Mapping[str, Any]) -> Any:
         """Validate and normalize a raw transform spec."""
@@ -102,6 +103,7 @@ class BaseTransform:
 
     type_name: ClassVar[str] = ""
     capabilities: ClassVar[TransformCapabilities] = TransformCapabilities()
+    config_keys: ClassVar[frozenset[str] | None] = None
 
     def prepare(self, spec: Mapping[str, Any]) -> Any:
         return spec
@@ -137,6 +139,7 @@ class IdentityTransform(BaseTransform):
     """Built-in transform that returns values unchanged."""
 
     type_name: ClassVar[str] = "identity"
+    config_keys: ClassVar[frozenset[str] | None] = frozenset()
     capabilities: ClassVar[TransformCapabilities] = TransformCapabilities(
         accepts_paired=True,
         preserves_pairing=True,

@@ -215,6 +215,12 @@ def _validate_transforms(
         if normalized not in transforms:
             _raise_unknown_reference("transform", field_name, reference, catalog.list_transforms())
         transform = transforms[normalized]
+        _validate_extension_keys(
+            f"types.{field_name}.transforms",
+            transform_spec,
+            transform.config_keys,
+            frozenset(("type",)),
+        )
         capability = fold_paired_capabilities(is_paired, (transform.capabilities,))
         if capability.incompatible_index is not None:
             raise ConfigError(
@@ -247,10 +253,26 @@ def _validate_field_spec(
 ) -> None:
     """Run the generator's prepare so per-spec errors surface (CLI-001)."""
     generator = generators[_normalize_config_reference(spec["type"])]
+    _validate_extension_keys(f"types.{field_name}", spec, generator.config_keys, COMMON_FIELD_KEYS)
     try:
         PreparationContext(generators).prepare_generator(generator, spec)
     except Exception as exc:  # noqa: BLE001 - boundary; normalized to ConfigError
         raise ConfigError(f"Invalid spec for {field_name!r}: {exc}") from exc
+
+
+def _validate_extension_keys(
+    path: str,
+    spec: Mapping[str, Any],
+    extension_keys: frozenset[str] | None,
+    common_keys: frozenset[str],
+) -> None:
+    if extension_keys is None:
+        return
+    allowed = common_keys | extension_keys
+    unknown = set(spec) - allowed
+    if unknown:
+        key = sorted(unknown)[0]
+        raise ConfigError(_unknown_key_message(path, key, allowed))
 
 
 def _normalize_config_reference(reference: str) -> str:

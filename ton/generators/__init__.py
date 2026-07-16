@@ -73,8 +73,37 @@ BUILTIN_GENERATOR_CLASSES: tuple[type[Generator], ...] = (
     WeightedGenerator,
 )
 
+BUILTIN_GENERATOR_CONFIG_KEYS: dict[str, frozenset[str]] = {
+    "boolean": frozenset(("whenTrue", "whenFalse")),
+    "bytes": frozenset(("length", "encoding")),
+    "char": frozenset(("values", "maxChar")),
+    "date": frozenset(("minValue", "maxValue", "format")),
+    "decimal": frozenset(("minValue", "maxValue", "decimals", "padWithZero")),
+    "email": frozenset(("domains",)),
+    "hash": frozenset(("values", "algorithm", "rounds")),
+    "ipv4": frozenset(("cidr",)),
+    "ipv6": frozenset(("cidr",)),
+    "integer": frozenset(("minValue", "maxValue", "padWithZero")),
+    "lmhash": frozenset(("values",)),
+    "mac": frozenset(("separator", "uppercase", "oui")),
+    "name": frozenset(("style",)),
+    "oneOf": frozenset(("choices",)),
+    "phone": frozenset(("format",)),
+    "regex": frozenset(("pattern",)),
+    "sequence": frozenset(("start", "step", "padWidth")),
+    "sequence_of": frozenset(("count", "separator", "spec")),
+    "string": frozenset(("values",)),
+    "text": frozenset(("unit", "count")),
+    "timestamp_unix": frozenset(("minValue", "maxValue", "unit")),
+    "uuid": frozenset(("version", "uppercase")),
+    "weighted": frozenset(("values", "weights", "choices")),
+}
+for _generator_class in BUILTIN_GENERATOR_CLASSES:
+    _generator_class.config_keys = BUILTIN_GENERATOR_CONFIG_KEYS[_generator_class.type_name]
+
 __all__ = [
     "BUILTIN_GENERATOR_CLASSES",
+    "BUILTIN_GENERATOR_CONFIG_KEYS",
     "BooleanGenerator",
     "BytesGenerator",
     "CharGenerator",

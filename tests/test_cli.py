@@ -58,6 +58,37 @@ def test_cli_stdout_uses_configured_encoding(write_config, monkeypatch) -> None:
     assert stdout.encoding.lower().replace("_", "-") == "utf-8"
 
 
+def test_cli_non_encodable_generated_stdout_returns_output_error(
+    write_config, monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = write_config(
+        {
+            "encoding": "ascii",
+            "format": "$word$",
+            "types": {"word": {"type": "string", "values": ["café"]}},
+        }
+    )
+    stdout = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+    monkeypatch.setattr(sys, "stdout", stdout)
+
+    assert main([str(config)]) == 1
+    error = capsys.readouterr().err
+    assert "cannot write output" in error
+    assert "unexpected error" not in error
+
+
+def test_cli_non_encodable_literal_cleans_atomic_output(
+    write_config, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = write_config({"encoding": "ascii", "format": "$n$é"})
+    output = tmp_path / "out.txt"
+
+    assert main([str(config), "-o", str(output)]) == 1
+    assert not output.exists()
+    assert list(tmp_path.glob(".out.txt.*.tmp")) == []
+    assert "unexpected error" not in capsys.readouterr().err
+
+
 def test_cli_stdout_without_reconfigure_still_writes(monkeypatch) -> None:
     from ton import cli
 

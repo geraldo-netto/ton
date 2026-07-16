@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from random import Random
+from timeit import repeat
 
 import pytest
 
@@ -145,3 +146,39 @@ def test_not_literal_pool_is_resolved_during_prepare(monkeypatch) -> None:
     )
 
     assert re.fullmatch(r"[^x]{3}", generator.generate(prepared, Random(0)))
+
+
+@pytest.mark.parametrize(
+    ("pattern", "pool"),
+    [
+        ("[a-z]", tuple("abcdefghijklmnopqrstuvwxyz")),
+        ("[^x]", tuple(chr(code) for code in range(0x20, 0x7F) if chr(code) != "x")),
+    ],
+)
+def test_prepared_regex_pools_preserve_seeded_choices(pattern: str, pool: tuple[str, ...]) -> None:
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": pattern})
+
+    for seed in range(20):
+        assert generator.generate(prepared, Random(seed)) == Random(seed).choice(pool)
+
+
+def test_prepared_regex_pool_lookup_benchmark_guard() -> None:
+    from ton.generators import _regex_parse as rx
+    from ton.generators import regex
+
+    items = tuple((rx.LITERAL, code) for code in range(ord("a"), ord("z") + 1))
+    pool = regex._in_pool(items)
+    rng = Random(0)
+    out: list[str] = []
+
+    prepared_time = min(repeat(lambda: regex._pick_in(pool, rng, out), repeat=3, number=20_000))
+    legacy_time = min(
+        repeat(
+            lambda: out.append(rng.choice(regex._in_pool(tuple(items)))),
+            repeat=3,
+            number=20_000,
+        )
+    )
+
+    assert prepared_time < legacy_time

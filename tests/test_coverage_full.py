@@ -554,7 +554,8 @@ def test_regex_emit_range_top_level_dispatch() -> None:
 def test_regex_emit_not_literal_top_level_dispatch() -> None:
     mod = _regex_internals()
     out: list[str] = []
-    mod._emit_not_literal(ord("a"), Random(0), out)
+    pool = mod._prepare_nodes(((mod.rx.NOT_LITERAL, ord("a")),))[0][1]
+    mod._emit_not_literal(pool, Random(0), out)
     assert out and out[0] != "a"
 
 
@@ -573,7 +574,7 @@ def test_regex_rejects_unsupported_class_element() -> None:
 def test_regex_empty_character_class_rejected() -> None:
     mod = _regex_internals()
     with pytest.raises(ValueError, match="empty character class"):
-        mod._pick_in([], Random(0), [])
+        mod._in_pool(())
 
 
 def test_regex_negated_class_excluding_all_rejected() -> None:

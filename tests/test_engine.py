@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 
 import pytest
 
+from ton._compiler import CompiledPlan
 from ton._engine import Engine, ProofError, TemplateError
 from ton._proof import ProofResult
 from ton._transforms import (
@@ -22,6 +23,10 @@ def test_engine_yields_requested_row_count(basic_config: dict) -> None:
     basic_config["rows"] = 5
     rows = list(Engine(basic_config, rng=Random(0)))
     assert len(rows) == 5
+
+
+def test_compiled_plan_is_immutable() -> None:
+    assert CompiledPlan.__dataclass_params__.frozen is True
 
 
 def test_engine_is_deterministic_for_a_seed(basic_config: dict) -> None:

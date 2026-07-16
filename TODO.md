@@ -90,7 +90,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| ARCH-011 | open | S | Define a compiler boundary and compiled-plan API that contains validation, field preparation, transform resolution, validator resolution, and pairing analysis. |
 | ARCH-014 | open | S | Move compile-time methods from `Engine` into the compiler without changing configuration errors or extension resolution. |
 | ARCH-015 | open | S | Make runtime `Engine` consume only the compiled plan for iteration, rendering, value resolution, and proof evaluation; add boundary tests. |
 

@@ -102,7 +102,15 @@ def test_validate_config_validator_refs_must_be_strings() -> None:
 
 def test_list_namespaces_prints_validators(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["--list-namespaces"]) == 0
-    assert "validators:" in capsys.readouterr().out
+    assert "validators: core.non_empty, non_empty" in capsys.readouterr().out
+
+
+def test_builtin_non_empty_validator_is_usable() -> None:
+    catalog = api.build_extension_catalog()
+
+    assert list(api.generate(_config(["ok"], ["non_empty"]), validators=catalog.validators())) == [
+        "ok"
+    ]
 
 
 def test_cli_validation_failure_exits_2(monkeypatch, write_config, capsys) -> None:

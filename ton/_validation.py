@@ -19,6 +19,15 @@ class ValidationError(ValueError):
     """Raised when a generated value fails a configured validator."""
 
 
+class NonEmptyValidator:
+    """Reference validator accepting values containing at least one character."""
+
+    type_name = "non_empty"
+
+    def validate(self, value: str) -> bool:
+        return bool(value)
+
+
 @runtime_checkable
 class Validator(Protocol):
     """Post-generation value check.

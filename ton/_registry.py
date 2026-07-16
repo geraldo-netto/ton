@@ -25,6 +25,7 @@ from typing import Any, TypeVar
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._transforms import IdentityTransform, Transform
+from ._validation import NonEmptyValidator
 
 # Importing ``ton.generators`` imports every concrete-generator submodule,
 # which is what populates Generator.__subclasses__() below.
@@ -192,7 +193,8 @@ def build_extension_catalog() -> ExtensionCatalog:
         transforms={
             "distribution": DistributionTransform(),
             "identity": IdentityTransform(),
-        }
+        },
+        validators={"non_empty": NonEmptyValidator()},
     )
 
 

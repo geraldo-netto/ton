@@ -92,7 +92,6 @@ Last full rescan: 2026-07-13 (all categories).
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
 | PLUG-010 | open | S | Reserved `core` namespace is not reserved. `_registry.py:147` only blocks *replacing* an existing core name, so an entry point named `core.foo` (or `catalog.register_data_type("core", "foo", ...)`) lands in the core namespace and `_flatten:134` promotes it to the bare alias `foo`. Verified. Contradicts `docs/architecture.md:12-31` ("plugins register additional namespaced types", built-ins isolated in `core`). Reject `core` for non-built-in registration. |
-| PLUG-013 | open | S | The `ton.validators` extension point ships with zero reference implementation: `catalog.list_validators()` is `()` and `--list-namespaces` prints an empty `validators:` line. No built-in validator, no example plugin, no doc'd way to try the feature without authoring a distribution. |
 
 ## CLI / option integrity
 

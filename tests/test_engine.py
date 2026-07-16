@@ -203,6 +203,33 @@ def test_engine_keeps_explicitly_empty_transform_catalog() -> None:
         Engine(config, transforms={})
 
 
+def test_lazy_registry_does_not_treat_transform_type_as_generator(monkeypatch) -> None:
+    import ton._engine as engine_module
+
+    requested: list[set[str]] = []
+    real_make_registry = engine_module.make_registry
+
+    def recording_registry(type_names=None):
+        requested.append(set(type_names or ()))
+        return real_make_registry(type_names)
+
+    monkeypatch.setattr(engine_module, "make_registry", recording_registry)
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "identity"}],
+            }
+        },
+    }
+
+    assert list(Engine(config)) == ["x"]
+    assert requested == [{"string"}, {"string"}]
+
+
 def test_engine_preserves_paired_value_through_identity_transform() -> None:
     config = {
         "rows": 1,

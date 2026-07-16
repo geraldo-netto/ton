@@ -567,34 +567,6 @@ class Engine:
         return result, tuple(steps)
 
 
-def _collect_nested_types(spec: Mapping[str, Any], needed: set[str]) -> None:
-    """Walk ``spec`` collecting every ``type`` referenced inside it.
-
-    Composite specs (e.g. ``weighted`` with ``choices``) embed nested
-    type specs the engine's lazy registry would otherwise miss. The
-    walk recurses through any list/dict value, picking up ``type``
-    keys at every level.
-    """
-    type_name = spec.get("type")
-    if isinstance(type_name, str):
-        needed.add(_runtime_type_name(type_name))
-    for value in spec.values():
-        _walk_value_for_types(value, needed)
-
-
-def _walk_value_for_types(value: Any, needed: set[str]) -> None:
-    if isinstance(value, Mapping):
-        if "type" in value and isinstance(value["type"], str):
-            _collect_nested_types(value, needed)
-            return
-        for inner in value.values():
-            _walk_value_for_types(inner, needed)
-        return
-    if isinstance(value, list):
-        for item in value:
-            _walk_value_for_types(item, needed)
-
-
 def _rng_for_seed(seed: int | None) -> Random:
     """Return a seeded ``Random`` when ``seed`` is given, else an unseeded one.
 

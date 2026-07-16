@@ -199,10 +199,12 @@ class Engine:
         seed: int | None = None,
         registry: Mapping[str, Generator] | None = None,
         transforms: Mapping[str, Transform] | None = None,
+        validators: Mapping[str, Validator] | None = None,
         rng: Random | None = None,
         proof_mode: str = "off",
         proof_sample_rate: int = 1,
         milestone_rows: int = 0,
+        redact_proof_failures: bool = False,
     ) -> Engine:
         """Build an Engine from a JSON config on disk.
 
@@ -217,10 +219,12 @@ class Engine:
             seed=seed,
             registry=registry,
             transforms=transforms,
+            validators=validators,
             rng=rng,
             proof_mode=proof_mode,
             proof_sample_rate=proof_sample_rate,
             milestone_rows=milestone_rows,
+            redact_proof_failures=redact_proof_failures,
         )
 
     @property

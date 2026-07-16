@@ -44,6 +44,7 @@ from ._engine import Engine, EngineOptions
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._transforms import Transform
+from ._validation import Validator
 from .generators import Generator
 
 _UINT64_MODULUS = 1 << 64
@@ -91,9 +92,11 @@ def fork_engine(
     rows: int | None = None,
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
+    validators: Mapping[str, Validator] | None = None,
     proof_mode: str = "off",
     proof_sample_rate: int = 1,
     milestone_rows: int = 0,
+    redact_proof_failures: bool = False,
 ) -> Engine:
     """Build an Engine with a per-worker RNG and an optional row override.
 
@@ -112,11 +115,13 @@ def fork_engine(
         EngineOptions(
             registry=registry,
             transforms=transforms,
+            validators=validators,
             rng=rng,
             seed=seed,
             proof_mode=proof_mode,
             proof_sample_rate=proof_sample_rate,
             milestone_rows=milestone_rows,
+            redact_proof_failures=redact_proof_failures,
         ),
     )
     _logger.info(

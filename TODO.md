@@ -92,7 +92,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| ARCH-010 | open | S | `EngineOptions` (DEC-001) did not stop option drift: `_engine.py:213` `Engine.from_file` and `concurrency.py:77` `fork_engine` both omit `validators` and `redact_proof_failures`. Concrete effect: `fork_engine` cannot pass plugin validators, so a config with a `validators` list works in the parent but dies in the worker with `TemplateError: Unknown validator`; and audit-mode workers cannot redact. Make `EngineOptions` the only construction surface. |
 | ARCH-011 | open | S | Define a compiler boundary and compiled-plan API that contains validation, field preparation, transform resolution, validator resolution, and pairing analysis. |
 | ARCH-014 | open | S | Move compile-time methods from `Engine` into the compiler without changing configuration errors or extension resolution. |
 | ARCH-015 | open | S | Make runtime `Engine` consume only the compiled plan for iteration, rendering, value resolution, and proof evaluation; add boundary tests. |

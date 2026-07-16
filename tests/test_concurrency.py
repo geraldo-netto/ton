@@ -93,6 +93,39 @@ def test_fork_engine_threads_worker_seed_and_proof_options() -> None:
     assert engine._proof.sample_rate == 3
 
 
+def test_fork_engine_threads_validators_and_redaction() -> None:
+    class AcceptAll:
+        type_name = "accept_all"
+
+        def validate(self, value: str) -> bool:
+            return True
+
+    config = {
+        "rows": 1,
+        "format": "$n$",
+        "types": {
+            "n": {
+                "type": "integer",
+                "minValue": 0,
+                "maxValue": 9,
+                "validators": ["accept_all"],
+            }
+        },
+    }
+
+    engine = fork_engine(
+        config,
+        parent_seed=5,
+        worker_id=1,
+        validators={"accept_all": AcceptAll()},
+        proof_mode="audit",
+        redact_proof_failures=True,
+    )
+
+    assert list(engine) != []
+    assert engine._proof.redact is True
+
+
 @pytest.mark.parametrize(
     "start_method",
     [

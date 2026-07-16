@@ -607,7 +607,7 @@ def test_engine_rejects_unknown_proof_mode(basic_config: dict) -> None:
 
 
 def test_engine_sample_proof_mode_skips_unsampled_rows() -> None:
-    class FailingSecondRowGenerator(Generator):
+    class FailingFirstRowGenerator(Generator):
         type_name = "sampled"
 
         def __init__(self) -> None:
@@ -620,13 +620,13 @@ def test_engine_sample_proof_mode_skips_unsampled_rows() -> None:
 
         def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
             del prepared
-            return ProofResult(ok=result.value != "row-2", reason="bad second row")
+            return ProofResult(ok=result.value != "row-1", reason="bad first row")
 
     config = {"rows": 3, "format": "$v$", "types": {"v": {"type": "sampled"}}}
     rows = list(
         Engine.from_config(
             config,
-            registry={"sampled": FailingSecondRowGenerator()},
+            registry={"sampled": FailingFirstRowGenerator()},
             proof_mode="sample",
             proof_sample_rate=2,
         )

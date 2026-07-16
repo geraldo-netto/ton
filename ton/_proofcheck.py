@@ -68,7 +68,7 @@ class ProofChecker:
         if self.mode == "off":
             return False
         if self.mode == "sample":
-            return rows_emitted % self.sample_rate == 0
+            return (rows_emitted + 1) % self.sample_rate == 0
         return True
 
     def evaluate(

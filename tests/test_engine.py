@@ -209,16 +209,16 @@ def test_engine_keeps_explicitly_empty_transform_catalog() -> None:
 
 
 def test_lazy_registry_does_not_treat_transform_type_as_generator(monkeypatch) -> None:
-    import ton._engine as engine_module
+    import ton._compiler as compiler_module
 
     requested: list[set[str]] = []
-    real_make_registry = engine_module.make_registry
+    real_make_registry = compiler_module.make_registry
 
     def recording_registry(type_names=None):
         requested.append(set(type_names or ()))
         return real_make_registry(type_names)
 
-    monkeypatch.setattr(engine_module, "make_registry", recording_registry)
+    monkeypatch.setattr(compiler_module, "make_registry", recording_registry)
     config = {
         "rows": 1,
         "format": "$v$",

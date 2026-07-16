@@ -14,26 +14,23 @@ from random import Random
 from typing import Any
 
 from . import _config
+from ._compiler import TemplateError as _TemplateError
+from ._compiler import compile_plan
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import (
     PreparedField,
-    PreparedTransform,
     ProofFailure,
     ProvenanceRecord,
     TransformStep,
 )
 from ._proofcheck import ProofChecker
-from ._registry import build_extension_catalog, make_registry, normalize_reference
-from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
+from ._template import Token
 from ._transforms import Transform, TransformResult
 from ._validation import ValidationError, Validator
 from .generators import Generator
-from .generators.base import PreparationContext
 
-
-class TemplateError(ValueError):
-    """Raised when a template references a type not declared in the config."""
+TemplateError = _TemplateError
 
 
 class ProofError(TemplateError):
@@ -85,17 +82,19 @@ class Engine:
         milestone_rows: int = 0,
         redact_proof_failures: bool = False,
     ) -> None:
-        self._template: str = config["format"]
-        self._types: Mapping[str, Mapping[str, Any]] = config["types"]
-        self._rows: int = int(config["rows"])
-        self._tokens = parse(self._template)
-        self._registry = self._resolve_registry(registry)
-        self._transforms = dict(
-            transforms if transforms is not None else build_extension_catalog().transforms()
+        plan = compile_plan(
+            config,
+            registry=registry,
+            transforms=transforms,
+            validators=validators,
         )
-        self._validators = dict(
-            validators if validators is not None else build_extension_catalog().validators()
-        )
+        self._template = plan.template
+        self._types = plan.types
+        self._rows = plan.rows
+        self._tokens = plan.tokens
+        self._registry = plan.registry
+        self._transforms = plan.transforms
+        self._validators = plan.validators
         self._rng = rng if rng is not None else Random()
         self._proof = ProofChecker(
             mode=proof_mode,
@@ -104,18 +103,10 @@ class Engine:
             redact=redact_proof_failures,
         )
         self._seed = seed
-        self._validate()
-        # Each referenced type spec is parsed once via Generator.prepare;
-        # the per-row hot path just looks up the prepared spec by name.
-        self._prepared: dict[str, PreparedField] = self._build_prepared()
-        # Skip per-row paired_cache allocation when no referenced type is paired.
-        self._has_paired = any(self._prepared[t.type_key].is_paired for t in self._tokens)
-        # Precompute the literal segments that surround placeholders so
-        # the per-row render is a straight string-join with no regex
-        # pass (TODO PERF-009).
-        literals, plan_tokens = split_segments(self._template)
-        self._literals: list[str] = literals
-        self._plan_tokens: list[Token] = plan_tokens
+        self._prepared = plan.prepared
+        self._has_paired = plan.has_paired
+        self._literals = plan.literals
+        self._plan_tokens = plan.plan_tokens
         self._milestone_rows = max(0, int(milestone_rows))
         self._rows_emitted = 0
         self._iteration_lock = threading.Lock()
@@ -279,135 +270,6 @@ class Engine:
                 )
             )
         return tuple(records)
-
-    def _resolve_registry(
-        self, registry: Mapping[str, Generator] | None
-    ) -> Mapping[str, Generator]:
-        if registry is not None:
-            return dict(registry)
-        # Build only the generator instances the template references so
-        # constructing an Engine for a one-type config does not allocate
-        # the other 19 built-ins (TODO PERF-012). Tokens referencing
-        # undeclared variables are tolerated here so the real diagnostic
-        # comes from :meth:`_validate` instead of a ``KeyError``. The
-        # walk recurses into composite specs (e.g. ``weighted``'s
-        # ``choices``) so nested types are present at prepare time.
-        root_specs: list[Mapping[str, Any]] = []
-        root_types: set[str] = set()
-        for token in self._tokens:
-            spec = self._types.get(token.type_key)
-            if isinstance(spec, Mapping) and "type" in spec:
-                root_specs.append(spec)
-                root_types.add(_runtime_type_name(spec["type"]))
-        roots = make_registry(root_types)
-        needed = set(root_types)
-        for spec in root_specs:
-            generator = roots.get(_runtime_type_name(spec["type"]))
-            if generator is not None:
-                needed.update(_runtime_type_name(name) for name in generator.nested_types(spec))
-        return make_registry(needed)
-
-    def _validate(self) -> None:
-        try:
-            validate_against(self._template, self._types.keys())
-        except UndeclaredVariableError as exc:
-            raise TemplateError(str(exc)) from exc
-        for token in self._tokens:
-            type_name = _runtime_type_name(self._types[token.type_key]["type"])
-            if type_name not in self._registry:
-                raise TemplateError(f"Unknown type {type_name!r} for variable {token.type_key!r}")
-
-    def _build_prepared(self) -> dict[str, PreparedField]:
-        prepared: dict[str, PreparedField] = {}
-        context = PreparationContext(self._registry)
-        for token in self._tokens:
-            if token.type_key in prepared:
-                continue
-            spec = self._types[token.type_key]
-            generator = self._registry[_runtime_type_name(spec["type"])]
-            try:
-                source_prepared = context.prepare_generator(generator, spec)
-                prepared[token.type_key] = PreparedField(
-                    generator=generator,
-                    source_prepared=source_prepared,
-                    transforms=self._prepare_transforms(token.type_key, spec, generator),
-                    validators=self._resolve_validators(token.type_key, spec),
-                )
-            except Exception as exc:  # noqa: BLE001 - boundary; re-raised below
-                # Surface the failing spec to log handlers before
-                # collapsing the exception to a TemplateError so a
-                # buggy third-party generator can be attributed
-                # without an interpreter traceback (TODO OBS-004).
-                _logger.warning(
-                    "prepare_failed type_key=%s generator_type=%s error=%s",
-                    token.type_key,
-                    type(generator).__name__,
-                    exc,
-                    extra={
-                        "event": LogEvent.PREPARE_FAILED.value,
-                        "type_key": token.type_key,
-                        "generator_type": type(generator).__name__,
-                        "error": f"{type(exc).__name__}: {exc}",
-                    },
-                )
-                raise TemplateError(
-                    f"Invalid spec for variable {token.type_key!r}: {type(exc).__name__}: {exc}"
-                ) from exc
-        return prepared
-
-    def _prepare_transforms(
-        self,
-        type_key: str,
-        spec: Mapping[str, Any],
-        generator: Generator,
-    ) -> tuple[PreparedTransform, ...]:
-        is_paired = bool(generator.is_paired)
-        prepared: list[PreparedTransform] = []
-        for transform_spec in spec.get("transforms", []):
-            transform = self._resolve_transform(type_key, transform_spec["type"])
-            if is_paired and not transform.capabilities.accepts_paired:
-                raise TemplateError(
-                    f"Transform {transform_spec['type']!r} for variable "
-                    f"{type_key!r} does not accept paired input"
-                )
-            prepared.append(
-                PreparedTransform(
-                    transform,
-                    transform.prepare_composite(transform_spec, self._registry),
-                )
-            )
-            _logger.info(
-                "transform_prepared type_key=%s transform=%s paired=%s",
-                type_key,
-                transform.type_name,
-                is_paired,
-                extra={
-                    "event": LogEvent.TRANSFORM_PREPARED.value,
-                    "type_key": type_key,
-                    "transform": transform.type_name,
-                    "paired_input": is_paired,
-                },
-            )
-            is_paired = is_paired and transform.capabilities.preserves_pairing
-        return tuple(prepared)
-
-    def _resolve_transform(self, type_key: str, reference: str) -> Transform:
-        normalized = normalize_reference(reference)
-        if normalized in self._transforms:
-            return self._transforms[normalized]
-        if reference in self._transforms:
-            return self._transforms[reference]
-        raise TemplateError(f"Unknown transform {reference!r} for variable {type_key!r}")
-
-    def _resolve_validators(self, type_key: str, spec: Mapping[str, Any]) -> tuple[Validator, ...]:
-        resolved: list[Validator] = []
-        for reference in spec.get("validators", []):
-            normalized = normalize_reference(reference)
-            validator = self._validators.get(normalized) or self._validators.get(reference)
-            if validator is None:
-                raise TemplateError(f"Unknown validator {reference!r} for variable {type_key!r}")
-            resolved.append(validator)
-        return tuple(resolved)
 
     def __iter__(self) -> Iterator[str]:
         if not self._iteration_lock.acquire(blocking=False):
@@ -573,9 +435,3 @@ def _rng_for_seed(seed: int | None) -> Random:
     idiom that was duplicated across the engine and CLI (DEC-002).
     """
     return Random(seed) if seed is not None else Random()
-
-
-def _runtime_type_name(type_name: object) -> str:
-    if isinstance(type_name, str) and type_name.startswith("core."):
-        return type_name.split(".", 1)[1]
-    return str(type_name)

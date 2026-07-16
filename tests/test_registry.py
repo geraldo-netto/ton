@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import inspect
-import logging
 import subprocess
 import sys
 import threading
@@ -13,7 +12,6 @@ from unittest import mock
 
 import pytest
 
-from ton._logging import LogEvent
 from ton._registry import (
     ExtensionCatalog,
     RegistryError,
@@ -282,13 +280,11 @@ def test_catalog_serializes_registration_and_snapshot_reads() -> None:
 def test_extension_catalog_rejects_builtin_replacement() -> None:
     catalog = build_extension_catalog()
 
-    with pytest.raises(RegistryError, match="cannot replace"):
+    with pytest.raises(RegistryError, match="reserved"):
         catalog.register_data_type("core", "string", default_registry()["string"])
 
 
-def test_core_registration_does_not_emit_plugin_event(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+def test_extension_catalog_rejects_new_core_registration() -> None:
     class CustomGenerator(Generator):
         type_name = "custom_core"
 
@@ -297,13 +293,8 @@ def test_core_registration_does_not_emit_plugin_event(
 
     catalog = ExtensionCatalog(generators={})
 
-    with caplog.at_level(logging.INFO, logger="ton"):
+    with pytest.raises(RegistryError, match="reserved"):
         catalog.register_data_type("core", "custom_core", CustomGenerator())
-
-    assert not any(
-        getattr(record, "event", None) == LogEvent.PLUGIN_REGISTERED.value
-        for record in caplog.records
-    )
 
 
 def test_extension_catalog_rejects_ambiguous_registration() -> None:

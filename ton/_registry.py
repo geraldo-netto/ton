@@ -159,8 +159,8 @@ class ExtensionCatalog:
     ) -> None:
         _validate_identifier("namespace", namespace)
         _validate_identifier("name", name)
-        if namespace == CORE_NAMESPACE and name in store[CORE_NAMESPACE]:
-            raise RegistryError(f"cannot replace built-in registration {name!r}")
+        if namespace == CORE_NAMESPACE:
+            raise RegistryError("namespace 'core' is reserved for built-in registrations")
         bucket = store.setdefault(namespace, {})
         if name in bucket:
             raise RegistryError(f"registration {namespace}.{name} already exists")
@@ -471,8 +471,6 @@ def registry_with_entry_points(
 
 
 def _log_plugin_registered(kind: str, namespace: str, name: str) -> None:
-    if namespace == CORE_NAMESPACE:
-        return
     _logger.info(
         "plugin_registered kind=%s namespace=%s name=%s",
         kind,

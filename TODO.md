@@ -112,7 +112,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DEC-011 | open | S | `_registry.py:121` `ExtensionCatalog._flattened` returns the *live* cached dict from `generators()`/`transforms()`/`validators()`; any caller mutating it corrupts catalog internals. Only `registry_with_entry_points:432` avoids this, via an explicit copy plus a warning comment. Return a copy or `MappingProxyType`. |
 | DEC-012 | open | S | `generators/base.py:315` hard-codes the registry's `core.` namespace convention inside the generator layer (see DUP-012). |
 | DEC-013 | open | S | Bidirectional coupling: `_proofcheck.py:26` imports `PreparedField`/`TransformStep` from `_engine` (TYPE_CHECKING only) while `_engine` imports `ProofChecker`. The trace value objects belong in `_proof.py`. |
 | DEC-014 | open | S | Add a generator extension hook that reports nested generator type names from a spec without preparing it. |

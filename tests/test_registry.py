@@ -218,7 +218,7 @@ def test_extension_catalog_registers_namespaced_plugins() -> None:
     assert catalog.get_transform("plugin.trim").type_name == "trim"
 
 
-def test_catalog_caches_flattened_view_until_registration() -> None:
+def test_catalog_returns_isolated_flattened_views_until_registration() -> None:
     class CustomGenerator(Generator):
         type_name = "widget"
 
@@ -228,11 +228,11 @@ def test_catalog_caches_flattened_view_until_registration() -> None:
 
     catalog = build_extension_catalog()
     first = catalog.generators()
-    assert catalog.generators() is first  # PERF-003: cached identity, not rebuilt
+    first.clear()
+    assert "string" in catalog.generators()
 
     catalog.register_data_type("acme", "widget", CustomGenerator())
 
-    assert catalog.generators() is not first  # registration invalidated the cache
     assert "acme.widget" in catalog.generators()
 
 

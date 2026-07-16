@@ -124,7 +124,7 @@ class ExtensionCatalog:
         if cached is None:
             cached = self._flatten(store)
             self._flat_cache[key] = cached
-        return cached
+        return dict(cached)
 
     @staticmethod
     def _flatten(store: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:

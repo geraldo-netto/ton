@@ -277,7 +277,7 @@ Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so adjacent w
 - `rows` — how many rows to emit (non-negative integer, maximum `1,000,000,000`).
 - `format` — the template; any `$name$` segment is a variable that must be declared in `types`. `$$` renders a literal `$`. A trailing `[id]` (e.g. `$word[id]$`) requests the paired-id facet of a paired generator — see [Paired references](#paired-references-nameid) below.
 - `types` — a map of variable name to type spec.
-- `encoding` — optional; the text codec used when writing to an `--output` file (default `utf-8`). Must be a codec Python recognizes. Output to stdout uses the stream's own encoding.
+- `encoding` — optional; the text codec used for file output and stdout (default `utf-8`). Must be a text codec Python recognizes; stdout is temporarily reconfigured for the run and restored afterward.
 - A value that the configured codec cannot represent is an output error (CLI exit `1`), not a configuration error.
 
 Unknown root keys and unknown keys owned by built-in generators/transforms are

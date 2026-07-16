@@ -25,6 +25,12 @@ File define expected behavior + usage model for AI agents in this repo.
 - Avoid duplication. Apply SOLID where practical.
 - Document assumptions, constraints, design intent in comments or commit notes when matter.
 - Prefer explicit, maintainable solutions over clever shortcuts.
+- Treat TON as a batch-processing system: never impose hard CPU, memory,
+  row-width, expansion, pool-size, precision, or workload caps, and do not
+  reject otherwise valid jobs because they are large. Prefer streaming, lazy
+  evaluation, chunking, spill-to-disk, backpressure, and explicit
+  operator-controlled settings without restrictive defaults. Reject or
+  rewrite review findings that propose hard resource caps.
 - Unpack TODO findings into the smallest independently actionable items by default.
   Keep an item whole only when it is genuinely atomic or splitting it would create
   artificial work; record that reason in the item description when it is not obvious.

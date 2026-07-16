@@ -175,6 +175,13 @@ def resolve_reference(registry: Mapping[str, _T], reference: str) -> _T | None:
     )
 
 
+def runtime_type_name(reference: object) -> str:
+    """Return the bare runtime key for a built-in qualified reference."""
+    if isinstance(reference, str):
+        return normalize_reference(reference).removeprefix(f"{CORE_NAMESPACE}.")
+    return str(reference)
+
+
 def build_extension_catalog() -> ExtensionCatalog:
     """Return a catalog containing the built-in data types."""
     return ExtensionCatalog(

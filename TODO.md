@@ -31,7 +31,6 @@ Last full rescan: 2026-07-13 (all categories).
 | DUP-010 | open | S | Extract a pure paired-transform capability fold that checks `accepts_paired` and computes whether pairing is preserved. |
 | DUP-016 | open | S | Route `_config._validate_transforms` and `_engine._prepare_transforms` through the shared capability fold while preserving their public error types/messages. |
 | DUP-017 | open | S | Add parity tests proving config validation and engine preparation accept/reject the same paired-transform chains. |
-| DUP-012 | open | S | `"core."` prefix stripping duplicated at `_engine.py:597` `_runtime_type_name` and `generators/base.py:315` `prepare_child_spec`; the registry owns that convention. |
 | DUP-013 | open | S | `generators/base.py:225` `coerce_int` and `:259` `coerce_float` repeat the same 8-line `_MISSING`/default resolution preamble. |
 | DUP-014 | open | S | Identical config-error mapping try/except (FileNotFoundError->1, ConfigError/TemplateError/JSONDecodeError->2) in `cli.py:240` `_validate_config` and `cli.py:258` `_prepare_engine`. |
 | DUP-015 | open | S | Proof-mode value list `off/sample/all/audit` hard-coded in `cli.py:109` (argparse choices) and `_proofcheck.py:227` (`validate_proof_mode`). |

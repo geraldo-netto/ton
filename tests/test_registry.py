@@ -24,6 +24,7 @@ from ton._registry import (
     normalize_reference,
     registry_with_entry_points,
     resolve_reference,
+    runtime_type_name,
 )
 from ton._transforms import BaseTransform
 from ton.generators import Generator
@@ -82,6 +83,8 @@ def test_resolve_reference_handles_bare_and_core_qualified_catalogs() -> None:
 
     assert resolve_reference({"string": value}, "core.string") is value
     assert resolve_reference({"core.string": value}, "string") is value
+    assert runtime_type_name("core.string") == "string"
+    assert runtime_type_name("string") == "string"
 
 
 def test_discover_returns_only_concrete_named_subclasses() -> None:

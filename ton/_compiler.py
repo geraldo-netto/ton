@@ -9,7 +9,12 @@ from typing import Any
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import PreparedField, PreparedTransform
-from ._registry import build_extension_catalog, make_registry, normalize_reference
+from ._registry import (
+    build_extension_catalog,
+    make_registry,
+    normalize_reference,
+    runtime_type_name,
+)
 from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
 from ._transforms import Transform
 from ._validation import Validator
@@ -85,13 +90,13 @@ class EngineCompiler:
             spec = self.types.get(token.type_key)
             if isinstance(spec, Mapping) and "type" in spec:
                 root_specs.append(spec)
-                root_types.add(_runtime_type_name(spec["type"]))
+                root_types.add(runtime_type_name(spec["type"]))
         roots = make_registry(root_types)
         needed = set(root_types)
         for spec in root_specs:
-            generator = roots.get(_runtime_type_name(spec["type"]))
+            generator = roots.get(runtime_type_name(spec["type"]))
             if generator is not None:
-                needed.update(_runtime_type_name(name) for name in generator.nested_types(spec))
+                needed.update(runtime_type_name(name) for name in generator.nested_types(spec))
         return make_registry(needed)
 
     def _validate(self) -> None:
@@ -100,7 +105,7 @@ class EngineCompiler:
         except UndeclaredVariableError as exc:
             raise TemplateError(str(exc)) from exc
         for token in self.tokens:
-            type_name = _runtime_type_name(self.types[token.type_key]["type"])
+            type_name = runtime_type_name(self.types[token.type_key]["type"])
             if type_name not in self.registry:
                 raise TemplateError(f"Unknown type {type_name!r} for variable {token.type_key!r}")
 
@@ -113,7 +118,7 @@ class EngineCompiler:
             if token.type_key in prepared:
                 continue
             spec = self.types[token.type_key]
-            generator = self.registry[_runtime_type_name(spec["type"])]
+            generator = self.registry[runtime_type_name(spec["type"])]
             try:
                 prepared[token.type_key] = PreparedField(
                     generator=generator,
@@ -199,9 +204,3 @@ def compile_plan(
 ) -> CompiledPlan:
     """Compile one config through the canonical compiler boundary."""
     return EngineCompiler(config, registry, transforms, validators).compile()
-
-
-def _runtime_type_name(type_name: object) -> str:
-    if isinstance(type_name, str) and type_name.startswith("core."):
-        return type_name.split(".", 1)[1]
-    return str(type_name)

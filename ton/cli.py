@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from typing import TextIO, TypeVar
 
 from . import __version__, api
+from ._logging import terminal_failure_fields
 from ._output import OutputEncodingError, open_output_path
 from ._proofcheck import PROOF_MODES
 from .api import (
@@ -196,6 +197,7 @@ def _run(args: argparse.Namespace) -> int:
             type(exc).__name__,
             extra={"event": LogEvent.CLI_UNEXPECTED_ERROR.value, "error_type": type(exc).__name__},
         )
+        _log_terminal_failure("unexpected", 3, 0, 0, exc)
         print(f"ton: unexpected error: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 3
 
@@ -294,15 +296,27 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
                 resume_from=args.resume_from,
             )
     except OSError as exc:
+        _log_terminal_failure(
+            "output", 1, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
+        )
         print(f"ton: cannot write output: {exc}", file=sys.stderr)
         return 1
     except ProofError as exc:
+        _log_terminal_failure(
+            "proof", 2, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
+        )
         print(f"ton: proof failed: {exc}", file=sys.stderr)
         return 2
     except ValidationError as exc:
+        _log_terminal_failure(
+            "validation", 2, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
+        )
         print(f"ton: validation failed: {exc}", file=sys.stderr)
         return 2
     except TemplateError as exc:
+        _log_terminal_failure(
+            "validation", 2, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
+        )
         print(f"ton: invalid config: {exc}", file=sys.stderr)
         return 2
     if args.verbose:
@@ -310,6 +324,31 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
     if args.proof_check == "audit":
         _report_proof_audit(engine)
     return 0
+
+
+def _log_terminal_failure(
+    category: str,
+    exit_code: int,
+    rows_written: int,
+    total_rows: int,
+    exc: Exception,
+) -> None:
+    fields = terminal_failure_fields(
+        category,
+        exit_code,
+        rows_written=rows_written,
+        total_rows=total_rows,
+        error_type=type(exc).__name__,
+    )
+    _logger.error(
+        "cli_failed category=%s exit_code=%d rows_written=%d total_rows=%d error_type=%s",
+        category,
+        exit_code,
+        rows_written,
+        total_rows,
+        type(exc).__name__,
+        extra=fields,
+    )
 
 
 def _report_proof_audit(engine: Engine) -> None:

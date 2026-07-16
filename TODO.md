@@ -95,7 +95,6 @@ Last full rescan: 2026-07-13 (all categories).
 | ARCH-011 | open | S | Define a compiler boundary and compiled-plan API that contains validation, field preparation, transform resolution, validator resolution, and pairing analysis. |
 | ARCH-014 | open | S | Move compile-time methods from `Engine` into the compiler without changing configuration errors or extension resolution. |
 | ARCH-015 | open | S | Make runtime `Engine` consume only the compiled plan for iteration, rendering, value resolution, and proof evaluation; add boundary tests. |
-| ARCH-012 | open | S | Extract output target validation and special-file/symlink policy from `cli.py` into a reusable output-sink module. |
 | ARCH-016 | open | S | Move atomic temporary-file replacement, cleanup, and interrupted-write behavior into the output sink. |
 | ARCH-017 | open | S | Move permission/umask preservation into the output sink and expose the sink through the supported library API. |
 | ARCH-018 | open | S | Add CLI/API parity tests for successful writes, special files, replacement failure, cleanup, and preserved permissions. |

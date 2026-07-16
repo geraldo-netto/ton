@@ -15,6 +15,7 @@ from contextlib import contextmanager, suppress
 from typing import TextIO, cast
 
 from . import __version__, api
+from ._output import validate_output_target
 from .api import (
     ConfigError,
     Engine,
@@ -401,33 +402,7 @@ def _open_output(
         with _reconfigured_stdout(encoding) as stream:
             yield stream
         return
-    exists = os.path.exists(path)
-    if exists:
-        # SEC-005: ``open(path, 'w')`` will happily redirect output into
-        # ``/dev/sda`` or any other block / character device the user
-        # can write to. Refuse explicitly so a stray ``-o`` argument
-        # cannot scribble over hardware nodes or named pipes.
-        st = os.stat(path)
-        if not (stat.S_ISREG(st.st_mode) or stat.S_ISFIFO(st.st_mode)):
-            _logger.error(
-                "output_special_file_rejected path=%s mode=%o",
-                path,
-                st.st_mode,
-                extra={
-                    "event": LogEvent.OUTPUT_SPECIAL_FILE_REJECTED.value,
-                    "path": path,
-                    "mode": st.st_mode,
-                },
-            )
-            raise OSError(f"refusing to write to special file (not a regular file): {path}")
-        if no_clobber:
-            raise OSError(f"refusing to overwrite existing file: {path}")
-        _logger.warning(
-            "output_overwrite path=%s",
-            path,
-            extra={"event": LogEvent.OUTPUT_OVERWRITE.value, "path": path},
-        )
-    if exists and stat.S_ISFIFO(os.stat(path).st_mode):
+    if validate_output_target(path, no_clobber=no_clobber):
         with open(path, "w", encoding=encoding) as fh:
             yield fh
         return

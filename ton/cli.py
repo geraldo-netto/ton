@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from typing import TextIO, TypeVar
 
 from . import __version__, api
-from ._output import open_output_path
+from ._output import OutputEncodingError, open_output_path
 from ._proofcheck import PROOF_MODES
 from .api import (
     ConfigError,
@@ -442,7 +442,10 @@ def _stream(
         count += 1
         if count <= resume_from:
             continue
-        stream.write(f"{row}\n")
+        try:
+            stream.write(f"{row}\n")
+        except UnicodeEncodeError as exc:
+            raise OutputEncodingError(stream.encoding or "unknown", exc.reason) from exc
         written += 1
         if written and written % flush_at == 0:
             # Block-buffered streams (e.g. files) rely on the interpreter

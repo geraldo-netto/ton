@@ -86,7 +86,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CLI-015 | open | S | Translate `UnicodeEncodeError` from stdout and file streaming into the chosen domain error and documented CLI exit code without the unexpected-error banner. |
 | CLI-016 | open | S | Add CLI tests for non-encodable literals/generated values on stdout and atomic file output, including partial-file cleanup. |
 
 ## configuration discoverability

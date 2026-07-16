@@ -101,6 +101,8 @@ def _prepare_nodes(seq: Iterable[tuple[Any, Any]]) -> tuple[tuple[Any, Any], ...
     for op, arg in seq:
         if op is rx.IN:
             arg = _in_pool(tuple(arg))
+        elif op is rx.NOT_LITERAL:
+            arg = _excluding_pool(frozenset((chr(arg),)))
         elif op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
             arg = (arg[0], arg[1], _prepare_nodes(arg[2]))
         elif op is rx.BRANCH:
@@ -182,8 +184,8 @@ def _emit_literal(arg: Any, rng: Random, out: list[str]) -> None:
     out.append(chr(arg))
 
 
-def _emit_not_literal(arg: Any, rng: Random, out: list[str]) -> None:
-    out.append(rng.choice(_excluding_pool(frozenset((chr(arg),)))))
+def _emit_not_literal(pool: tuple[str, ...], rng: Random, out: list[str]) -> None:
+    out.append(rng.choice(pool))
 
 
 def _emit_any(arg: Any, rng: Random, out: list[str]) -> None:

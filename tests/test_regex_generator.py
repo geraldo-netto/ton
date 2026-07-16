@@ -133,3 +133,15 @@ def test_character_classes_are_resolved_during_prepare(monkeypatch) -> None:
     monkeypatch.setattr(regex, "_in_pool", lambda items: pytest.fail("resolved class again"))
 
     assert re.fullmatch(r"([a-z]|[0-9]){3}", generator.generate(prepared, Random(0)))
+
+
+def test_not_literal_pool_is_resolved_during_prepare(monkeypatch) -> None:
+    from ton.generators import regex
+
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": "[^x]{3}"})
+    monkeypatch.setattr(
+        regex, "_excluding_pool", lambda excluded: pytest.fail("resolved exclusion again")
+    )
+
+    assert re.fullmatch(r"[^x]{3}", generator.generate(prepared, Random(0)))

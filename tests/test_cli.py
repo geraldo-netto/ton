@@ -389,6 +389,18 @@ def test_cli_atomic_output_preserves_existing_file_mode(write_config, tmp_path: 
     assert stat.S_IMODE(os.stat(out_file).st_mode) == 0o644
 
 
+def test_cli_refuses_symlink_output_without_replacing_link(write_config, tmp_path: Path) -> None:
+    config = write_config()
+    target = tmp_path / "target.txt"
+    target.write_text("old\n", encoding="utf-8")
+    link = tmp_path / "output.txt"
+    link.symlink_to(target)
+
+    assert main([str(config), "-o", str(link)]) == 1
+    assert link.is_symlink()
+    assert target.read_text(encoding="utf-8") == "old\n"
+
+
 def test_cli_atomic_output_new_file_respects_umask(write_config, tmp_path: Path) -> None:
     config = write_config()
     out_file = tmp_path / "fresh.txt"

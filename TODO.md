@@ -86,7 +86,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| ROB-010 | open | S | `cli.py:479` `os.replace(tmp_name, path)` destroys a symlinked `--output`: `os.stat` follows the link so the `S_ISREG` gate passes, then the rename replaces the *link* with a regular file and the real target is never written. Verified: `ln -s real.txt link.txt; ton c.json -o link.txt` -> `link.txt` is now a regular file, `real.txt` still holds its old content (plain `open(path,"w")` would have written through). Resolve the target with `os.path.realpath` before choosing the temp dir / rename target, or refuse symlinks explicitly. |
 
 ## architecture/modularity/SOLID
 

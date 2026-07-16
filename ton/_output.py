@@ -15,6 +15,8 @@ from ._logging import logger as _logger
 
 def validate_output_target(path: str, *, no_clobber: bool = False) -> bool:
     """Validate ``path`` and return whether it names an existing FIFO."""
+    if os.path.islink(path):
+        raise OSError(f"refusing to replace symbolic-link output: {path}")
     if not os.path.exists(path):
         return False
     target = os.stat(path)

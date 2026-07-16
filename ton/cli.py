@@ -457,8 +457,8 @@ def _stream(
             # Block-buffered streams (e.g. files) rely on the interpreter
             # for write batching; this controls only the flush cadence.
             stream.flush()
-        if progress_every and count % progress_every == 0:
-            _emit_progress(count, time.perf_counter() - started)
+        if progress_every and written % progress_every == 0:
+            _emit_progress(written, time.perf_counter() - started)
     return written
 
 

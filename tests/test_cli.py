@@ -180,6 +180,19 @@ def test_cli_progress_does_not_enable_engine_milestones(
     assert "engine_milestone" not in events
 
 
+def test_cli_progress_counts_only_rows_written_after_resume(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = write_config()
+
+    assert main([str(config), "--resume-from", "2", "--progress", "2"]) == 0
+
+    progress = [
+        json.loads(line) for line in capsys.readouterr().err.splitlines() if line.startswith("{")
+    ]
+    assert [event["rows"] for event in progress] == [2]
+
+
 def test_cli_validate_checks_config_without_generating_rows(
     write_config, capsys: pytest.CaptureFixture[str]
 ) -> None:

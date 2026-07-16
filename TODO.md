@@ -100,7 +100,6 @@ Last full rescan: 2026-07-13 (all categories).
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
 | CLI-010 | open | S | `--redact-proof-failures` is a no-op for CLI users. It only masks the retained `Engine.proof_failures` records, which the CLI never emits (`cli.py:315` `_report_proof_audit` prints a count), and the `proof_check_failed` log event (`_proofcheck.py:208`) already carries no `value`/`spec`. The flag changes no CLI-visible output. |
-| CLI-013 | open | S | `--progress` counts *generated* rows while `--verbose` counts *written* rows (`cli.py:520-535`); with `--resume-from N` the progress JSON reports rows that were never written and the two summaries disagree. |
 | CLI-014 | open | S | Define whether configured output-encoding failures are configuration errors (exit 2) or output errors (exit 1), and add a pointed domain error carrying encoding/field context. |
 | CLI-015 | open | S | Translate `UnicodeEncodeError` from stdout and file streaming into the chosen domain error and documented CLI exit code without the unexpected-error banner. |
 | CLI-016 | open | S | Add CLI tests for non-encodable literals/generated values on stdout and atomic file output, including partial-file cleanup. |

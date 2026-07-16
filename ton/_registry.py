@@ -25,7 +25,7 @@ from typing import Any, TypeVar
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._transforms import IdentityTransform, Transform
-from ._validation import NonEmptyValidator
+from ._validation import NonEmptyValidator, Validator
 
 # Importing ``ton.generators`` imports every concrete-generator submodule,
 # which is what populates Generator.__subclasses__() below.
@@ -94,6 +94,8 @@ class ExtensionCatalog:
         _log_plugin_registered("transform", namespace, name)
 
     def register_validator(self, namespace: str, name: str, validator: Any) -> None:
+        if not isinstance(validator, Validator):
+            raise TypeError("validator must implement the Validator protocol")
         with self._lock:
             self._register(self._validators, namespace, name, validator)
         _log_plugin_registered("validator", namespace, name)
@@ -287,6 +289,8 @@ def _register_entry_point_plugin(
             raise TypeError("transform entry point must return a Transform")
         catalog.register_transform(namespace, name, plugin)
         return
+    if not isinstance(plugin, Validator):
+        raise TypeError("validator entry point must return a Validator")
     catalog.register_validator(namespace, name, plugin)
 
 

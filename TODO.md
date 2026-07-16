@@ -87,7 +87,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
 | PLUG-014 | open | M | Catalog generator prototypes are deep-copied per registry, but transforms and validators are returned as shared instances and their lifecycle/statelessness contract is undocumented. Define one extension-instance policy and test two Engines built from a reused catalog with stateful transform/validator fixtures. |
-| PLUG-015 | open | S | Validator entry points receive no runtime contract check: any object is registered, listed, and accepted by config validation, then fails at row generation with a missing `validate`/`type_name` attribute. Validate the `Validator` protocol during direct and entry-point registration, matching generator/transform handling. |
 
 ## CLI / option integrity
 

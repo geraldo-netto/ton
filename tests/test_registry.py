@@ -26,6 +26,7 @@ from ton._registry import (
     runtime_type_name,
 )
 from ton._transforms import BaseTransform
+from ton._validation import NonEmptyValidator
 from ton.generators import Generator
 
 
@@ -217,7 +218,7 @@ def test_extension_catalog_registers_namespaced_plugins() -> None:
     catalog = build_extension_catalog()
     catalog.register_data_type("plugin", "custom", CustomGenerator())
     catalog.register_transform("plugin", "trim", CustomTransform())
-    catalog.register_validator("plugin", "custom", object())
+    catalog.register_validator("plugin", "custom", NonEmptyValidator())
 
     assert "string" in catalog.list_data_types()
     assert "core.string" in catalog.list_data_types()
@@ -263,7 +264,7 @@ def test_catalog_serializes_registration_and_snapshot_reads() -> None:
 
     def register() -> None:
         started.set()
-        catalog.register_validator("plugin", "check", object())
+        catalog.register_validator("plugin", "check", NonEmptyValidator())
         completed.set()
 
     with catalog._lock:
@@ -295,6 +296,11 @@ def test_extension_catalog_rejects_new_core_registration() -> None:
 
     with pytest.raises(RegistryError, match="reserved"):
         catalog.register_data_type("core", "custom_core", CustomGenerator())
+
+
+def test_extension_catalog_rejects_invalid_validator() -> None:
+    with pytest.raises(TypeError, match="Validator protocol"):
+        build_extension_catalog().register_validator("plugin", "bad", object())
 
 
 def test_extension_catalog_rejects_ambiguous_registration() -> None:
@@ -338,7 +344,7 @@ def test_catalog_entry_points_load_separate_plugin_kinds() -> None:
     validator_ep = mock.Mock()
     validator_ep.name = "acme.custom"
     validator_ep.value = "pkg:Validator"
-    validator_ep.load.return_value = lambda: object()
+    validator_ep.load.return_value = NonEmptyValidator
 
     def _entry_points(group: str):
         return {

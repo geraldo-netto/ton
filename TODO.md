@@ -76,7 +76,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DEC-010 | open | S | `ton.api` claims to be the only supported public facade, but README examples require `from ton import concurrency` and `ton.concurrency` exposes public helpers independently. Decide whether concurrency is supported, then re-export/document it through the facade or narrow the facade claim. |
 
 ## business/design patterns/DDD
 

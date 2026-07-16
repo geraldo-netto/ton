@@ -21,6 +21,12 @@ def test_generate_yields_iterator(basic_config: dict) -> None:
     assert all(row.isdigit() for row in rows)
 
 
+def test_concurrency_helpers_are_available_from_public_facade() -> None:
+    assert api.chunk_rows(10, 3, 0) == 4
+    assert api.derive_rng(1, 0).random() == api.derive_rng(1, 0).random()
+    assert callable(api.fork_engine)
+
+
 def test_engine_options_is_public_parameter_object() -> None:
     options = api.EngineOptions(seed=42, proof_mode="audit")
 

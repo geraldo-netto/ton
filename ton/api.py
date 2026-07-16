@@ -64,6 +64,7 @@ from ._registry import (
 from ._template import UndeclaredVariableError
 from ._transforms import Transform
 from ._validation import ValidationError, Validator
+from .concurrency import chunk_rows, derive_rng, derive_seed, fork_engine
 from .generators import Generator, PairedGenerator
 
 __all__ = [
@@ -86,6 +87,10 @@ __all__ = [
     "build_extension_catalog",
     "build_registry",
     "configure_stderr",
+    "chunk_rows",
+    "derive_rng",
+    "derive_seed",
+    "fork_engine",
     "generate",
     "generate_from_file",
     "load_config",

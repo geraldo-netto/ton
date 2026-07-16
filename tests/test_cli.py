@@ -229,6 +229,15 @@ def test_cli_validate_rejects_bad_field_bounds(
     assert "invalid config" in captured.err
 
 
+def test_cli_validate_rejects_non_string_transform_type(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config = write_config({"types": {"n": {"type": "integer", "transforms": [{"type": 7}]}}})
+
+    assert main([str(config), "--validate"]) == 2
+    assert "invalid config" in capsys.readouterr().err
+
+
 def test_cli_validate_missing_config_returns_1(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -88,7 +88,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 |---------|--------|--------|-------------|
 | CLI-015 | open | S | Translate `UnicodeEncodeError` from stdout and file streaming into the chosen domain error and documented CLI exit code without the unexpected-error banner. |
 | CLI-016 | open | S | Add CLI tests for non-encodable literals/generated values on stdout and atomic file output, including partial-file cleanup. |
-| CLI-017 | open | S | A transform spec with a non-string `type` reaches `normalize_reference`, raises `AttributeError`, and makes `ton config.json --validate` exit 3 with an unexpected-error banner. Map malformed transform references to the normal invalid-config exit 2 path. |
 
 ## configuration discoverability
 

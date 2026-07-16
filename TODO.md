@@ -138,7 +138,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-026 | open | S | Complete `generate` / `generate_from_file` documentation for `validators=`, `proof_mode`, `proof_sample_rate`, and `redact_proof_failures`, with a minimal example. |
 | DOC-027 | open | S | Add a documentation/API-surface test or checklist that compares `api.__all__` with the supported-surface and README references. |
 | DOC-023 | open | S | README type-reference tables omit shipped defaults/caps: `bytes.length` defaults to 16 (table implies required), `text.count` defaults to 5, and `hash.rounds` is absent from the field table. |
 | DOC-028 | open | S | README's UUID section says UUID1 uses the host clock/node and ignores the seed, but `UUIDGenerator` constructs both v1 and v4 from seeded random bytes specifically to avoid host-data leakage. Correct the behavior and reproducibility text. |

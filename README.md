@@ -232,6 +232,27 @@ Public extension and provenance types:
   each field's source type, transform chain, proof settings/failure count, and
   plugin package/version when available.
 
+`generate(config, *, seed=None, registry=None, transforms=None,
+validators=None, proof_mode="off", proof_sample_rate=1,
+milestone_rows=0, redact_proof_failures=False)` and `generate_from_file`
+accept the same generation options. For example:
+
+```python
+catalog = api.build_extension_catalog()
+rows = api.generate_from_file(
+    "config.json",
+    seed=42,
+    validators=catalog.validators(),
+    proof_mode="sample",
+    proof_sample_rate=100,
+    redact_proof_failures=True,
+)
+```
+
+`proof_mode` is `off`, `sample`, `all`, or `audit`; sample mode checks every
+Nth row. Redaction removes values/specs only from retained audit failure
+records. It does not alter generated rows.
+
 Custom plugins register via three entry-point groups in any installed package: `ton.generators` (data types), `ton.transforms`, and `ton.validators`:
 
 Generator extensions implement `prepare(spec, context=None)`. Composite generators

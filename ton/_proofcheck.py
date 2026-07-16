@@ -15,6 +15,7 @@ engine's ``TemplateError``).
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 
 from ._logging import LogEvent
@@ -89,19 +90,20 @@ class ProofChecker:
         """
         if not self.should_check(rows_emitted):
             return None
-        retain_detail = self.mode != "audit" or len(self.failures) < MAX_AUDIT_SAMPLE
         failures = self.build_failures(
             type_key,
             field,
             source_result,
             steps,
             row=rows_emitted + 1,
-            spec=spec if retain_detail else None,
+            spec=spec if self.mode != "audit" else None,
         )
         if not failures:
             return None
         if self.mode == "audit":
             for failure in failures:
+                if len(self.failures) < MAX_AUDIT_SAMPLE:
+                    failure = replace(failure, spec=dict(spec))
                 self._record_audit(failure)
                 self._log_failure(failure)
             return None

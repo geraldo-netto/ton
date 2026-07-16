@@ -536,7 +536,8 @@ def test_engine_audit_proof_failures_bounded_but_counted(monkeypatch: Any) -> No
     assert len(engine.proof_failures) == 2
     assert engine.proof_failure_count == 5
     assert engine.provenance[0].proof_failures == 5
-    assert [spec is None for spec in seen_specs] == [False, False, True, True, True]
+    assert all(spec is None for spec in seen_specs)
+    assert all(failure.spec == {"type": "failing"} for failure in engine.proof_failures)
 
 
 def test_engine_provenance_reports_source_transforms_and_proof_state() -> None:

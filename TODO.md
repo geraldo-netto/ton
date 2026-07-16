@@ -107,7 +107,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DEC-014 | open | S | Add a generator extension hook that reports nested generator type names from a spec without preparing it. |
 | DEC-017 | open | S | Implement nested-type discovery for each built-in composite generator and use it during lazy registry construction. |
 | DEC-018 | open | S | Remove `_engine._walk_value_for_types` and add tests proving transform mappings are ignored while plugin composite children are discovered. |
 

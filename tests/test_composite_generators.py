@@ -15,7 +15,7 @@ import pytest
 from ton import api
 from ton._engine import Engine, TemplateError
 from ton._logging import LogEvent
-from ton.generators.base import prepare_child_spec
+from ton.generators.base import Generator, prepare_child_spec
 from ton.generators.one_of import OneOfGenerator
 from ton.generators.sequence_of import (
     MAX_SEQUENCE_OF_COUNT,
@@ -280,6 +280,23 @@ def test_prepare_child_spec_rejects_missing_type_field() -> None:
 def test_prepare_child_spec_rejects_unknown_type() -> None:
     with pytest.raises(ValueError, match="unknown type"):
         prepare_child_spec("custom", "'spec'", {"type": "nope"}, {})
+
+
+def test_generator_nested_type_hook_defaults_empty_and_is_extensible() -> None:
+    class Composite(Generator):
+        type_name = "composite"
+
+        def nested_types(self, spec):
+            return tuple(spec["children"])
+
+        def generate(self, prepared, rng):
+            return ""
+
+    assert Generator.nested_types(Composite(), {}) == ()
+    assert Composite().nested_types({"children": ["string", "integer"]}) == (
+        "string",
+        "integer",
+    )
 
 
 # ---------------------------------------------------------------------------

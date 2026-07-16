@@ -96,6 +96,16 @@ class Generator(ABC):
         del registry
         return self.prepare(spec)
 
+    def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
+        """Return direct child generator references declared by ``spec``.
+
+        Composite extensions override this discovery hook so lazy registry
+        construction does not need to infer generator references from
+        arbitrary nested mappings.
+        """
+        del spec
+        return ()
+
     @abstractmethod
     def generate(self, prepared: Any, rng: Random) -> str:
         """Return the generated value, using the prepared spec."""

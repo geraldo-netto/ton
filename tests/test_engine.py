@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from random import Random
-from threading import Barrier, Thread
 from typing import Any, ClassVar
 
 import pytest
@@ -87,27 +86,11 @@ def test_engine_rejects_concurrent_iteration(basic_config: dict) -> None:
     basic_config["rows"] = 2
     engine = Engine(basic_config, rng=Random(0))
     iterator = iter(engine)
-    next(iterator)
 
-    errors: list[BaseException] = []
-    barrier = Barrier(2)
+    with pytest.raises(RuntimeError, match="concurrently"):
+        iter(engine)
 
-    def _iterate_again() -> None:
-        barrier.wait()
-        try:
-            list(engine)
-        except BaseException as exc:  # noqa: BLE001 - test captures thread failure
-            errors.append(exc)
-
-    thread = Thread(target=_iterate_again)
-    thread.start()
-    barrier.wait()
-    thread.join(timeout=2)
-    list(iterator)
-
-    assert len(errors) == 1
-    assert isinstance(errors[0], RuntimeError)
-    assert "concurrently" in str(errors[0])
+    assert list(iterator) != []
 
 
 def test_engine_applies_transform_chain_to_single_value() -> None:

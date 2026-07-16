@@ -428,10 +428,14 @@ class Engine:
     def __iter__(self) -> Iterator[str]:
         if not self._iteration_lock.acquire(blocking=False):
             raise RuntimeError("Engine instances cannot be iterated concurrently")
+        if self._iteration_started:
+            self._iteration_lock.release()
+            raise RuntimeError("Engine instances are single-shot and cannot be iterated twice")
+        self._iteration_started = True
+        return self._iterate()
+
+    def _iterate(self) -> Iterator[str]:
         try:
-            if self._iteration_started:
-                raise RuntimeError("Engine instances are single-shot and cannot be iterated twice")
-            self._iteration_started = True
             milestone = self._milestone_rows
             self._rows_emitted = 0
             self._proof.reset()

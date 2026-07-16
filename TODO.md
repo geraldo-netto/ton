@@ -138,5 +138,4 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-028 | open | S | README's UUID section says UUID1 uses the host clock/node and ignores the seed, but `UUIDGenerator` constructs both v1 and v4 from seeded random bytes specifically to avoid host-data leakage. Correct the behavior and reproducibility text. |
 | DOC-029 | open | S | The public API overview and exception list omit the exported `OutputEncodingError`, including when callers should catch it and its `encoding` / `field_name` context attributes. |

@@ -656,7 +656,8 @@ Same bounds semantics as `date` but emits epoch seconds (or millis).
 
 #### `uuid`
 
-UUID4 (default) or UUID1. UUID4 is built from the seeded RNG, so it is reproducible; UUID1 uses the host clock + node id and ignores the seed.
+UUID4 (default) or synthetic UUID1. Both versions are built from the seeded RNG,
+so output is reproducible and UUID1 never exposes the host clock, node id, or MAC address.
 
 | field        | type | description                          |
 |--------------|------|--------------------------------------|

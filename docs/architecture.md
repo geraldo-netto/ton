@@ -43,7 +43,7 @@ Entry-point names may be qualified (`acme.customer_id`) or unqualified
 
 For each template field, `Engine` prepares an explicit pipeline:
 
-1. Source data type: `Generator.prepare()` or `prepare_composite()`.
+1. Source data type: `Generator.prepare(spec, preparation_context)`.
 2. Ordered transform chain: `Transform.prepare_composite()`.
 3. Per-row source generation.
 4. Per-row transform application.

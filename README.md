@@ -136,11 +136,7 @@ sequenceDiagram
   Engine->>Registry: make_registry(referenced_type_names)
   Registry-->>Engine: {type → Generator}
   loop for each declared type used by the template
-    alt generator.is_composite
-      Engine->>G: prepare_composite(spec, registry)
-    else
-      Engine->>G: prepare(spec)
-    end
+    Engine->>G: prepare(spec, preparation_context)
     G-->>Engine: prepared spec (typed dataclass)
   end
   Caller->>Engine: iter(engine)
@@ -203,6 +199,11 @@ as `sequence` one unambiguous lifecycle. Calling `api.generate(...)` again
 constructs a fresh Engine and reproduces seeded output.
 
 Custom plugins register via three entry-point groups in any installed package: `ton.generators` (data types), `ton.transforms`, and `ton.validators`:
+
+Generator extensions implement `prepare(spec, context=None)`. Composite generators
+resolve children with `context.prepare_child(parent_type, location, child_spec)` and
+declare nested references with `nested_types(spec)`. The legacy one-argument
+`prepare(spec)` contract remains supported for existing plugins.
 
 ```toml
 [project.entry-points."ton.generators"]

@@ -329,6 +329,37 @@ def test_builtin_composites_declare_transitive_nested_types(generator, spec, exp
     assert generator.nested_types(spec) == expected
 
 
+def test_plugin_composite_uses_public_preparation_context() -> None:
+    class Wrapper(Generator):
+        type_name = "wrapper"
+
+        def prepare(self, spec, context=None):
+            assert context is not None
+            return context.prepare_child("wrapper", "'child'", spec["child"])
+
+        def nested_types(self, spec):
+            return self._nested_type_names(spec["child"])
+
+        def generate(self, prepared, rng):
+            generator, child = prepared
+            return f"[{generator.generate(child, rng)}]"
+
+    registry = api.build_extension_catalog().generators()
+    registry["wrapper"] = Wrapper()
+    config = {
+        "rows": 1,
+        "format": "$value$",
+        "types": {
+            "value": {
+                "type": "wrapper",
+                "child": {"type": "string", "values": ["x"]},
+            }
+        },
+    }
+
+    assert list(Engine(config, registry=registry)) == ["[x]"]
+
+
 # ---------------------------------------------------------------------------
 # REL-019: weighted also blocks paired children (regression guard)
 # ---------------------------------------------------------------------------

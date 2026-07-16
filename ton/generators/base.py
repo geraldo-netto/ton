@@ -70,11 +70,8 @@ class Generator(ABC):
     #: third-party generators can opt in without subclassing a concrete type.
     is_paired: ClassVar[bool] = False
 
-    #: True when the generator's prepared spec contains nested generators
-    #: that need access to the same registry the engine uses. Composite
-    #: generators override :meth:`prepare_composite` instead of (or in
-    #: addition to) :meth:`prepare`; the engine routes them through the
-    #: composite path so they can resolve nested type specs.
+    #: Legacy composite marker retained for compatibility. New extensions
+    #: accept ``PreparationContext`` in :meth:`prepare` instead.
     is_composite: ClassVar[bool] = False
 
     def prepare(
@@ -89,11 +86,8 @@ class Generator(ABC):
         The default passes the dict through, preserving the legacy
         contract for third-party generators that take a raw dict.
 
-        Composite generators (``is_composite = True``) must be prepared
-        via :meth:`prepare_composite` so they can resolve nested specs
-        against the registry; the default therefore refuses the direct
-        path for them (DUP-003). Composite subclasses that also accept a
-        non-composite legacy form override this method.
+        Composite generators use ``context.prepare_child(...)`` to resolve
+        nested specs through the same registry as their parent.
         """
         del context
         return spec
@@ -374,6 +368,5 @@ def prepare_child_spec(
             "paired generators cannot be nested inside a composite generator "
             "(the [id] half would be unreachable)"
         )
-    if child.is_composite:
-        return child, child.prepare_composite(nested_spec, registry)
-    return child, child.prepare(nested_spec)
+    context = PreparationContext(registry)
+    return child, context.prepare_generator(child, nested_spec)

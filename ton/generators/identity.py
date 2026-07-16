@@ -99,7 +99,10 @@ class EmailGenerator(Generator):
 
 @dataclass(frozen=True)
 class PhoneSpec:
-    pattern: str
+    segments: tuple[str, ...]
+
+
+_DIGITS = "0123456789"
 
 
 class PhoneGenerator(Generator):
@@ -111,7 +114,14 @@ class PhoneGenerator(Generator):
         pattern = str(spec.get("format", "+1 (###) ###-####"))
         if "#" not in pattern:
             raise ValueError("phone 'format' must contain at least one '#'")
-        return PhoneSpec(pattern=pattern)
+        return PhoneSpec(segments=tuple(pattern.split("#")))
 
     def generate(self, prepared: PhoneSpec, rng: Random) -> str:
-        return "".join(str(rng.randint(0, 9)) if ch == "#" else ch for ch in prepared.pattern)
+        digits = rng.choices(_DIGITS, k=len(prepared.segments) - 1)
+        return (
+            "".join(
+                segment + digit
+                for segment, digit in zip(prepared.segments[:-1], digits, strict=True)
+            )
+            + prepared.segments[-1]
+        )

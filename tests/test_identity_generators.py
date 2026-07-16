@@ -49,6 +49,7 @@ def test_phone_format_replaces_only_hash() -> None:
     prepared = gen.prepare({"format": "+1 (###) ###-####"})
     value = gen.generate(prepared, Random(0))
     assert re.fullmatch(r"\+1 \(\d{3}\) \d{3}-\d{4}", value)
+    assert prepared.segments == ("+1 (", "", "", ") ", "", "", "-", "", "", "", "")
 
 
 def test_phone_requires_at_least_one_hash() -> None:

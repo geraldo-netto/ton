@@ -62,7 +62,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CONC-010 | open | S | `fork_engine` offsets nested sequences by `worker_id * worker_rows`; uneven shards use different `worker_rows`, producing overlaps/gaps (10 rows / 3 workers starts at 0, 3, 6 instead of 0, 4, 7). Compute the prefix sum implied by `chunk_rows`. |
 | CONC-011 | open | S | `ExtensionCatalog` has no synchronization around registration and flattened-cache rebuilds. Concurrent `generators()`/`register_*()` calls can iterate a mutating dict or publish a stale flattened snapshot after invalidation; lock mutations and cache publication or document construction-only use. |
 
 ## robustness/recovery

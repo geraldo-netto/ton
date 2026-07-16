@@ -47,8 +47,15 @@ def test_fork_engine_overrides_row_count() -> None:
         "format": "$n$",
         "types": {"n": {"type": "integer", "minValue": 1, "maxValue": 9, "padWithZero": False}},
     }
-    engine = fork_engine(config, parent_seed=1, worker_id=0, rows=7)
+    engine = fork_engine(config, parent_seed=1, worker_id=0, workers=15, rows=7)
     assert len(list(engine)) == 7
+
+
+def test_fork_engine_requires_worker_count_for_row_override() -> None:
+    config = {"rows": 10, "fields": {"id": {"type": "sequence"}}}
+
+    with pytest.raises(ValueError, match="workers is required"):
+        fork_engine(config, parent_seed=1, worker_id=0, rows=7)
 
 
 def test_fork_engine_reproducible_per_worker() -> None:
@@ -64,17 +71,40 @@ def test_fork_engine_reproducible_per_worker() -> None:
 
 def test_fork_engine_offsets_sequence_ranges_without_mutating_config() -> None:
     config = {
-        "rows": 3,
+        "rows": 6,
         "format": "$id$",
         "types": {"id": {"type": "sequence", "start": 10}},
     }
 
-    first = list(fork_engine(config, parent_seed=1, worker_id=0, rows=3))
-    second = list(fork_engine(config, parent_seed=1, worker_id=1, rows=3))
+    first = list(fork_engine(config, parent_seed=1, worker_id=0, workers=2, rows=3))
+    second = list(fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=3))
 
     assert first == ["10", "11", "12"]
     assert second == ["13", "14", "15"]
     assert config["types"]["id"]["start"] == 10
+
+
+def test_fork_engine_offsets_uneven_sequence_shards() -> None:
+    config = {
+        "rows": 10,
+        "format": "$id$",
+        "types": {"id": {"type": "sequence", "start": 0}},
+    }
+
+    chunks = [
+        list(
+            fork_engine(
+                config,
+                parent_seed=1,
+                worker_id=worker_id,
+                workers=3,
+                rows=chunk_rows(10, 3, worker_id),
+            )
+        )
+        for worker_id in range(3)
+    ]
+
+    assert chunks == [["0", "1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]]
 
 
 def test_derive_seed_matches_derive_rng() -> None:

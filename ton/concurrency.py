@@ -20,6 +20,7 @@ A multi-process generator can then do::
         rows_per_worker = concurrency.chunk_rows(config["rows"], workers, worker_id)
         eng = concurrency.fork_engine(config, parent_seed=42,
                                       worker_id=worker_id,
+                                      workers=workers,
                                       rows=rows_per_worker)
         return list(eng)
 
@@ -91,6 +92,7 @@ def fork_engine(
     *,
     parent_seed: int,
     worker_id: int,
+    workers: int | None = None,
     rows: int | None = None,
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
@@ -110,8 +112,14 @@ def fork_engine(
     """
     seed = derive_seed(parent_seed, worker_id)
     rng = Random(seed)
-    worker_rows = int(config["rows"] if rows is None else rows)
-    config = _offset_sequences(config, worker_id * worker_rows)
+    total_rows = int(config["rows"])
+    worker_rows = int(total_rows if rows is None else rows)
+    if rows is not None and workers is None:
+        raise ValueError("workers is required when rows overrides a worker shard")
+    offset = worker_id * worker_rows
+    if workers is not None:
+        offset = _chunk_offset(total_rows, workers, worker_id)
+    config = _offset_sequences(config, offset)
     if rows is not None:
         config = {**config, "rows": rows}
     engine = Engine.from_options(
@@ -141,6 +149,13 @@ def fork_engine(
         },
     )
     return engine
+
+
+def _chunk_offset(total_rows: int, workers: int, worker_id: int) -> int:
+    """Return the number of rows assigned to workers before ``worker_id``."""
+    chunk_rows(total_rows, workers, worker_id)
+    base, remainder = divmod(total_rows, workers)
+    return worker_id * base + min(worker_id, remainder)
 
 
 def _offset_sequences(config: Mapping[str, Any], offset: int) -> dict[str, Any]:

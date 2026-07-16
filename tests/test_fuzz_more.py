@@ -128,7 +128,15 @@ def test_fork_engine_workers_yield_disjoint_streams_when_partitioned() -> None:
             },
         }
         chunks.append(
-            list(fork_engine(config, parent_seed=42, worker_id=wid, rows=rows_per_worker))
+            list(
+                fork_engine(
+                    config,
+                    parent_seed=42,
+                    worker_id=wid,
+                    workers=workers,
+                    rows=rows_per_worker,
+                )
+            )
         )
     flattened = [row for chunk in chunks for row in chunk]
     assert len(set(flattened)) == workers * rows_per_worker

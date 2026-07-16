@@ -28,7 +28,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-017 | open | S | Add parity tests proving config validation and engine preparation accept/reject the same paired-transform chains. |
 
 ## reliability/correctness
 

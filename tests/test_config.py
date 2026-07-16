@@ -257,6 +257,53 @@ def test_validate_config_rejects_incompatible_transform_chain() -> None:
         api.validate_config(payload, catalog=catalog)
 
 
+def test_config_and_engine_agree_on_paired_transform_chains() -> None:
+    class PreservePair(BaseTransform):
+        type_name: ClassVar[str] = "preserve"
+        capabilities: ClassVar[TransformCapabilities] = TransformCapabilities(True, True)
+
+    class DropPair(BaseTransform):
+        type_name: ClassVar[str] = "drop"
+        capabilities: ClassVar[TransformCapabilities] = TransformCapabilities(True, False)
+
+    class SingleOnly(BaseTransform):
+        type_name: ClassVar[str] = "single"
+        capabilities: ClassVar[TransformCapabilities] = TransformCapabilities(False, False)
+
+    transforms = {
+        "plugin.preserve": PreservePair(),
+        "plugin.drop": DropPair(),
+        "plugin.single": SingleOnly(),
+    }
+    catalog = api.build_extension_catalog()
+    for reference, transform in transforms.items():
+        namespace, name = reference.split(".")
+        catalog.register_transform(namespace, name, transform)
+
+    def payload(chain: list[str]) -> dict:
+        return {
+            "rows": 1,
+            "format": "$word$",
+            "types": {
+                "word": {
+                    "type": "lmhash",
+                    "values": ["secret"],
+                    "transforms": [{"type": reference} for reference in chain],
+                }
+            },
+        }
+
+    accepted = payload(["plugin.preserve", "plugin.drop", "plugin.single"])
+    api.validate_config(accepted, catalog=catalog)
+    Engine(accepted, transforms=transforms)
+
+    rejected = payload(["plugin.preserve", "plugin.single"])
+    with pytest.raises(ConfigError, match="does not accept paired input"):
+        api.validate_config(rejected, catalog=catalog)
+    with pytest.raises(TemplateError, match="does not accept paired input"):
+        Engine(rejected, transforms=transforms)
+
+
 def test_validate_config_accepts_core_identity_transform() -> None:
     payload = _valid_payload()
     payload["types"]["a"]["transforms"] = [{"type": "identity"}]

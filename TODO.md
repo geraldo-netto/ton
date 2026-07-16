@@ -67,7 +67,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| ROB-010 | open | M | `--no-clobber` is a check-then-replace policy: after `validate_output_target` sees no file, `atomic_output` eventually calls `os.replace` and overwrites any file created in between. Use an atomic exclusive publish operation and add a race regression test. |
 | ROB-011 | open | S | Atomic output fsyncs the temporary file but not its parent directory after `os.replace`. A crash/power loss can therefore lose the newly published directory entry despite a successful return; fsync the directory on supported platforms with a documented fallback. |
 
 ## architecture/modularity/SOLID

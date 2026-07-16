@@ -121,6 +121,29 @@ def test_public_output_sink_rolls_back_failed_write(tmp_path: Path) -> None:
     assert list(tmp_path.glob(".rows.txt.*.tmp")) == []
 
 
+def test_public_output_sink_no_clobber_publish_is_atomic(tmp_path: Path) -> None:
+    output = tmp_path / "rows.txt"
+
+    with (
+        pytest.raises(FileExistsError),
+        api.open_output_path(str(output), no_clobber=True) as stream,
+    ):
+        stream.write("generated\n")
+        output.write_text("racing writer\n", encoding="utf-8")
+
+    assert output.read_text(encoding="utf-8") == "racing writer\n"
+    assert list(tmp_path.glob(".rows.txt.*.tmp")) == []
+
+
+def test_public_output_sink_no_clobber_publishes_new_file(tmp_path: Path) -> None:
+    output = tmp_path / "rows.txt"
+
+    with api.open_output_path(str(output), no_clobber=True) as stream:
+        stream.write("generated\n")
+
+    assert output.read_text(encoding="utf-8") == "generated\n"
+
+
 def test_public_output_sink_matches_cli_symlink_policy(tmp_path: Path) -> None:
     target = tmp_path / "target.txt"
     target.write_text("old\n", encoding="utf-8")

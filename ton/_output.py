@@ -65,6 +65,7 @@ def atomic_output(
     *,
     encoding: str = "utf-8",
     mode: int = 0o600,
+    no_clobber: bool = False,
 ) -> Iterator[TextIO]:
     """Yield a temporary stream and atomically replace ``path`` on success."""
     directory = os.path.dirname(os.path.abspath(path)) or "."
@@ -85,7 +86,11 @@ def atomic_output(
             stream.flush()
             os.fsync(stream.fileno())
         os.chmod(tmp_name, mode)
-        os.replace(tmp_name, path)
+        if no_clobber:
+            os.link(tmp_name, path)
+            os.unlink(tmp_name)
+        else:
+            os.replace(tmp_name, path)
         tmp_name = ""
     finally:
         if tmp_name:
@@ -105,7 +110,12 @@ def open_output_path(
         with open(path, "w", encoding=encoding, newline="\n") as stream:
             yield stream
         return
-    with atomic_output(path, encoding=encoding, mode=target_mode(path)) as stream:
+    with atomic_output(
+        path,
+        encoding=encoding,
+        mode=target_mode(path),
+        no_clobber=no_clobber,
+    ) as stream:
         yield stream
 
 

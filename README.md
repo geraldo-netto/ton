@@ -73,14 +73,28 @@ Everything observability-related goes to stderr; stdout stays clean for piping. 
 
 ### Resume / partition a long run
 
-```bash
-ton huge.json --seed 1 --resume-from 0       -o chunk-0.txt --batch-rows 4096
-ton huge.json --seed 1 --resume-from 500000  -o chunk-1.txt --batch-rows 4096
-ton huge.json --seed 1 --resume-from 1000000 -o chunk-2.txt --batch-rows 4096
+```python
+from ton import api
+
+config = api.load_config("huge.json")
+workers = 3
+for worker_id in range(workers):
+    rows = api.chunk_rows(config["rows"], workers, worker_id)
+    engine = api.fork_engine(
+        config,
+        parent_seed=1,
+        worker_id=worker_id,
+        workers=workers,
+        rows=rows,
+    )
+    with open(f"chunk-{worker_id}.txt", "w", encoding="utf-8", newline="\n") as output:
+        for row in engine:
+            output.write(f"{row}\n")
 ```
 
-Each shard sees the same seeded RNG; later shards just throw away the prefix they don't want. Combined with `concurrency.fork_engine` (below) this gives deterministic parallel output without coordinating writers.
-For large offsets, `--resume-from` still pays the cost of generating skipped rows so every generator reaches the same deterministic state. Prefer explicit worker partitioning with `ton.concurrency.fork_engine` when startup time matters.
+Each shard receives an exact, non-overlapping row count and a deterministic
+worker RNG. `--resume-from` is for restarting one seeded stream: it still
+generates the skipped prefix and does not limit the number of later rows.
 
 ## Architecture
 

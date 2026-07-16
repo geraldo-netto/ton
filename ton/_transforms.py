@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar, Protocol, runtime_checkable
@@ -14,6 +14,27 @@ class TransformCapabilities:
 
     accepts_paired: bool = False
     preserves_pairing: bool = False
+
+
+@dataclass(frozen=True)
+class PairedCapabilityResult:
+    """Result of folding a transform chain's paired-value capabilities."""
+
+    preserves_pairing: bool
+    incompatible_index: int | None = None
+
+
+def fold_paired_capabilities(
+    starts_paired: bool,
+    capabilities: Sequence[TransformCapabilities],
+) -> PairedCapabilityResult:
+    """Check paired-input compatibility and fold pairing preservation."""
+    is_paired = starts_paired
+    for index, capability in enumerate(capabilities):
+        if is_paired and not capability.accepts_paired:
+            return PairedCapabilityResult(False, index)
+        is_paired = is_paired and capability.preserves_pairing
+    return PairedCapabilityResult(is_paired)
 
 
 @dataclass(frozen=True)

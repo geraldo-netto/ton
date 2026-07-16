@@ -6,7 +6,13 @@ from random import Random
 from typing import Any
 
 from ton._registry import default_registry
-from ton._transforms import BaseTransform, TransformProof, TransformResult
+from ton._transforms import (
+    BaseTransform,
+    TransformCapabilities,
+    TransformProof,
+    TransformResult,
+    fold_paired_capabilities,
+)
 from ton.transforms import DistributionTransform
 
 
@@ -21,6 +27,30 @@ class EchoTransform(BaseTransform):
     ) -> TransformResult:
         del prepared, rng
         return value
+
+
+def test_fold_paired_capabilities_reports_first_incompatible_stage() -> None:
+    result = fold_paired_capabilities(
+        True,
+        (
+            TransformCapabilities(accepts_paired=True, preserves_pairing=True),
+            TransformCapabilities(),
+            TransformCapabilities(accepts_paired=True, preserves_pairing=True),
+        ),
+    )
+
+    assert result.incompatible_index == 1
+    assert result.preserves_pairing is False
+
+
+def test_fold_paired_capabilities_tracks_pairing_loss() -> None:
+    result = fold_paired_capabilities(
+        True,
+        (TransformCapabilities(accepts_paired=True, preserves_pairing=False),),
+    )
+
+    assert result.incompatible_index is None
+    assert result.preserves_pairing is False
 
 
 def test_transform_result_reports_pairing() -> None:

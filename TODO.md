@@ -28,7 +28,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-010 | open | S | Extract a pure paired-transform capability fold that checks `accepts_paired` and computes whether pairing is preserved. |
 | DUP-016 | open | S | Route `_config._validate_transforms` and `_engine._prepare_transforms` through the shared capability fold while preserving their public error types/messages. |
 | DUP-017 | open | S | Add parity tests proving config validation and engine preparation accept/reject the same paired-transform chains. |
 

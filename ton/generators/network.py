@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator
+from .base import Generator, coerce_bool
 
 # ---------------------------------------------------------------------------
 # IPv4 / IPv6
@@ -114,7 +114,7 @@ class MACGenerator(Generator):
         oui_bytes = _parse_oui(oui_value) if oui_value is not None else None
         return MACSpec(
             separator=separator,
-            uppercase=bool(spec.get("uppercase", False)),
+            uppercase=coerce_bool(spec, "uppercase", type_name="mac", default=False),
             oui_bytes=oui_bytes,
         )
 

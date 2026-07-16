@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_int, pad_with_zero, require_min_le_max
+from .base import Generator, coerce_bool, coerce_int, pad_with_zero, require_min_le_max
 
 
 @dataclass(frozen=True)
@@ -27,7 +27,7 @@ class IntegerGenerator(Generator):
         max_value = coerce_int(spec, "maxValue", type_name="integer")
         require_min_le_max("integer", min_value, max_value)
         pad_width = 0
-        if spec.get("padWithZero", False):
+        if coerce_bool(spec, "padWithZero", type_name="integer", default=False):
             # Width must cover the widest possible rendering so a positive
             # value and the corresponding negative line up in fixed-width
             # output (TODO REL-014).

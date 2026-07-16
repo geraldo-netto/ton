@@ -369,3 +369,15 @@ def test_same_seed_yields_same_value(seed: int) -> None:
     gen = IntegerGenerator()
     prepared = gen.prepare(spec)
     assert gen.generate(prepared, Random(seed)) == gen.generate(prepared, Random(seed))
+
+
+@pytest.mark.parametrize(
+    ("generator", "spec"),
+    [
+        (IntegerGenerator(), {"minValue": 1, "maxValue": 2, "padWithZero": "false"}),
+        (DecimalGenerator(), {"minValue": 1, "maxValue": 2, "decimals": 1, "padWithZero": 1}),
+    ],
+)
+def test_boolean_options_reject_non_booleans(generator, spec: dict) -> None:
+    with pytest.raises(ValueError, match="must be a boolean"):
+        generator.prepare(spec)

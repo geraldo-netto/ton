@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_int
+from .base import Generator, coerce_bool, coerce_int
 
 _SUPPORTED_VERSIONS = (1, 4)
 
@@ -45,7 +45,10 @@ class UUIDGenerator(Generator):
         version = coerce_int(spec, "version", type_name="uuid", default=4)
         if version not in _SUPPORTED_VERSIONS:
             raise ValueError(f"uuid 'version' must be 1 or 4, got {version}")
-        return UUIDSpec(version=version, uppercase=bool(spec.get("uppercase", False)))
+        return UUIDSpec(
+            version=version,
+            uppercase=coerce_bool(spec, "uppercase", type_name="uuid", default=False),
+        )
 
     def generate(self, prepared: UUIDSpec, rng: Random) -> str:
         # Both versions are built from 16 bytes drawn from the seeded RNG:

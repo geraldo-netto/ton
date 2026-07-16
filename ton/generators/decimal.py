@@ -8,7 +8,14 @@ from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_float, coerce_int, pad_with_zero, require_min_le_max
+from .base import (
+    Generator,
+    coerce_bool,
+    coerce_float,
+    coerce_int,
+    pad_with_zero,
+    require_min_le_max,
+)
 
 
 @dataclass(frozen=True)
@@ -42,7 +49,7 @@ class DecimalGenerator(Generator):
                 f"decimal range contains no value representable with {decimals} decimal place(s)"
             )
         pad_width = 0
-        if spec.get("padWithZero", False):
+        if coerce_bool(spec, "padWithZero", type_name="decimal", default=False):
             # Width must cover the widest possible rendering -- include the
             # '-' sign on negative bounds and the decimal point + fraction
             # (TODO REL-014).

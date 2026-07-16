@@ -336,6 +336,20 @@ def coerce_string(
     return str(_value_or_default(spec, key, type_name, default))
 
 
+def coerce_bool(
+    spec: Mapping[str, Any],
+    key: str,
+    *,
+    type_name: str,
+    default: Any = _MISSING,
+) -> bool:
+    """Read a JSON boolean without treating non-empty strings as true."""
+    raw = _value_or_default(spec, key, type_name, default)
+    if not isinstance(raw, bool):
+        raise ValueError(f"{type_name} {key!r} must be a boolean (got {raw!r})")
+    return raw
+
+
 def require_min_le_max(type_name: str, lo: Any, hi: Any) -> None:
     """Raise when ``hi < lo``. Centralizes the bounds check used by the
     integer / decimal / date / timestamp_unix generators (TODO DUP-004).

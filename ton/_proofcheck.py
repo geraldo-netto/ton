@@ -15,15 +15,12 @@ engine's ``TemplateError``).
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
-from ._proof import ProofFailure
+from ._proof import PreparedField, ProofFailure, TransformStep
 from ._transforms import TransformResult
-
-if TYPE_CHECKING:
-    from ._engine import PreparedField, TransformStep
 
 #: Upper bound on the number of detailed audit failures retained in
 #: memory. Beyond this the total count and per-type tallies keep

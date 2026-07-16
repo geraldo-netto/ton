@@ -3,10 +3,47 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from functools import cached_property
 from typing import Any
+
+from ._transforms import TransformResult
 
 #: Placeholder substituted for sensitive proof-failure fields (DG-002).
 REDACTED = "<redacted>"
+
+
+@dataclass(frozen=True)
+class PreparedTransform:
+    """A transform paired with its immutable prepared configuration."""
+
+    transform: Any
+    prepared: Any
+
+
+@dataclass(frozen=True)
+class PreparedField:
+    """Prepared source and proof trace metadata for one template field."""
+
+    generator: Any
+    source_prepared: Any
+    transforms: tuple[PreparedTransform, ...]
+    validators: tuple[Any, ...] = ()
+
+    @cached_property
+    def is_paired(self) -> bool:
+        if not self.transforms:
+            return bool(self.generator.is_paired)
+        last = self.transforms[-1].transform
+        return bool(self.generator.is_paired and last.capabilities.preserves_pairing)
+
+
+@dataclass(frozen=True)
+class TransformStep:
+    """Before/after trace for one prepared transform application."""
+
+    prepared: PreparedTransform
+    before: TransformResult
+    after: TransformResult
 
 
 @dataclass(frozen=True)

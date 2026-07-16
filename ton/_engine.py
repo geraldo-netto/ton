@@ -10,14 +10,19 @@ from __future__ import annotations
 import threading
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from functools import cached_property
 from random import Random
 from typing import Any
 
 from . import _config
 from ._logging import LogEvent
 from ._logging import logger as _logger
-from ._proof import ProofFailure, ProvenanceRecord
+from ._proof import (
+    PreparedField,
+    PreparedTransform,
+    ProofFailure,
+    ProvenanceRecord,
+    TransformStep,
+)
 from ._proofcheck import ProofChecker
 from ._registry import build_extension_catalog, make_registry, normalize_reference
 from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
@@ -55,38 +60,6 @@ class EngineOptions:
     seed: int | None = None
     milestone_rows: int = 0
     redact_proof_failures: bool = False
-
-
-@dataclass(frozen=True)
-class PreparedTransform:
-    transform: Transform
-    prepared: Any
-
-
-@dataclass(frozen=True)
-class PreparedField:
-    generator: Generator
-    source_prepared: Any
-    transforms: tuple[PreparedTransform, ...]
-    validators: tuple[Validator, ...] = ()
-
-    @cached_property
-    def is_paired(self) -> bool:
-        # Cached because _resolve reads it per token per row on the hot
-        # path; the value is fixed once the field is prepared (PERF-002).
-        # cached_property writes through __dict__, so it works on this
-        # frozen dataclass.
-        if not self.transforms:
-            return self.generator.is_paired
-        last = self.transforms[-1].transform
-        return self.generator.is_paired and last.capabilities.preserves_pairing
-
-
-@dataclass(frozen=True)
-class TransformStep:
-    prepared: PreparedTransform
-    before: TransformResult
-    after: TransformResult
 
 
 class Engine:
@@ -515,7 +488,7 @@ class Engine:
             ) from exc
 
     def _generate_pair(self, type_key: str, field: PreparedField) -> tuple[str, str]:
-        pair = field.generator.generate_pair(field.source_prepared, self._rng)  # type: ignore[attr-defined]
+        pair = field.generator.generate_pair(field.source_prepared, self._rng)
         source = TransformResult(value=pair[1], id_value=pair[0])
         transformed, steps = self._apply_transforms_with_trace(field, source)
         self._handle_proof_failures(type_key, field, source, steps)

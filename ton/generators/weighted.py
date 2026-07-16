@@ -77,6 +77,9 @@ class WeightedGenerator(Generator):
     type_name = "weighted"
     is_composite: ClassVar[bool] = True
 
+    def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
+        return self._nested_type_names(spec.get("choices"))
+
     def prepare(self, spec: Mapping[str, Any]) -> WeightedSpec:
         # Composite specs require ``prepare_composite`` so they can
         # access the engine's registry; legacy specs are routed here

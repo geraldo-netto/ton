@@ -42,6 +42,9 @@ class OneOfGenerator(Generator):
     type_name = "oneOf"
     is_composite: ClassVar[bool] = True
 
+    def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
+        return self._nested_type_names(spec.get("choices"))
+
     def prepare_composite(
         self,
         spec: Mapping[str, Any],

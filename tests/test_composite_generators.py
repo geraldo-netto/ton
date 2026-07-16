@@ -299,6 +299,25 @@ def test_generator_nested_type_hook_defaults_empty_and_is_extensible() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("generator", "spec", "expected"),
+    [
+        (
+            OneOfGenerator(),
+            {"choices": [{"type": "string"}, {"type": "sequence_of", "spec": {"type": "char"}}]},
+            ("string", "sequence_of", "char"),
+        ),
+        (
+            SequenceOfGenerator(),
+            {"spec": {"type": "oneOf", "choices": [{"type": "integer"}]}},
+            ("oneOf", "integer"),
+        ),
+    ],
+)
+def test_builtin_composites_declare_transitive_nested_types(generator, spec, expected) -> None:
+    assert generator.nested_types(spec) == expected
+
+
 # ---------------------------------------------------------------------------
 # REL-019: weighted also blocks paired children (regression guard)
 # ---------------------------------------------------------------------------

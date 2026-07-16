@@ -291,11 +291,19 @@ class Engine:
         # comes from :meth:`_validate` instead of a ``KeyError``. The
         # walk recurses into composite specs (e.g. ``weighted``'s
         # ``choices``) so nested types are present at prepare time.
-        needed: set[str] = set()
+        root_specs: list[Mapping[str, Any]] = []
+        root_types: set[str] = set()
         for token in self._tokens:
             spec = self._types.get(token.type_key)
             if isinstance(spec, Mapping) and "type" in spec:
-                _collect_nested_types(spec, needed)
+                root_specs.append(spec)
+                root_types.add(_runtime_type_name(spec["type"]))
+        roots = make_registry(root_types)
+        needed = set(root_types)
+        for spec in root_specs:
+            generator = roots.get(_runtime_type_name(spec["type"]))
+            if generator is not None:
+                needed.update(_runtime_type_name(name) for name in generator.nested_types(spec))
         return make_registry(needed)
 
     def _validate(self) -> None:

@@ -106,6 +106,22 @@ class Generator(ABC):
         del spec
         return ()
 
+    @staticmethod
+    def _nested_type_names(specs: Any) -> tuple[str, ...]:
+        """Collect type references below a composite-owned spec subtree."""
+        names: list[str] = []
+        values = specs if isinstance(specs, list) else [specs]
+        for value in values:
+            if not isinstance(value, Mapping):
+                continue
+            type_name = value.get("type")
+            if isinstance(type_name, str):
+                names.append(type_name)
+            for nested in value.values():
+                if isinstance(nested, (Mapping, list)):
+                    names.extend(Generator._nested_type_names(nested))
+        return tuple(names)
+
     @abstractmethod
     def generate(self, prepared: Any, rng: Random) -> str:
         """Return the generated value, using the prepared spec."""

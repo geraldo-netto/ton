@@ -8,14 +8,13 @@ import logging
 import os
 import stat
 import sys
-import tempfile
 import time
 from collections.abc import Iterator, Sequence
-from contextlib import contextmanager, suppress
-from typing import TextIO, cast
+from contextlib import contextmanager
+from typing import TextIO
 
 from . import __version__, api
-from ._output import validate_output_target
+from ._output import atomic_output, validate_output_target
 from .api import (
     ConfigError,
     Engine,
@@ -406,7 +405,7 @@ def _open_output(
         with open(path, "w", encoding=encoding) as fh:
             yield fh
         return
-    with _open_atomic_output(path, encoding=encoding) as stream:
+    with atomic_output(path, encoding=encoding, mode=_target_mode(path)) as stream:
         yield stream
 
 
@@ -430,36 +429,6 @@ def _reconfigured_stdout(encoding: str) -> Iterator[TextIO]:
             restore["errors"] = old_errors
         if restore:
             reconfigure(**restore)
-
-
-@contextmanager
-def _open_atomic_output(path: str, *, encoding: str = "utf-8") -> Iterator[TextIO]:
-    directory = os.path.dirname(os.path.abspath(path)) or "."
-    basename = os.path.basename(path)
-    tmp_name = ""
-    try:
-        with tempfile.NamedTemporaryFile(
-            "w",
-            encoding=encoding,
-            dir=directory,
-            prefix=f".{basename}.",
-            suffix=".tmp",
-            delete=False,
-        ) as fh:
-            tmp_name = fh.name
-            yield cast(TextIO, fh)
-            fh.flush()
-            os.fsync(fh.fileno())
-        # NamedTemporaryFile creates the temp at 0600; without this the
-        # atomic replace would silently narrow an existing 0644 file to
-        # 0600 and ignore the umask for new files (ROB-001).
-        os.chmod(tmp_name, _target_mode(path))
-        os.replace(tmp_name, path)
-        tmp_name = ""
-    finally:
-        if tmp_name:
-            with suppress(FileNotFoundError):
-                os.unlink(tmp_name)
 
 
 def _target_mode(path: str) -> int:

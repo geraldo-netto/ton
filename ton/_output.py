@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import os
 import stat
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
+from typing import TextIO, cast
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
@@ -34,3 +38,36 @@ def validate_output_target(path: str, *, no_clobber: bool = False) -> bool:
         extra={"event": LogEvent.OUTPUT_OVERWRITE.value, "path": path},
     )
     return stat.S_ISFIFO(target.st_mode)
+
+
+@contextmanager
+def atomic_output(
+    path: str,
+    *,
+    encoding: str = "utf-8",
+    mode: int = 0o600,
+) -> Iterator[TextIO]:
+    """Yield a temporary stream and atomically replace ``path`` on success."""
+    directory = os.path.dirname(os.path.abspath(path)) or "."
+    basename = os.path.basename(path)
+    tmp_name = ""
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding=encoding,
+            dir=directory,
+            prefix=f".{basename}.",
+            suffix=".tmp",
+            delete=False,
+        ) as stream:
+            tmp_name = stream.name
+            yield cast(TextIO, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(tmp_name, mode)
+        os.replace(tmp_name, path)
+        tmp_name = ""
+    finally:
+        if tmp_name:
+            with suppress(FileNotFoundError):
+                os.unlink(tmp_name)

@@ -21,10 +21,23 @@ from typing import Any
 
 from .base import Generator, assert_below_cap, coerce_int
 
+
+def _encode_hex(raw: bytes) -> str:
+    return raw.hex()
+
+
+def _encode_base64(raw: bytes) -> str:
+    return base64.b64encode(raw).decode("ascii")
+
+
+def _encode_base32(raw: bytes) -> str:
+    return base64.b32encode(raw).decode("ascii")
+
+
 _ENCODERS: dict[str, Callable[[bytes], str]] = {
-    "hex": lambda raw: raw.hex(),
-    "base64": lambda raw: base64.b64encode(raw).decode("ascii"),
-    "base32": lambda raw: base64.b32encode(raw).decode("ascii"),
+    "hex": _encode_hex,
+    "base64": _encode_base64,
+    "base32": _encode_base32,
 }
 
 #: Upper bound on raw bytes drawn per row (TODO SCALE-002).

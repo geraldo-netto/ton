@@ -3,12 +3,23 @@
 from __future__ import annotations
 
 import base64
+import pickle
 import re
 from random import Random
 
 import pytest
 
 from ton.generators.bytes import BytesGenerator
+
+
+@pytest.mark.parametrize("encoding", ["hex", "base64", "base32"])
+def test_prepared_bytes_specs_are_pickle_safe(encoding: str) -> None:
+    generator = BytesGenerator()
+    prepared = generator.prepare({"length": 4, "encoding": encoding})
+
+    restored = pickle.loads(pickle.dumps(prepared))
+
+    assert generator.generate(restored, Random(3)) == generator.generate(prepared, Random(3))
 
 
 def test_default_hex_encoding_length() -> None:

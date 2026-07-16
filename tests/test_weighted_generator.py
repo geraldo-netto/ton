@@ -289,3 +289,29 @@ def test_weighted_composite_rejects_non_mapping_choice() -> None:
     }
     with pytest.raises(TemplateError, match="weight"):
         list(api.generate(config))
+
+
+def test_weighted_composite_rejects_non_mapping_child_spec() -> None:
+    from ton import api
+    from ton._engine import TemplateError
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "weighted",
+                "choices": [{"weight": 1, "spec": "not-an-object"}],
+            }
+        },
+    }
+    with pytest.raises(TemplateError, match="must be an object"):
+        list(api.generate(config))
+
+
+def test_weighted_legacy_composite_hook_delegates_to_legacy_prepare() -> None:
+    generator = WeightedGenerator()
+
+    prepared = generator.prepare_composite({"values": ["x"], "weights": [1]}, default_registry())
+
+    assert generator.generate(prepared, Random(0)) == "x"

@@ -410,7 +410,7 @@ def test_cli_refuses_write_to_special_file(
             return device_stat
         return real_stat(path, *args, **kwargs)
 
-    with mock.patch("ton.cli.os.stat", side_effect=fake_stat):
+    with mock.patch("ton._output.os.stat", side_effect=fake_stat):
         code = cli_main([str(config), "-o", str(output)])
     assert code == 1
     assert "special file" in capsys.readouterr().err

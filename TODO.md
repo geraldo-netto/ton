@@ -41,7 +41,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-032 | open | S | `ExtensionCatalog.generators()` deep-copies every generator prototype on every call, and catalog validation calls it repeatedly per field (`_validate_type_reference`, `_validate_transforms`, list operations). Cache name-only views and create one Engine-scoped registry snapshot per validation/build. |
 | PERF-033 | open | S | `CompiledPlan` retains unused `template`, `registry`, `transforms`, `validators`, and `plan_tokens` fields after compilation. Remove dead runtime state so each Engine does not keep redundant mappings/plugin objects alive. |
 | PERF-034 | open | S | Proof audit detail suppression is only decided before building all failures for a field. When source plus transform failures cross `MAX_AUDIT_SAMPLE`, specs for over-cap failures are still copied; pass a remaining-detail budget or build records lazily per failure. |
 

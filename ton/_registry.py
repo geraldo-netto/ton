@@ -116,13 +116,16 @@ class ExtensionCatalog:
             return deepcopy(self._flattened("validators", self._validators))
 
     def list_data_types(self) -> tuple[str, ...]:
-        return tuple(sorted(self.generators()))
+        with self._lock:
+            return tuple(sorted(self._flattened("generators", self._generators)))
 
     def list_transforms(self) -> tuple[str, ...]:
-        return tuple(sorted(self.transforms()))
+        with self._lock:
+            return tuple(sorted(self._flattened("transforms", self._transforms)))
 
     def list_validators(self) -> tuple[str, ...]:
-        return tuple(sorted(self.validators()))
+        with self._lock:
+            return tuple(sorted(self._flattened("validators", self._validators)))
 
     def namespaces(self) -> tuple[str, ...]:
         with self._lock:

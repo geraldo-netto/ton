@@ -80,10 +80,12 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
     """
     validate_structure(data)
     generators = catalog.generators()
+    transforms = catalog.transforms()
+    validators = catalog.validators()
     for field_name, spec in data["types"].items():
-        _validate_type_reference(field_name, spec["type"], catalog)
-        _validate_transforms(field_name, spec, catalog)
-        _validate_field_validators(field_name, spec, catalog)
+        _validate_type_reference(field_name, spec["type"], generators)
+        _validate_transforms(field_name, spec, generators, transforms)
+        _validate_field_validators(field_name, spec, validators)
         _validate_field_spec(field_name, spec, generators)
     _logger.info(
         "config_validated types=%d",
@@ -195,26 +197,26 @@ def _validate_template_references(template: str, types: dict[str, Any]) -> None:
 def _validate_type_reference(
     field_name: str,
     reference: str,
-    catalog: ExtensionCatalog,
+    generators: Mapping[str, Any],
 ) -> None:
     normalized = _normalize_config_reference(reference)
-    if normalized not in catalog.generators():
-        _raise_unknown_reference("type", field_name, reference, catalog.list_data_types())
+    if normalized not in generators:
+        _raise_unknown_reference("type", field_name, reference, tuple(sorted(generators)))
 
 
 def _validate_transforms(
     field_name: str,
     spec: dict[str, Any],
-    catalog: ExtensionCatalog,
+    generators: Mapping[str, Any],
+    transforms: Mapping[str, Any],
 ) -> None:
-    generator = catalog.generators()[_normalize_config_reference(spec["type"])]
+    generator = generators[_normalize_config_reference(spec["type"])]
     is_paired = bool(generator.is_paired)
     for transform_spec in spec.get("transforms", []):
         reference = transform_spec["type"]
         normalized = _normalize_config_reference(reference)
-        transforms = catalog.transforms()
         if normalized not in transforms:
-            _raise_unknown_reference("transform", field_name, reference, catalog.list_transforms())
+            _raise_unknown_reference("transform", field_name, reference, tuple(sorted(transforms)))
         transform = transforms[normalized]
         _validate_extension_keys(
             f"types.{field_name}.transforms",
@@ -233,18 +235,17 @@ def _validate_transforms(
 def _validate_field_validators(
     field_name: str,
     spec: dict[str, Any],
-    catalog: ExtensionCatalog,
+    available: Mapping[str, Any],
 ) -> None:
     """Validate a field's ``validators`` references against ``catalog`` (PLUG-001)."""
     references = spec.get("validators", [])
     if not isinstance(references, list):
         raise ConfigError(f"Type spec {field_name!r} 'validators' must be a list.")
-    available = catalog.validators()
     for reference in references:
         if not isinstance(reference, str):
             raise ConfigError(f"Type spec {field_name!r} validator refs must be strings.")
         if _normalize_config_reference(reference) not in available:
-            _raise_unknown_reference("validator", field_name, reference, catalog.list_validators())
+            _raise_unknown_reference("validator", field_name, reference, tuple(sorted(available)))
 
 
 def _validate_field_spec(

@@ -137,7 +137,6 @@ Last full rescan: 2026-07-13 (all categories).
 | id | status | effort | description |
 |----|--------|--------|-------------|
 | PLAT-010 | open | S | `cli.py:428` and `cli.py:463` open output in text mode with default newline translation, so on Windows every row terminator becomes CRLF while POSIX writes LF. Byte-level output (and any checksum over it) is not reproducible across the OS matrix CI declares. Pass `newline="\n"`. |
-| PLAT-011 | open | S | `concurrency.py:15-30` docstring's `multiprocessing.Pool` example lacks an `if __name__ == "__main__":` guard; under the spawn start method (Windows always, macOS default) copying it re-imports the module and raises RuntimeError. Guard the example. |
 
 ## observability
 

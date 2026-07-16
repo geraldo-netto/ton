@@ -15,18 +15,19 @@ A multi-process generator can then do::
     from multiprocessing import Pool
     from ton import api, concurrency
 
-    config = api.load_config("examples/dna.json")
     def work(worker_id: int) -> list[str]:
+        config = api.load_config("examples/dna.json")
         rows_per_worker = concurrency.chunk_rows(config["rows"], workers, worker_id)
         eng = concurrency.fork_engine(config, parent_seed=42,
                                       worker_id=worker_id,
                                       rows=rows_per_worker)
         return list(eng)
 
-    with Pool(workers) as p:
-        for chunk in p.imap(work, range(workers)):
-            for row in chunk:
-                print(row)
+    if __name__ == "__main__":
+        with Pool(workers) as p:
+            for chunk in p.imap(work, range(workers)):
+                for row in chunk:
+                    print(row)
 
 The output is *deterministic* for a given (parent_seed, workers,
 worker_id) tuple.

@@ -12,7 +12,10 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SEC-010 | open | M | Composite generators have no total-expansion budget. `generators/sequence_of.py:40` caps `count` per level (10_000) but nesting multiplies: `sequence_of{10_000} > sequence_of{10_000} > char{maxChar:100_000}` passes `--validate` and materializes ~1e13 chars/row (verified: 200x200x200 -> 8 MB row in 1.5s). `regex` already guards this with MAX_TOTAL_EXPANSION; `sequence_of`/`oneOf`/`weighted` need the same product cap. |
+| SEC-010 | open | S | Define one shared maximum total-expansion budget and overflow-safe product helper for composite generator preparation, aligned with `regex.MAX_TOTAL_EXPANSION`. |
+| SEC-013 | open | S | Apply the total-expansion budget to nested `sequence_of` specs; reject products above the cap during validation/prepare. |
+| SEC-014 | open | S | Propagate and enforce the total-expansion budget through nested `oneOf` and `weighted` branches. |
+| SEC-015 | open | S | Add boundary and adversarial nesting tests proving composite expansion is accepted at the cap and rejected above it without materializing output. |
 | SEC-011 | open | S | `generators/hash.py:48` bcrypt-hashes every entry of an unbounded `values` list at prepare time (up to 2^12 rounds each). `--validate` runs `prepare`, so a "validate only, no rows" invocation performs unbounded KDF work (1000 words ~= minutes of CPU). Cap `values` length for bcrypt or hash lazily. |
 | SEC-012 | open | S | `cli.py:496` `_target_mode` flips the process-wide umask to 0 and restores it to read it. In an embedding/threaded process any file created in that window lands at 0666/0777. Derive the mode without mutating global umask. |
 
@@ -20,14 +23,18 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CX-010 | open | M | `_engine.py:95` `Engine.__init__` is a 59-line constructor doing 12 jobs (template parse, registry resolve, transform/validator catalogs, RNG, ProofChecker, validate, prepare, paired scan, segment split, milestone, logging). CC low but SRP-heavy; split compile-time setup into a plan object. |
+| CX-010 | open | S | Introduce an immutable compiled-plan value object for prepared fields, template segments, pairing metadata, and resolved catalogs currently assembled in `Engine.__init__`. |
+| CX-012 | open | S | Extract template parsing, registry resolution, validation, and field preparation from `Engine.__init__` into a compiler that returns the compiled plan. |
+| CX-013 | open | S | Reduce `Engine.__init__` to runtime-state initialization from the compiled plan and add focused compiler/constructor tests. |
 | CX-011 | open | S | Near the CC<=10 limit (all at 9, none over): `generators/regex.py:98` `_reject_oversized_repeats`, `_logging.py:70` `configure_stderr`, `_config.py:158` `_validate_type_spec`. Watch on next change. |
 
 ## code duplication
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-010 | open | M | Paired-transform capability rule implemented twice: `_config.py:191` `_validate_transforms` and `_engine.py:366` `_prepare_transforms` both walk transforms, check `accepts_paired`, and fold `preserves_pairing`. Two error types, one rule -- will drift. |
+| DUP-010 | open | S | Extract a pure paired-transform capability fold that checks `accepts_paired` and computes whether pairing is preserved. |
+| DUP-016 | open | S | Route `_config._validate_transforms` and `_engine._prepare_transforms` through the shared capability fold while preserving their public error types/messages. |
+| DUP-017 | open | S | Add parity tests proving config validation and engine preparation accept/reject the same paired-transform chains. |
 | DUP-011 | open | S | Composite dispatch `if generator.is_composite: prepare_composite(...) else prepare(...)` copy-pasted at `_engine.py:334` and `_config.py:237`. |
 | DUP-012 | open | S | `"core."` prefix stripping duplicated at `_engine.py:597` `_runtime_type_name` and `generators/base.py:315` `prepare_child_spec`; the registry owns that convention. |
 | DUP-013 | open | S | `generators/base.py:225` `coerce_int` and `:259` `coerce_float` repeat the same 8-line `_MISSING`/default resolution preamble. |
@@ -40,7 +47,9 @@ Last full rescan: 2026-07-13 (all categories).
 |---------|--------|--------|-------------|
 | REL-020 | open | S | `generators/decimal.py:38-39` derives the step range with `math.ceil(min*scale)` / `math.floor(max*scale)` on binary floats, so representation error shifts the bounds. Verified: `{"minValue":0.07,"maxValue":0.07,"decimals":2}` -> `0.07*100 == 7.000000000000001` -> `min_step=8 > max_step=7` -> prepare raises "decimal range contains no value representable with 2 decimal place(s)" for a valid config; `{"minValue":0.07,"maxValue":0.29,"decimals":2}` yields `min_step=8, max_step=28`, so 0.07 and 0.29 are never emitted. 134/2000 two-decimal values are affected. Compute steps from the decimal string / integer math instead of float multiply. |
 | REL-021 | open | S | `generators/decimal.py:64-66` draws `rng.uniform(min,max)` then rounds to the step grid, so the two boundary steps get half the probability of interior ones. Verified: `{"minValue":0,"maxValue":0.2,"decimals":1}` over 60k draws -> 0.0 25%, 0.1 50%, 0.2 25% (uniform would be 33/33/33). `round()` also uses banker's rounding, biasing exact .5 ties. Draw `rng.randint(min_step, max_step)` instead. |
-| REL-022 | open | M | `_engine.py:420` `__iter__` resets `_rows_emitted` and the ProofChecker but not the RNG or generator-owned state, so a second iteration of the same Engine is not reproducible even with `seed=`. Verified: `e = Engine.from_config(cfg, seed=42)` with an `integer` + `sequence` field -> pass 1 `['2 1','1 2','5 3']`, pass 2 `['4 4','4 5','3 6']`. Either re-seed + re-prepare stateful specs on each `__iter__`, or document the Engine as single-shot and refuse a second iteration. |
+| REL-022 | open | S | Decide and document the Engine iteration contract: reproducible re-iteration or explicit single-shot refusal; record the generator-state implications in the API docs. |
+| REL-026 | open | S | Implement the chosen iteration-state lifecycle for RNG, ProofChecker, counters, and generator-owned prepared state. |
+| REL-027 | open | S | Add repeated-iteration tests covering seeded random fields, `sequence`, proof state, and the chosen failure/reproducibility behavior. |
 | REL-023 | open | S | `_engine.py:114` `dict(transforms or build_extension_catalog().transforms())` tests truthiness, so an explicitly empty mapping is silently replaced by the full built-in catalog (the sibling `validators` line correctly uses `is not None`). Verified: `Engine.from_config(cfg, transforms={})` on a config whose field declares `{"type":"identity"}` renders rows instead of raising `TemplateError: Unknown transform`. Use `transforms if transforms is not None else ...`. |
 | REL-024 | open | S | `generators/_regex_parse.py:236` `_parse_class_member` accepts a reversed range: `[z-a]` builds `RANGE(122,97)` and `regex.py:235` `_flatten_range` expands `range(122,98)` to `[]`. Alone it is caught as an empty class, but `[z-a0]` silently prepares with a one-character pool, so `{"pattern":"[z-a0]{4}"}` always emits "0000" where `re` would reject the pattern. Raise `RegexParseError("bad character range")` when `hi < lo`. |
 | REL-025 | open | S | `_engine.py:497` wraps a row-time generator crash in `TemplateError`, but `cli.py:290` `_execute` only catches `OSError` / `ProofError` / `ValidationError`, so it falls through to the `_run` catch-all: a plugin generator raising on row 500 exits 3 with "ton: unexpected error: TemplateError: ..." instead of the documented config-error exit 2. Catch `TemplateError` in `_execute`. |
@@ -49,8 +58,12 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-020 | open | M | Hot path pays the proof/transform machinery even when unused. `_engine.py:510` `_generate_single` allocates a `TransformResult` per field per row, `:546` `_apply_transforms_with_trace` builds a steps tuple, and `:525` `_handle_proof_failures` does a `self._types[...]` lookup + `ProofChecker.evaluate` call on every field of every row -- all no-ops when the field has no transforms/validators and `proof_mode="off"` (the default). Measured on a 2-field integer+string config: 2.55 us/row baseline vs 1.02 us/row with a fast path that still keeps the try/except and the paired branch (2.5x). Precompute a per-token plan and branch once. |
-| PERF-021 | open | M | `generators/regex.py:209` `_pick_in` rebuilds the `lru_cache` key on every emitted character: `tuple(items)` allocation plus a nested-tuple hash. Measured 0.30 us of the 0.59 us spent per character; `[A-Za-z0-9]{20}` costs 11.7 us/row vs 3.9 us with a pre-resolved pool (~3x). `:169` `_emit_not_literal` likewise allocates a `frozenset` per character. Resolve `IN` / `NOT_LITERAL` nodes to concrete pools once in `prepare`. |
+| PERF-020 | open | S | Extend the compiled field/token plan with flags and resolved references needed to identify the no-transform, no-validator, proof-off path once at prepare time. |
+| PERF-028 | open | S | Add a direct single-value generation fast path that skips `TransformResult`, trace tuples, type lookup, and `ProofChecker.evaluate` when the compiled plan marks them unused. |
+| PERF-029 | open | S | Add behavior parity tests and a benchmark guard for the default proof-off fast path, including paired and exception-wrapping branches. |
+| PERF-021 | open | S | Resolve regex `IN` nodes to immutable concrete character pools during prepare so generation performs no tuple-key construction or nested hashing. |
+| PERF-030 | open | S | Resolve regex `NOT_LITERAL` exclusions/pools during prepare so generation performs no per-character `frozenset` allocation. |
+| PERF-031 | open | S | Add regex equivalence tests and focused benchmarks for prepared `IN` and `NOT_LITERAL` pools. |
 | PERF-022 | open | S | Per-character `rng.choice` in a genexp: `generators/char.py:37` and `generators/text.py:129`. `rng.choices(values, k=n)` is ~4x faster (`maxChar=64`: 10.2 -> 2.5 us/row). Caveat: changes the seeded RNG stream, so existing seeds stop reproducing byte-for-byte. |
 | PERF-023 | open | S | `transforms/distribution.py:34` `WeightedChoiceSet.choose` and `generators/weighted.py:112` call `rng.choices(range(n), cum_weights=..., k=1)[0]` per row -- allocates a `range` + result list and re-derives the total each draw. A direct `bisect(cum_weights, rng.random() * cum_weights[-1])` is ~4x faster (0.35 -> 0.08 us/op). |
 | PERF-024 | open | S | `generators/network.py:59` `_draw_ip` constructs an `ipaddress.IPv4Address`/`IPv6Address` object per row solely to `str()` it (0.88 us/op vs ~0.5 us formatting the octets from the int). |
@@ -62,15 +75,22 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SCAL-010 | open | M | The only documented multiprocess recipe defeats the engine's streaming design: `concurrency.py:21-30` has each worker `return list(eng)`, materializing `rows // workers` rendered rows in the worker and pickling all of them back through the pool pipe. At `rows=1e9` / 8 workers that is ~125M rows (multi-GB) per worker. The Engine itself streams correctly (`_engine.py:420` yields row by row, O(1) memory) -- ship a streaming/shard-to-file recipe or a chunked helper instead. |
-| SCAL-011 | open | M | Per-row width is effectively unbounded: `_config.py:46` `MAX_ROW_WIDTH_GUIDANCE` (2 MB) is documentation only -- nothing enforces it, and it describes *one* placeholder. A template with k placeholders of `{"type":"bytes","length":1000000,"encoding":"hex"}` builds k x 2 MB of strings inside `_engine.py:453` `_render_row`. Related to SEC-010 (composite multiplication). |
+| SCAL-010 | open | S | Replace the `concurrency.py` worker contract that returns `list(eng)` with a bounded-memory shard-to-file or chunk-streaming primitive. |
+| SCAL-013 | open | S | Add multiprocess tests proving the replacement preserves exact row counts/order expectations and does not accumulate an entire worker shard in memory. |
+| SCAL-014 | open | S | Rewrite the documented multiprocessing recipe to use the bounded-memory primitive and explain output merge/cleanup behavior. |
+| SCAL-011 | open | S | Define row-width limit semantics for literals plus all placeholders, including whether the existing 2 MB guidance becomes a hard default or configurable cap. |
+| SCAL-015 | open | S | Compute a conservative prepared worst-case width for fixed/bounded generators and reject templates whose aggregate width exceeds the configured limit. |
+| SCAL-016 | open | S | Enforce a runtime row-width guard for generators whose maximum cannot be known during prepare, before unbounded content is retained or written. |
+| SCAL-017 | open | S | Add aggregate-placeholder, composite, boundary, and unknown-width tests; document the row-width limit and error. |
 | SCAL-012 | open | S | `cli.py:522` `--resume-from` generates and discards every skipped row, so sharding an N-row job into k offset shards costs O(k*N) total generation. README:84 admits the cost, but README:83 still presents offset-sharding as a parallel recipe; point users at `fork_engine` (O(N) total) instead. |
 
 ## concurrency
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CONC-010 | open | M | `Engine` cannot cross a process boundary. `_engine.py:140` stores a `threading.Lock` (verified: `TypeError: cannot pickle '_thread.lock' object`), and `generators/bytes.py:24-28` stores bare `lambda`s in `BytesSpec.encode` so even a prepared spec fails to pickle (`PicklingError`). Under the spawn/forkserver start methods (Windows/macOS default; forkserver is the 3.14 Linux default) no engine or prepared spec can be sent to or returned from a worker. Add `__getstate__`/`__setstate__` that drop and rebuild the lock, and replace the encoder lambdas with module-level functions. |
+| CONC-010 | open | S | Make `Engine` pickle-safe by excluding `_iteration_lock` from serialized state and rebuilding it when unpickled. |
+| CONC-014 | open | S | Replace `BytesSpec.encode` lambdas with pickle-safe module-level encoder functions or stable encoder identifiers. |
+| CONC-015 | open | S | Add spawn/forkserver serialization tests for prepared byte specs and complete engines, including generation after round-trip. |
 | CONC-011 | open | S | `concurrency.py:19` docstring recipe computes `rows_per_worker = config["rows"] // workers`, silently dropping `rows % workers` rows (`rows=10`, `workers=4` -> 8 rows generated). Give the remainder to the last worker, or ship a `chunk_rows()` helper so the split is not hand-rolled at every call site. |
 | CONC-012 | open | S | `fork_engine` does not offset stateful generators: every worker's `sequence` counter restarts at `start`, so the documented recipe emits duplicate ids across workers. The caveat exists in `generators/sequence.py:13-17`, but not in the `concurrency.py:13-33` recipe users actually copy. Offset `start` by `worker_id * rows` in `fork_engine` (or refuse to fork a config containing a `sequence` without an explicit offset). |
 | CONC-013 | open | S | `_engine.py:420` `__iter__` is a generator function, so the `_iteration_lock` guard is not taken until the first `next()`. Two threads can both obtain an iterator from `iter(engine)` / `api.generate(...)` and the "cannot be iterated concurrently" `RuntimeError` surfaces only when the second one advances, far from the offending call. Acquire the lock in a non-generator `__iter__` that returns an inner generator. |
@@ -86,19 +106,30 @@ Last full rescan: 2026-07-13 (all categories).
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
 | ARCH-010 | open | S | `EngineOptions` (DEC-001) did not stop option drift: `_engine.py:213` `Engine.from_file` and `concurrency.py:77` `fork_engine` both omit `validators` and `redact_proof_failures`. Concrete effect: `fork_engine` cannot pass plugin validators, so a config with a `validators` list works in the parent but dies in the worker with `TemplateError: Unknown validator`; and audit-mode workers cannot redact. Make `EngineOptions` the only construction surface. |
-| ARCH-011 | open | M | `Engine` mixes compile-time (`_validate`, `_build_prepared`, `_prepare_transforms`, `_resolve_transform`, `_resolve_validators`) with runtime (`__iter__`, `_render_row`, `_resolve`, `_generate_*`). ProofChecker was already extracted (ARCH-001); do the same for the compile half. |
-| ARCH-012 | open | M | Atomic-write, special-file rejection, and umask/permission preservation (`cli.py:390-499`) are library-grade output concerns trapped in the CLI; `ton.api` callers writing to a file get none of it. Extract an output-sink module. |
-| ARCH-013 | open | M | LSP/OCP: `generators/base.py:72` makes the base `Generator.prepare` *raise* for `is_composite` subclasses, so the interface is not uniformly callable and every caller must branch on the flag (see DUP-011). A single `prepare(spec, context)` carrying the registry removes the flag, the raising default, and both branches. |
+| ARCH-011 | open | S | Define a compiler boundary and compiled-plan API that contains validation, field preparation, transform resolution, validator resolution, and pairing analysis. |
+| ARCH-014 | open | S | Move compile-time methods from `Engine` into the compiler without changing configuration errors or extension resolution. |
+| ARCH-015 | open | S | Make runtime `Engine` consume only the compiled plan for iteration, rendering, value resolution, and proof evaluation; add boundary tests. |
+| ARCH-012 | open | S | Extract output target validation and special-file/symlink policy from `cli.py` into a reusable output-sink module. |
+| ARCH-016 | open | S | Move atomic temporary-file replacement, cleanup, and interrupted-write behavior into the output sink. |
+| ARCH-017 | open | S | Move permission/umask preservation into the output sink and expose the sink through the supported library API. |
+| ARCH-018 | open | S | Add CLI/API parity tests for successful writes, special files, replacement failure, cleanup, and preserved permissions. |
+| ARCH-013 | open | S | Introduce a preparation context carrying registry/composite resolution and make `Generator.prepare(spec, context)` uniformly callable. |
+| ARCH-019 | open | S | Migrate built-in atomic and composite generators to the uniform preparation interface, removing `is_composite` dispatch branches. |
+| ARCH-020 | open | S | Update the public generator extension contract and tests so third-party composites implement the same preparation interface. |
 
 ## decoupling
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DEC-010 | open | M | **Circular import, reproducible failure.** `generators/weighted.py:55` imports `..transforms.distribution`, which imports `..generators` back (`distribution.py:11-12`). `import ton.transforms` / `import ton.transforms.distribution` therefore raises `ImportError: cannot import name 'WeightedChoiceSet' from partially initialized module` unless `ton.generators` happens to be fully imported first. `_registry.py:168` already hides this with a function-local deferred import. Fix: move `WeightedChoiceSet` / `prepare_distribution` / `validate_weights` into a neutral module both packages import. |
+| DEC-010 | open | S | Create a neutral distribution module containing `WeightedChoiceSet`, `prepare_distribution`, and `validate_weights` with no generator/transform package imports. |
+| DEC-015 | open | S | Migrate weighted generators, distribution transforms, and registry construction to the neutral distribution module; remove the deferred-import workaround. |
+| DEC-016 | open | S | Add clean-interpreter import-order tests for `ton.transforms`, `ton.transforms.distribution`, `ton.generators`, and the default registry. |
 | DEC-011 | open | S | `_registry.py:121` `ExtensionCatalog._flattened` returns the *live* cached dict from `generators()`/`transforms()`/`validators()`; any caller mutating it corrupts catalog internals. Only `registry_with_entry_points:432` avoids this, via an explicit copy plus a warning comment. Return a copy or `MappingProxyType`. |
 | DEC-012 | open | S | `generators/base.py:315` hard-codes the registry's `core.` namespace convention inside the generator layer (see DUP-012). |
 | DEC-013 | open | S | Bidirectional coupling: `_proofcheck.py:26` imports `PreparedField`/`TransformStep` from `_engine` (TYPE_CHECKING only) while `_engine` imports `ProofChecker`. The trace value objects belong in `_proof.py`. |
-| DEC-014 | open | M | OCP: `_engine.py:559` `_collect_nested_types` / `_walk_value_for_types` hard-code the assumption that *any* nested mapping with a `"type"` key is a generator reference, so the lazy registry silently depends on undocumented composite-spec shape (and sweeps up transform `type`s too, which `make_registry` then drops). Let composite generators declare their nested type names instead. |
+| DEC-014 | open | S | Add a generator extension hook that reports nested generator type names from a spec without preparing it. |
+| DEC-017 | open | S | Implement nested-type discovery for each built-in composite generator and use it during lazy registry construction. |
+| DEC-018 | open | S | Remove `_engine._walk_value_for_types` and add tests proving transform mappings are ignored while plugin composite children are discovered. |
 
 ## business/design patterns/DDD
 
@@ -123,13 +154,18 @@ Last full rescan: 2026-07-13 (all categories).
 | CLI-011 | open | S | `--batch-rows` help ("Buffer N rendered rows per write() syscall", `cli.py:78`) and the README flag table misdescribe the behavior: `_stream` (`cli.py:520`) writes every row immediately and only calls `stream.flush()` every N rows. It is a flush interval, not a write batch. |
 | CLI-012 | open | S | `--progress N` silently doubles as `milestone_rows=N` (`cli.py:377`), so any handler attached to the `ton` logger receives both `engine_progress` and `engine_milestone` at the same cadence. Undocumented coupling between an output flag and an engine option. |
 | CLI-013 | open | S | `--progress` counts *generated* rows while `--verbose` counts *written* rows (`cli.py:520-535`); with `--resume-from N` the progress JSON reports rows that were never written and the two summaries disagree. |
-| CLI-014 | open | M | A config `encoding` that cannot encode the rendered rows escapes as an unhandled `UnicodeEncodeError` through the top-level catch-all: exit code 3, "ton: unexpected error" (verified with `{"encoding":"ascii"}` and a non-ASCII `format`). Should be a config/output error (exit 1/2) with a pointed message. |
+| CLI-014 | open | S | Define whether configured output-encoding failures are configuration errors (exit 2) or output errors (exit 1), and add a pointed domain error carrying encoding/field context. |
+| CLI-015 | open | S | Translate `UnicodeEncodeError` from stdout and file streaming into the chosen domain error and documented CLI exit code without the unexpected-error banner. |
+| CLI-016 | open | S | Add CLI tests for non-encodable literals/generated values on stdout and atomic file output, including partial-file cleanup. |
 
 ## configuration discoverability
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CFG-010 | open | M | Unknown config keys are silently ignored at every level. `_config._validate_root:131` checks only for *missing* required keys, and no generator rejects extra spec keys: `{"seed": 42}` at top level does nothing, and a `padwithzero` typo silently disables padding (verified). Reject or warn on unknown keys. |
+| CFG-010 | open | S | Define the unknown-key policy and canonical allowed root/field keys, including extension-owned namespaces and error-message suggestions for typos. |
+| CFG-015 | open | S | Reject unknown root and common field keys during configuration validation with path-aware errors. |
+| CFG-016 | open | S | Add a declarative allowed-key contract for generators/transforms/validators and enforce it for built-ins without blocking plugin-specific keys. |
+| CFG-017 | open | S | Add typo, nested-spec, and plugin-extension tests; document unknown-key validation and migration expectations. |
 | CFG-011 | open | S | `generators/boolean.py:26` reads `spec["whenTrue"]` / `spec["whenFalse"]` directly, so a missing key surfaces as `Invalid spec for 'x': KeyError: 'whenTrue'` instead of the uniform "<type> 'key' is required" message every other generator produces via `base.coerce_*` / `require_*`. |
 | CFG-012 | open | S | Validation limits that reject configs are undocumented: `_config.MAX_ROWS` (1e9), `regex.MAX_TOTAL_EXPANSION` (`generators/regex.py:51`), `_regex_parse.MAX_GROUP_NESTING` (`:97`), `sequence.MAX_SEQUENCE_PAD_WIDTH`. README:785 mentions only `MAX_UNBOUNDED_REPEAT` / `MAX_LITERAL_REPEAT`. |
 | CFG-013 | open | S | `_config.MAX_ROW_WIDTH_GUIDANCE:46` is dead: defined and documented as the worst-case row-width ceiling, referenced by nothing, enforced nowhere. Either enforce it or drop it. |
@@ -157,8 +193,12 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| OBS-020 | open | M | Audit proof failures are undiagnosable from the CLI. `--proof-check audit` prints only a count and tells the user to rerun with `--log-level warning`, but `proof_check_failed` deliberately omits the value/spec (`_proofcheck.py:208`) and the CLI never exposes `Engine.proof_failures`. There is no CLI path to learn *which* value failed. Add a proof-report output (and then `--redact-proof-failures`, see CLI-010, would finally mean something). |
-| OBS-021 | open | M | A failed run emits no terminal structured event. `_execute` (`cli.py:299-307`) catches `OSError` / `ProofError` / `ValidationError` and prints to stderr without logging; `engine_completed` is only emitted on full iteration. A structured-log consumer sees `engine_constructed` and then silence, and cannot distinguish an aborted run from a crashed process. |
+| OBS-020 | open | S | Define a bounded proof-audit report schema and CLI destination/format, including redaction semantics and behavior when the sample cap is reached. |
+| OBS-024 | open | S | Emit retained `Engine.proof_failures` through the proof-audit report path and make `--redact-proof-failures` affect that visible output. |
+| OBS-025 | open | S | Add CLI tests for clear/redacted reports, sampling caps, paired values, and report-write failures; update proof-audit help/docs. |
+| OBS-021 | open | S | Define one terminal structured failure event schema with error category, exit code, progress counts, and safe diagnostic fields. |
+| OBS-026 | open | S | Emit the terminal failure event from each handled `_execute` failure path exactly once while preserving existing stderr and exit behavior. |
+| OBS-027 | open | S | Add structured-log tests distinguishing completed, validation-failed, proof-failed, output-failed, and unexpected-crash runs. |
 | OBS-022 | open | S | `_install_progress_handler` (`cli.py:588`) forces the shared `ton` logger to level INFO whenever `--progress` is passed, overriding a stricter `--log-level error/critical` set in the same invocation and leaking the level change to any handler a library caller attached to `ton`. |
 | OBS-023 | open | S | `cli.py:593` `_report` prints `inf rows/s` when elapsed rounds to 0 (`ton: wrote 0 rows in 0.000s (inf rows/s)`); the progress event guards the same division with `None` (`cli.py:546`) — two behaviors for one calculation. |
 
@@ -169,6 +209,9 @@ Last full rescan: 2026-07-13 (all categories).
 | DOC-010 | open | S | `README.md:78-80` documents chunked generation as three `--resume-from 0/500000/1000000` runs, but the CLI has no row-limit option: each run generates *all* `rows` and only skips a prefix, so chunk-0 contains the whole dataset and the chunks overlap. Either document `fork_engine` for chunking or add a `--max-rows`/`--limit` flag. |
 | DOC-020 | open | S | `README.md:256` ("Output to stdout uses the stream's own encoding") is false: `cli._open_output:398` routes stdout through `_reconfigured_stdout(encoding)`, applying the config's `encoding` to stdout as well. Verified: `{"encoding": "ascii"}` with a non-ASCII `format` crashes on stdout. |
 | DOC-021 | open | S | `README.md:435` says a field's `validators` entries are "a built-in or namespaced validator name" — TON ships **no** built-in validators (`catalog.list_validators()` is empty), so only plugin-provided names can ever resolve. |
-| DOC-022 | open | M | Shipped public API is undocumented. `README.md` "Library use" and the `ton/api.py:8-22` "supported surface" list both omit `validate_config`, `output_encoding`, `normalize_reference`, `RegistryError`, `Transform`, `Validator`, `ProvenanceRecord`, `Engine.provenance`, and the `validators=` / `proof_mode` / `proof_sample_rate` / `redact_proof_failures` keyword arguments of `generate` / `generate_from_file`, all of which are in `api.__all__`. |
+| DOC-022 | open | S | Document public helper functions `validate_config`, `output_encoding`, and `normalize_reference` with signatures, behavior, and errors. |
+| DOC-025 | open | S | Document public extension/error/value types `RegistryError`, `Transform`, `Validator`, and `ProvenanceRecord`, plus `Engine.provenance`. |
+| DOC-026 | open | S | Complete `generate` / `generate_from_file` documentation for `validators=`, `proof_mode`, `proof_sample_rate`, and `redact_proof_failures`, with a minimal example. |
+| DOC-027 | open | S | Add a documentation/API-surface test or checklist that compares `api.__all__` with the supported-surface and README references. |
 | DOC-023 | open | S | README type-reference tables omit shipped defaults and caps: `bytes.length` defaults to 16 (table implies required), `text.count` defaults to 5, `sequence.padWidth` is capped by `MAX_SEQUENCE_PAD_WIDTH`, `hash.rounds` is absent from the field table. |
 | DOC-024 | open | S | `README.md:59` `--batch-rows` ("Rows buffered per `write()` syscall") describes an implementation that does not exist — see CLI-011; the value is a flush interval. |

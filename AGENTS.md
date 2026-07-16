@@ -25,6 +25,9 @@ File define expected behavior + usage model for AI agents in this repo.
 - Avoid duplication. Apply SOLID where practical.
 - Document assumptions, constraints, design intent in comments or commit notes when matter.
 - Prefer explicit, maintainable solutions over clever shortcuts.
+- Unpack TODO findings into the smallest independently actionable items by default.
+  Keep an item whole only when it is genuinely atomic or splitting it would create
+  artificial work; record that reason in the item description when it is not obvious.
 - Propose business/design patterns + DDD only when improve clarity or structure.
 - ALWAYS record review findings in `TODO.md` — never report only in chat. Any time
   scan, review, audit, or "look for issues" (not just major changes), add each finding to

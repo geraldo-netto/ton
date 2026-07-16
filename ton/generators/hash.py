@@ -32,7 +32,7 @@ class HashGenerator(PairedWordPoolGenerator):
 
     type_name = "hash"
 
-    def prepare(self, spec: Mapping[str, Any]) -> WordPairSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> WordPairSpec:
         words = require_string_tuple(spec)
         algorithm = str(spec.get("algorithm", "sha256")).lower()
         if algorithm not in _ALGORITHMS:

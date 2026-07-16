@@ -67,7 +67,7 @@ class IPv4Generator(Generator):
 
     type_name = "ipv4"
 
-    def prepare(self, spec: Mapping[str, Any]) -> IPNetworkSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> IPNetworkSpec:
         return _prepare_ip(spec, default_cidr="0.0.0.0/0", version=4)
 
     def generate(self, prepared: IPNetworkSpec, rng: Random) -> str:
@@ -79,7 +79,7 @@ class IPv6Generator(Generator):
 
     type_name = "ipv6"
 
-    def prepare(self, spec: Mapping[str, Any]) -> IPNetworkSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> IPNetworkSpec:
         return _prepare_ip(spec, default_cidr="::/0", version=6)
 
     def generate(self, prepared: IPNetworkSpec, rng: Random) -> str:
@@ -103,7 +103,7 @@ class MACGenerator(Generator):
 
     type_name = "mac"
 
-    def prepare(self, spec: Mapping[str, Any]) -> MACSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> MACSpec:
         separator = str(spec.get("separator", ":"))
         if separator and len(separator) > 1:
             raise ValueError("mac 'separator' must be a single character")

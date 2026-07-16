@@ -68,7 +68,7 @@ class RegexGenerator(Generator):
 
     type_name = "regex"
 
-    def prepare(self, spec: Mapping[str, Any]) -> RegexSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> RegexSpec:
         pattern = spec.get("pattern")
         if not isinstance(pattern, str) or not pattern:
             raise ValueError("regex 'pattern' must be a non-empty string")

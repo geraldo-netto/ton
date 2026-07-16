@@ -30,6 +30,7 @@ from .._proof import ProofResult
 from .._transforms import TransformResult
 from .base import (
     Generator,
+    PreparationContext,
     assert_below_cap,
     coerce_int,
     prepare_child_spec,
@@ -55,6 +56,15 @@ class SequenceOfGenerator(Generator):
 
     def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
         return self._nested_type_names(spec.get("spec"))
+
+    def prepare(
+        self,
+        spec: Mapping[str, Any],
+        context: PreparationContext | None = None,
+    ) -> SequenceOfSpec:
+        if context is None:
+            raise self._composite_path_error()
+        return self.prepare_composite(spec, context.registry)
 
     def prepare_composite(
         self,

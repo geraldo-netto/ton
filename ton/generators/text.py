@@ -107,7 +107,7 @@ class TextGenerator(Generator):
 
     type_name = "text"
 
-    def prepare(self, spec: Mapping[str, Any]) -> TextSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> TextSpec:
         unit = str(spec.get("unit", "words"))
         if unit not in _UNITS:
             raise ValueError(f"text 'unit' must be one of {_UNITS} (got {unit!r})")

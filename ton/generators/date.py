@@ -49,7 +49,7 @@ class DateGenerator(Generator):
 
     type_name = "date"
 
-    def prepare(self, spec: Mapping[str, Any]) -> DateSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> DateSpec:
         lo, hi = parse_iso_bounds("date", spec)
         fmt = spec.get("format", _DEFAULT_FORMAT)
         _validate_format(fmt)

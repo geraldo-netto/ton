@@ -50,7 +50,7 @@ class SequenceGenerator(Generator):
 
     type_name = "sequence"
 
-    def prepare(self, spec: Mapping[str, Any]) -> SequenceSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> SequenceSpec:
         start = coerce_int(spec, "start", type_name="sequence", default=0)
         step = coerce_int(spec, "step", type_name="sequence", default=1)
         if step == 0:

@@ -55,7 +55,7 @@ class BytesGenerator(Generator):
 
     type_name = "bytes"
 
-    def prepare(self, spec: Mapping[str, Any]) -> BytesSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> BytesSpec:
         length = coerce_int(spec, "length", type_name="bytes", default=16)
         if length < 1:
             raise ValueError("bytes 'length' must be >= 1")

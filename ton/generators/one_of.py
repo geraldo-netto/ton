@@ -28,7 +28,7 @@ from typing import Any, ClassVar
 
 from .._proof import ProofResult
 from .._transforms import TransformResult
-from .base import Generator, prepare_child_spec
+from .base import Generator, PreparationContext, prepare_child_spec
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,15 @@ class OneOfGenerator(Generator):
 
     def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
         return self._nested_type_names(spec.get("choices"))
+
+    def prepare(
+        self,
+        spec: Mapping[str, Any],
+        context: PreparationContext | None = None,
+    ) -> OneOfSpec:
+        if context is None:
+            raise self._composite_path_error()
+        return self.prepare_composite(spec, context.registry)
 
     def prepare_composite(
         self,

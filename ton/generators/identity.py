@@ -53,7 +53,7 @@ class NameGenerator(Generator):
 
     type_name = "name"
 
-    def prepare(self, spec: Mapping[str, Any]) -> NameSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> NameSpec:
         style = str(spec.get("style", "full"))
         if style not in _NAME_STYLES:
             raise ValueError(f"name 'style' must be one of {_NAME_STYLES} (got {style!r})")
@@ -82,7 +82,7 @@ class EmailGenerator(Generator):
 
     type_name = "email"
 
-    def prepare(self, spec: Mapping[str, Any]) -> EmailSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> EmailSpec:
         if "domains" not in spec:
             return EmailSpec(domains=tuple(EMAIL_DOMAINS))
         return EmailSpec(domains=require_string_tuple(spec, key="domains"))
@@ -107,7 +107,7 @@ class PhoneGenerator(Generator):
 
     type_name = "phone"
 
-    def prepare(self, spec: Mapping[str, Any]) -> PhoneSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> PhoneSpec:
         pattern = str(spec.get("format", "+1 (###) ###-####"))
         if "#" not in pattern:
             raise ValueError("phone 'format' must contain at least one '#'")

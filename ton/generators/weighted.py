@@ -58,7 +58,7 @@ from .._distribution import (
 )
 from .._proof import ProofResult
 from .._transforms import TransformResult
-from .base import Generator
+from .base import Generator, PreparationContext
 
 
 @dataclass(frozen=True)
@@ -80,12 +80,18 @@ class WeightedGenerator(Generator):
     def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
         return self._nested_type_names(spec.get("choices"))
 
-    def prepare(self, spec: Mapping[str, Any]) -> WeightedSpec:
+    def prepare(
+        self,
+        spec: Mapping[str, Any],
+        context: PreparationContext | None = None,
+    ) -> WeightedSpec:
         # Composite specs require ``prepare_composite`` so they can
         # access the engine's registry; legacy specs are routed here
         # directly so callers that bypass the engine still work.
         if "choices" in spec:
-            raise self._composite_path_error()
+            if context is None:
+                raise self._composite_path_error()
+            return self.prepare_composite(spec, context.registry)
         return self._prepare_legacy(spec)
 
     def prepare_composite(

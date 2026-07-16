@@ -30,6 +30,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
+from inspect import signature
 from random import Random
 from typing import Any, ClassVar
 
@@ -51,6 +52,12 @@ class PreparationContext:
     ) -> tuple[Generator, Any]:
         return prepare_child_spec(parent_type, location, nested_spec, self.registry)
 
+    def prepare_generator(self, generator: Generator, spec: Mapping[str, Any]) -> Any:
+        """Prepare through the context while retaining legacy plugin compatibility."""
+        if len(signature(generator.prepare).parameters) == 1:
+            return generator.prepare(spec)
+        return generator.prepare(spec, self)
+
 
 class Generator(ABC):
     """Strategy interface: produce one string value from a (prepared) spec."""
@@ -70,7 +77,11 @@ class Generator(ABC):
     #: composite path so they can resolve nested type specs.
     is_composite: ClassVar[bool] = False
 
-    def prepare(self, spec: Mapping[str, Any]) -> Any:
+    def prepare(
+        self,
+        spec: Mapping[str, Any],
+        context: PreparationContext | None = None,
+    ) -> Any:
         """Validate and pre-parse ``spec`` once per Engine construction.
 
         Override to return a typed value-object (a dataclass works well)
@@ -84,8 +95,7 @@ class Generator(ABC):
         path for them (DUP-003). Composite subclasses that also accept a
         non-composite legacy form override this method.
         """
-        if self.is_composite:
-            raise self._composite_path_error()
+        del context
         return spec
 
     def _composite_path_error(self) -> ValueError:

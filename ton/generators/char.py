@@ -25,7 +25,7 @@ class CharGenerator(Generator):
 
     type_name = "char"
 
-    def prepare(self, spec: Mapping[str, Any]) -> CharSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> CharSpec:
         values = require_string_tuple(spec)
         max_char = coerce_int(spec, "maxChar", type_name="char")
         if max_char < 1:

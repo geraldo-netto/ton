@@ -22,7 +22,7 @@ class IntegerGenerator(Generator):
 
     type_name = "integer"
 
-    def prepare(self, spec: Mapping[str, Any]) -> IntegerSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> IntegerSpec:
         min_value = coerce_int(spec, "minValue", type_name="integer")
         max_value = coerce_int(spec, "maxValue", type_name="integer")
         require_min_le_max("integer", min_value, max_value)

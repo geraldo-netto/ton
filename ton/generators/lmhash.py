@@ -41,7 +41,7 @@ class LMHashGenerator(PairedWordPoolGenerator):
 
     type_name = "lmhash"
 
-    def prepare(self, spec: Mapping[str, Any]) -> WordPairSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> WordPairSpec:
         words = require_string_tuple(spec)
         return WordPairSpec(pairs=tuple((w, self._nt_hash(w)) for w in words))
 

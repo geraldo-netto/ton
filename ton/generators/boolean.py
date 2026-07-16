@@ -21,7 +21,7 @@ class BooleanGenerator(Generator):
 
     type_name = "boolean"
 
-    def prepare(self, spec: Mapping[str, Any]) -> BooleanSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> BooleanSpec:
         return BooleanSpec(
             when_true=str(spec["whenTrue"]),
             when_false=str(spec["whenFalse"]),

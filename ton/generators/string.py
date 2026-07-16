@@ -20,7 +20,7 @@ class StringGenerator(Generator):
 
     type_name = "string"
 
-    def prepare(self, spec: Mapping[str, Any]) -> StringSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> StringSpec:
         return StringSpec(values=require_string_tuple(spec))
 
     def generate(self, prepared: StringSpec, rng: Random) -> str:

@@ -41,7 +41,7 @@ class UUIDGenerator(Generator):
 
     type_name = "uuid"
 
-    def prepare(self, spec: Mapping[str, Any]) -> UUIDSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> UUIDSpec:
         version = coerce_int(spec, "version", type_name="uuid", default=4)
         if version not in _SUPPORTED_VERSIONS:
             raise ValueError(f"uuid 'version' must be 1 or 4, got {version}")

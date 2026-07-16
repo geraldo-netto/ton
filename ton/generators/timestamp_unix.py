@@ -41,7 +41,7 @@ class TimestampUnixGenerator(Generator):
 
     type_name = "timestamp_unix"
 
-    def prepare(self, spec: Mapping[str, Any]) -> TimestampUnixSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> TimestampUnixSpec:
         lo, hi = parse_iso_bounds("timestamp_unix", spec, as_utc=True)
         unit = str(spec.get("unit", "seconds"))
         if unit not in _UNIT_MULTIPLIERS:

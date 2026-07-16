@@ -29,6 +29,7 @@ from ._template import Token, UndeclaredVariableError, parse, split_segments, va
 from ._transforms import Transform, TransformResult
 from ._validation import ValidationError, Validator
 from .generators import Generator
+from .generators.base import PreparationContext
 
 
 class TemplateError(ValueError):
@@ -318,16 +319,14 @@ class Engine:
 
     def _build_prepared(self) -> dict[str, PreparedField]:
         prepared: dict[str, PreparedField] = {}
+        context = PreparationContext(self._registry)
         for token in self._tokens:
             if token.type_key in prepared:
                 continue
             spec = self._types[token.type_key]
             generator = self._registry[_runtime_type_name(spec["type"])]
             try:
-                if generator.is_composite:
-                    source_prepared = generator.prepare_composite(spec, self._registry)
-                else:
-                    source_prepared = generator.prepare(spec)
+                source_prepared = context.prepare_generator(generator, spec)
                 prepared[token.type_key] = PreparedField(
                     generator=generator,
                     source_prepared=source_prepared,

@@ -27,7 +27,7 @@ class DecimalGenerator(Generator):
 
     type_name = "decimal"
 
-    def prepare(self, spec: Mapping[str, Any]) -> DecimalSpec:
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> DecimalSpec:
         min_value = coerce_float(spec, "minValue", type_name="decimal")
         max_value = coerce_float(spec, "maxValue", type_name="decimal")
         require_min_le_max("decimal", min_value, max_value)

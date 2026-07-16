@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pytest
 
+from ton._engine import Engine, TemplateError
+from ton.generators import Generator
 from ton.generators.bytes import MAX_BYTES_LENGTH, BytesGenerator
 from ton.generators.char import MAX_CHAR_LENGTH, CharGenerator
 from ton.generators.regex import (
@@ -78,3 +80,40 @@ def test_regex_accepts_pattern_within_total_expansion() -> None:
     prepared = RegexGenerator().prepare({"pattern": "a{10000}"})
     assert prepared is not None
     assert MAX_TOTAL_EXPANSION == 1_000_000
+
+
+def test_row_width_counts_literals_and_all_placeholders() -> None:
+    config = {
+        "rows": 1,
+        "maxRowWidth": 5,
+        "format": "x$a$$b$",
+        "types": {
+            "a": {"type": "string", "values": ["aa"]},
+            "b": {"type": "string", "values": ["bb"]},
+        },
+    }
+    assert list(Engine(config)) == ["xaabb"]
+    config["maxRowWidth"] = 4
+    with pytest.raises(TemplateError, match="maxRowWidth"):
+        list(Engine(config))
+
+
+def test_row_width_guards_composite_and_unknown_width_values() -> None:
+    composite = {
+        "rows": 1,
+        "maxRowWidth": 3,
+        "format": "$v$",
+        "types": {"v": {"type": "oneOf", "choices": [{"type": "string", "values": ["wide"]}]}},
+    }
+    with pytest.raises(TemplateError, match="maxRowWidth"):
+        list(Engine(composite))
+
+    class UnknownWidth(Generator):
+        type_name = "unknown"
+
+        def generate(self, prepared, rng) -> str:
+            return "wide"
+
+    unknown = {"rows": 1, "maxRowWidth": 3, "format": "$v$", "types": {"v": {"type": "unknown"}}}
+    with pytest.raises(TemplateError, match="maxRowWidth"):
+        list(Engine(unknown, registry={"unknown": UnknownWidth()}))

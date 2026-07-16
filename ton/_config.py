@@ -28,7 +28,7 @@ class ConfigError(ValueError):
 
 
 _REQUIRED_TOP_LEVEL = ("rows", "format", "types")
-ROOT_KEYS = frozenset((*_REQUIRED_TOP_LEVEL, "encoding"))
+ROOT_KEYS = frozenset((*_REQUIRED_TOP_LEVEL, "encoding", "maxRowWidth"))
 COMMON_FIELD_KEYS = frozenset(("type", "transforms", "validators"))
 
 
@@ -42,6 +42,7 @@ def _unknown_key_message(path: str, key: str, allowed: frozenset[str]) -> str:
 #: Defensive upper bound on row count. Type-specific upper bounds
 #: belong to the relevant generator's ``prepare`` method.
 MAX_ROWS = 1_000_000_000
+DEFAULT_MAX_ROW_WIDTH = 2_000_000
 
 
 def load(path: str | Path) -> dict[str, Any]:
@@ -121,6 +122,17 @@ def validate_structure(data: Any) -> None:
     _validate_types(data["types"])
     _validate_template_references(data["format"], data["types"])
     _validate_encoding(data)
+    _validate_row_width(data)
+
+
+def _validate_row_width(data: dict[str, Any]) -> None:
+    value = data.get("maxRowWidth", DEFAULT_MAX_ROW_WIDTH)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise ConfigError("'maxRowWidth' must be a positive integer.")
+
+
+def row_width_limit(data: Mapping[str, Any]) -> int:
+    return int(data.get("maxRowWidth", DEFAULT_MAX_ROW_WIDTH))
 
 
 def _validate_encoding(data: dict[str, Any]) -> None:

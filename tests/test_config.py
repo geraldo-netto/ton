@@ -316,9 +316,16 @@ def test_validate_config_accepts_core_identity_transform() -> None:
 def test_unknown_key_policy_defines_root_and_common_field_keys() -> None:
     from ton._config import COMMON_FIELD_KEYS, ROOT_KEYS, _unknown_key_message
 
-    assert {"rows", "format", "types", "encoding"} == ROOT_KEYS
+    assert {"rows", "format", "types", "encoding", "maxRowWidth"} == ROOT_KEYS
     assert {"type", "transforms", "validators"} == COMMON_FIELD_KEYS
     assert "Did you mean 'rows'?" in _unknown_key_message("config", "row", ROOT_KEYS)
+
+
+def test_max_row_width_must_be_positive() -> None:
+    payload = _valid_payload()
+    payload["maxRowWidth"] = 0
+    with pytest.raises(ConfigError, match="positive integer"):
+        api.validate_config(payload)
 
 
 @pytest.mark.parametrize("reference", [123, ""])

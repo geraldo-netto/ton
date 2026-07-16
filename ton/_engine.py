@@ -89,6 +89,7 @@ class Engine:
             validators=validators,
         )
         self._plan = plan
+        self._max_row_width = _config.row_width_limit(config)
         self._rng = rng if rng is not None else Random()
         self._proof = ProofChecker(
             mode=proof_mode,
@@ -320,13 +321,20 @@ class Engine:
         literals = self._plan.literals
         resolved_tokens = self._plan.resolved_tokens
         if not resolved_tokens:
-            return literals[0]
+            return self._bounded_row(literals[0])
         parts: list[str] = []
         for index, resolved in enumerate(resolved_tokens):
             parts.append(literals[index])
             parts.append(self._resolve(resolved, paired_cache))
         parts.append(literals[-1])
-        return "".join(parts)
+        return self._bounded_row("".join(parts))
+
+    def _bounded_row(self, row: str) -> str:
+        if len(row) > self._max_row_width:
+            raise TemplateError(
+                f"rendered row width {len(row)} exceeds maxRowWidth ({self._max_row_width})"
+            )
+        return row
 
     def _resolve(
         self, resolved: ResolvedToken, paired_cache: dict[str, tuple[str, str]] | None

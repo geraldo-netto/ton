@@ -116,6 +116,18 @@ def test_decimal_accepts_equal_representable_fractional_bounds() -> None:
     assert DecimalGenerator().generate(prepared, Random(0)) == "0.07"
 
 
+def test_decimal_draws_representable_steps_uniformly() -> None:
+    generator = DecimalGenerator()
+    prepared = generator.prepare({"minValue": 0, "maxValue": 0.2, "decimals": 1})
+    rng = Random(42)
+    counts = {value: 0 for value in ("0.0", "0.1", "0.2")}
+
+    for _ in range(30_000):
+        counts[generator.generate(prepared, rng)] += 1
+
+    assert all(9_500 <= count <= 10_500 for count in counts.values())
+
+
 def test_coerce_float_uses_default_when_optional_key_is_missing() -> None:
     assert coerce_float({}, "value", type_name="test", default=1.5) == 1.5
 

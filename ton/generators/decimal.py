@@ -61,9 +61,7 @@ class DecimalGenerator(Generator):
         )
 
     def generate(self, prepared: DecimalSpec, rng: Random) -> str:
-        raw = rng.uniform(prepared.min_value, prepared.max_value)
-        step = round(raw * prepared.scale)
-        step = min(max(step, prepared.min_step), prepared.max_step)
+        step = rng.randint(prepared.min_step, prepared.max_step)
         # f-string formatting keeps trailing zeros so pad_width math stays
         # consistent (str(round(1.5, 2)) drops the trailing zero).
         value = f"{step / prepared.scale:.{prepared.decimals}f}"

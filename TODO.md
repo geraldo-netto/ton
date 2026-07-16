@@ -100,7 +100,6 @@ Last full rescan: 2026-07-13 (all categories).
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
 | CLI-010 | open | S | `--redact-proof-failures` is a no-op for CLI users. It only masks the retained `Engine.proof_failures` records, which the CLI never emits (`cli.py:315` `_report_proof_audit` prints a count), and the `proof_check_failed` log event (`_proofcheck.py:208`) already carries no `value`/`spec`. The flag changes no CLI-visible output. |
-| CLI-011 | open | S | `--batch-rows` help ("Buffer N rendered rows per write() syscall", `cli.py:78`) and the README flag table misdescribe the behavior: `_stream` (`cli.py:520`) writes every row immediately and only calls `stream.flush()` every N rows. It is a flush interval, not a write batch. |
 | CLI-012 | open | S | `--progress N` silently doubles as `milestone_rows=N` (`cli.py:377`), so any handler attached to the `ton` logger receives both `engine_progress` and `engine_milestone` at the same cadence. Undocumented coupling between an output flag and an engine option. |
 | CLI-013 | open | S | `--progress` counts *generated* rows while `--verbose` counts *written* rows (`cli.py:520-535`); with `--resume-from N` the progress JSON reports rows that were never written and the two summaries disagree. |
 | CLI-014 | open | S | Define whether configured output-encoding failures are configuration errors (exit 2) or output errors (exit 1), and add a pointed domain error carrying encoding/field context. |

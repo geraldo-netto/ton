@@ -56,7 +56,7 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 | `--no-clobber`         | Fail instead of overwriting an existing `--output` file.                             |
 | `--resume-from N`      | Generate and discard the first `N` rows before writing output (paired with `--seed`). |
 | `--validate`           | Validate the config and exit without generating rows.                                |
-| `--batch-rows N`       | Rows buffered per `write()` syscall (default `1024`).                                |
+| `--batch-rows N`       | Flush output every N written rows (default `1024`).                                  |
 | `--progress N`         | Emit a JSON progress line on stderr every `N` rows (also surfaces a logger event).   |
 | `--verbose`            | Print final row count, elapsed time, and rows/sec to stderr.                         |
 | `--log-level LEVEL`    | Attach a stderr handler to the `ton` logger (`debug`/`info`/`warning`/`error`/`critical`). |

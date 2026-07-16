@@ -74,11 +74,7 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_positive_int,
         metavar="N",
         default=_DEFAULT_BATCH_ROWS,
-        help=(
-            "Buffer N rendered rows per write() syscall. Larger values "
-            "amortize syscall overhead at the cost of peak memory for "
-            "wide rows."
-        ),
+        help="Flush output every N written rows (default: 1024).",
     )
     parser.add_argument(
         "--no-clobber",

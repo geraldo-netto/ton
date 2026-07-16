@@ -25,17 +25,12 @@ from .generators import Generator
 class CompiledPlan:
     """Immutable configuration artifacts required by row generation."""
 
-    template: str
     types: Mapping[str, Mapping[str, Any]]
     rows: int
     tokens: tuple[Token, ...]
-    registry: Mapping[str, Generator]
-    transforms: Mapping[str, Transform]
-    validators: Mapping[str, Validator]
     prepared: Mapping[str, PreparedField]
     has_paired: bool
     literals: tuple[str, ...]
-    plan_tokens: tuple[Token, ...]
     resolved_tokens: tuple[ResolvedToken, ...]
 
 
@@ -80,17 +75,12 @@ class EngineCompiler:
             for token in plan_tokens
         )
         return CompiledPlan(
-            template=self.template,
             types=self.types,
             rows=self.rows,
             tokens=self.tokens,
-            registry=self.registry,
-            transforms=self.transforms,
-            validators=self.validators,
             prepared=prepared,
             has_paired=any(prepared[token.type_key].is_paired for token in self.tokens),
             literals=tuple(literals),
-            plan_tokens=tuple(plan_tokens),
             resolved_tokens=resolved_tokens,
         )
 

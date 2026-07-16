@@ -39,7 +39,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-033 | open | S | `CompiledPlan` retains unused `template`, `registry`, `transforms`, `validators`, and `plan_tokens` fields after compilation. Remove dead runtime state so each Engine does not keep redundant mappings/plugin objects alive. |
 | PERF-034 | open | S | Proof audit detail suppression is only decided before building all failures for a field. When source plus transform failures cross `MAX_AUDIT_SAMPLE`, specs for over-cap failures are still copied; pass a remaining-detail budget or build records lazily per failure. |
 
 ## scalability

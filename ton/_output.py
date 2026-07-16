@@ -57,6 +57,7 @@ def atomic_output(
         with tempfile.NamedTemporaryFile(
             "w",
             encoding=encoding,
+            newline="\n",
             dir=directory,
             prefix=f".{basename}.",
             suffix=".tmp",
@@ -84,7 +85,7 @@ def open_output_path(
 ) -> Iterator[TextIO]:
     """Open a validated path with FIFO or atomic regular-file semantics."""
     if validate_output_target(path, no_clobber=no_clobber):
-        with open(path, "w", encoding=encoding) as stream:
+        with open(path, "w", encoding=encoding, newline="\n") as stream:
             yield stream
         return
     with atomic_output(path, encoding=encoding, mode=target_mode(path)) as stream:

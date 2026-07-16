@@ -458,5 +458,5 @@ def test_open_output_streams_existing_fifo(tmp_path: Path) -> None:
     ):
         writer.write("row\n")
 
-    opened.assert_called_once_with(str(fifo), "w", encoding="utf-8")
+    opened.assert_called_once_with(str(fifo), "w", encoding="utf-8", newline="\n")
     opened().write.assert_called_once_with("row\n")

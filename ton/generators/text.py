@@ -126,7 +126,7 @@ class TextGenerator(Generator):
 
 
 def _words(count: int, rng: Random) -> str:
-    return " ".join(rng.choice(_WORDS) for _ in range(count))
+    return " ".join(rng.choices(_WORDS, k=count))
 
 
 def _sentence(rng: Random) -> str:

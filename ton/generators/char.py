@@ -34,4 +34,4 @@ class CharGenerator(Generator):
         return CharSpec(values=values, max_char=max_char)
 
     def generate(self, prepared: CharSpec, rng: Random) -> str:
-        return "".join(rng.choice(prepared.values) for _ in range(prepared.max_char))
+        return "".join(rng.choices(prepared.values, k=prepared.max_char))

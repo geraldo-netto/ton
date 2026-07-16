@@ -45,7 +45,6 @@ Last full rescan: 2026-07-13 (all categories).
 | PERF-030 | open | S | Resolve regex `NOT_LITERAL` exclusions/pools during prepare so generation performs no per-character `frozenset` allocation. |
 | PERF-031 | open | S | Add regex equivalence tests and focused benchmarks for prepared `IN` and `NOT_LITERAL` pools. |
 | PERF-022 | open | S | Per-character `rng.choice` in a genexp: `generators/char.py:37` and `generators/text.py:129`. `rng.choices(values, k=n)` is ~4x faster (`maxChar=64`: 10.2 -> 2.5 us/row). Caveat: changes the seeded RNG stream, so existing seeds stop reproducing byte-for-byte. |
-| PERF-023 | open | S | `_distribution.py:24` `WeightedChoiceSet.choose` calls `rng.choices(range(n), cum_weights=..., k=1)[0]` per row -- allocates a `range` + result list and re-derives the total each draw. A direct `bisect(cum_weights, rng.random() * cum_weights[-1])` is ~4x faster (0.35 -> 0.08 us/op). |
 
 ## scalability
 

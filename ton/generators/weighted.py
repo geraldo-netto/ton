@@ -55,6 +55,7 @@ from .._distribution import (
     cumulative_weights,
     prepare_distribution,
     validate_weights,
+    weighted_index,
 )
 from .._proof import ProofResult
 from .._transforms import TransformResult
@@ -118,7 +119,7 @@ class WeightedGenerator(Generator):
         if prepared.distribution is not None:
             return prepared.distribution.choose(rng)
         # Legacy string-only form.
-        return rng.choices(prepared.values, cum_weights=prepared.cum_weights, k=1)[0]  # type: ignore[arg-type]
+        return prepared.values[weighted_index(prepared.cum_weights, rng)]  # type: ignore[index]
 
     def prove(self, prepared: WeightedSpec, result: TransformResult) -> ProofResult:
         # Composite form recurses into the drawn child; the legacy string

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from bisect import bisect
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from random import Random
@@ -17,7 +18,7 @@ class WeightedChoiceSet:
     children: tuple[tuple[Any, Any], ...]
 
     def choose(self, rng: Random) -> str:
-        index = rng.choices(range(len(self.children)), cum_weights=self.cum_weights, k=1)[0]
+        index = weighted_index(self.cum_weights, rng)
         generator, prepared = self.children[index]
         return cast(str, generator.generate(prepared, rng))
 
@@ -110,6 +111,11 @@ def cumulative_weights(weights: Sequence[float]) -> tuple[float, ...]:
         total += weight
         cumulative.append(total)
     return tuple(cumulative)
+
+
+def weighted_index(cum_weights: tuple[float, ...], rng: Random) -> int:
+    """Draw an index without allocating the temporary objects used by ``choices``."""
+    return bisect(cum_weights, rng.random() * cum_weights[-1], 0, len(cum_weights) - 1)
 
 
 def _choices_error(label: str, min_choices: int) -> str:

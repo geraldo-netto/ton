@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from random import Random
 from typing import Any, ClassVar
 
@@ -59,8 +60,6 @@ def test_engine_rejects_unknown_type(basic_config: dict) -> None:
 def test_engine_wraps_unexpected_prepare_error_as_template_error() -> None:
     """A buggy third-party generator that raises a non-ValueError must still
     surface as TemplateError so the CLI maps to exit 2 (REL-012)."""
-    from collections.abc import Mapping
-
     from ton.generators import Generator
 
     class BrokenGenerator(Generator):
@@ -444,6 +443,14 @@ def test_engine_audit_proof_failures_bounded_but_counted(monkeypatch: Any) -> No
             return ProofResult(ok=False, reason="bad value")
 
     monkeypatch.setattr(proofcheck, "MAX_AUDIT_SAMPLE", 2)
+    seen_specs: list[Mapping[str, Any] | None] = []
+    original_make_failure = proofcheck.ProofChecker._make_failure
+
+    def track_spec(self: Any, **kwargs: Any) -> Any:
+        seen_specs.append(kwargs["spec"])
+        return original_make_failure(self, **kwargs)
+
+    monkeypatch.setattr(proofcheck.ProofChecker, "_make_failure", track_spec)
     config = {"rows": 5, "format": "$v$", "types": {"v": {"type": "failing"}}}
     engine = Engine.from_config(
         config,
@@ -457,6 +464,7 @@ def test_engine_audit_proof_failures_bounded_but_counted(monkeypatch: Any) -> No
     assert len(engine.proof_failures) == 2
     assert engine.proof_failure_count == 5
     assert engine.provenance[0].proof_failures == 5
+    assert [spec is None for spec in seen_specs] == [False, False, True, True, True]
 
 
 def test_engine_provenance_reports_source_transforms_and_proof_state() -> None:

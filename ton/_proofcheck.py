@@ -89,8 +89,14 @@ class ProofChecker:
         """
         if not self.should_check(rows_emitted):
             return None
+        retain_detail = self.mode != "audit" or len(self.failures) < MAX_AUDIT_SAMPLE
         failures = self.build_failures(
-            type_key, field, source_result, steps, row=rows_emitted + 1, spec=spec
+            type_key,
+            field,
+            source_result,
+            steps,
+            row=rows_emitted + 1,
+            spec=spec if retain_detail else None,
         )
         if not failures:
             return None

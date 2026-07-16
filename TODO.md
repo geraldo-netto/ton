@@ -48,7 +48,6 @@ Last full rescan: 2026-07-13 (all categories).
 | PERF-023 | open | S | `_distribution.py:24` `WeightedChoiceSet.choose` calls `rng.choices(range(n), cum_weights=..., k=1)[0]` per row -- allocates a `range` + result list and re-derives the total each draw. A direct `bisect(cum_weights, rng.random() * cum_weights[-1])` is ~4x faster (0.35 -> 0.08 us/op). |
 | PERF-024 | open | S | `generators/network.py:59` `_draw_ip` constructs an `ipaddress.IPv4Address`/`IPv6Address` object per row solely to `str()` it (0.88 us/op vs ~0.5 us formatting the octets from the int). |
 | PERF-025 | open | S | `generators/identity.py:117` `PhoneGenerator.generate` walks the whole format string char-by-char and calls `rng.randint(0, 9)` per `#` on every row (3.05 us/row). Precompute the literal segments + digit count at prepare time and fill with one `rng.choices(_DIGITS, k=n)`. |
-| PERF-026 | open | S | `_proofcheck.py:195` `_make_failure` copies the entire field spec (`dict(spec)`) for every failure *before* `:111` `_record_audit` applies `MAX_AUDIT_SAMPLE`. In audit mode with a systematically failing field, every row pays a dict copy that is immediately discarded. Build the record lazily (or drop `spec` once the cap is hit). |
 
 ## scalability
 

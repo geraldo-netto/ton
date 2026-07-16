@@ -111,7 +111,6 @@ Last full rescan: 2026-07-13 (all categories).
 | CFG-015 | open | S | Reject unknown root and common field keys during configuration validation with path-aware errors. |
 | CFG-016 | open | S | Add a declarative allowed-key contract for generators/transforms/validators and enforce it for built-ins without blocking plugin-specific keys. |
 | CFG-017 | open | S | Add typo, nested-spec, and plugin-extension tests; document unknown-key validation and migration expectations. |
-| CFG-012 | open | S | Validation limits that reject configs are undocumented: `_config.MAX_ROWS` (1e9), `regex.MAX_TOTAL_EXPANSION` (`generators/regex.py:51`), `_regex_parse.MAX_GROUP_NESTING` (`:97`), `sequence.MAX_SEQUENCE_PAD_WIDTH`. README:785 mentions only `MAX_UNBOUNDED_REPEAT` / `MAX_LITERAL_REPEAT`. |
 | CFG-013 | open | S | `_config.MAX_ROW_WIDTH_GUIDANCE:46` is dead: defined and documented as the worst-case row-width ceiling, referenced by nothing, enforced nowhere. Either enforce it or drop it. |
 
 ## data governance

@@ -256,7 +256,7 @@ Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so adjacent w
 }
 ```
 
-- `rows` — how many rows to emit (non-negative integer).
+- `rows` — how many rows to emit (non-negative integer, maximum `1,000,000,000`).
 - `format` — the template; any `$name$` segment is a variable that must be declared in `types`. `$$` renders a literal `$`. A trailing `[id]` (e.g. `$word[id]$`) requests the paired-id facet of a paired generator — see [Paired references](#paired-references-nameid) below.
 - `types` — a map of variable name to type spec.
 - `encoding` — optional; the text codec used when writing to an `--output` file (default `utf-8`). Must be a codec Python recognizes. Output to stdout uses the stream's own encoding.
@@ -615,7 +615,7 @@ Monotonic counter, useful for primary keys / row ids. State lives on the prepare
 |------------|------|-----------------------------------|
 | `start`    | int  | first value (default `0`)         |
 | `step`     | int  | non-zero increment (default `1`)  |
-| `padWidth` | int  | zero-pad to this width (`0` off)  |
+| `padWidth` | int  | zero-pad to this width (`0` off, maximum `100,000`) |
 
 ```json
 {"type": "sequence", "start": 1000, "step": 1}
@@ -789,7 +789,7 @@ ipsum mollit culpa nostrud laboris reprehenderit
 
 #### `regex`
 
-Produce strings matching a user-supplied regex. Supports literals, character classes, escapes (`\d \w \s` and their negations), quantifiers, alternation, and groups. Unbounded `*` / `+` are capped at `MAX_UNBOUNDED_REPEAT` extra repeats; literal `{N}` quantifiers are capped at `MAX_LITERAL_REPEAT`.
+Produce strings matching a user-supplied regex. Supports literals, character classes, escapes (`\d \w \s` and their negations), quantifiers, alternation, and groups. Unbounded `*` / `+` add at most 8 repeats, literal `{N}` quantifiers are capped at 10,000, total nested expansion is capped at 1,000,000 characters per row, and group nesting is capped at 100.
 
 | field     | type   | description                       |
 |-----------|--------|-----------------------------------|

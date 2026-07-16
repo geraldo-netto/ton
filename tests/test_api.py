@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import stat
 from pathlib import Path
 from random import Random
 from typing import Any
@@ -86,3 +88,40 @@ def test_load_config_validates(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError):
         api.load_config(str(bad))
+
+
+def test_public_output_sink_replaces_atomically_and_preserves_mode(tmp_path: Path) -> None:
+    output = tmp_path / "rows.txt"
+    output.write_text("old\n", encoding="utf-8")
+    os.chmod(output, 0o640)
+
+    with api.open_output_path(str(output)) as stream:
+        stream.write("new\n")
+
+    assert output.read_text(encoding="utf-8") == "new\n"
+    assert stat.S_IMODE(output.stat().st_mode) == 0o640
+
+
+def test_public_output_sink_rolls_back_failed_write(tmp_path: Path) -> None:
+    output = tmp_path / "rows.txt"
+    output.write_text("old\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="failed"), api.open_output_path(str(output)) as stream:
+        stream.write("partial\n")
+        raise RuntimeError("failed")
+
+    assert output.read_text(encoding="utf-8") == "old\n"
+    assert list(tmp_path.glob(".rows.txt.*.tmp")) == []
+
+
+def test_public_output_sink_matches_cli_symlink_policy(tmp_path: Path) -> None:
+    target = tmp_path / "target.txt"
+    target.write_text("old\n", encoding="utf-8")
+    link = tmp_path / "rows.txt"
+    link.symlink_to(target)
+
+    with pytest.raises(OSError, match="symbolic-link"), api.open_output_path(str(link)):
+        pass
+
+    assert link.is_symlink()
+    assert target.read_text(encoding="utf-8") == "old\n"

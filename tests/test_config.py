@@ -326,3 +326,19 @@ def test_transform_type_must_be_non_empty_string(reference: object) -> None:
 
     with pytest.raises(ConfigError, match="transform 0 'type' must be a non-empty string"):
         api.validate_config(payload)
+
+
+def test_unknown_root_key_is_rejected_with_suggestion() -> None:
+    payload = _valid_payload()
+    payload["row"] = payload["rows"]
+
+    with pytest.raises(ConfigError, match="config.row.*Did you mean 'rows'"):
+        api.validate_config(payload)
+
+
+def test_common_field_key_typo_is_rejected() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["transform"] = []
+
+    with pytest.raises(ConfigError, match="types.a.transform.*Did you mean 'transforms'"):
+        api.validate_config(payload)

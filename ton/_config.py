@@ -133,6 +133,10 @@ def _validate_root(data: Any) -> None:
     missing = [key for key in _REQUIRED_TOP_LEVEL if key not in data]
     if missing:
         raise ConfigError(f"Config missing required keys: {missing}")
+    unknown = set(data) - ROOT_KEYS
+    if unknown:
+        key = sorted(unknown)[0]
+        raise ConfigError(_unknown_key_message("config", key, ROOT_KEYS))
 
 
 def _validate_rows(rows: Any) -> None:
@@ -159,6 +163,12 @@ def _validate_type_spec(name: str, spec: Any) -> None:
         raise ConfigError(f"Type spec {name!r} must be an object with a 'type' field.")
     if not isinstance(spec["type"], str) or not spec["type"]:
         raise ConfigError(f"Type spec {name!r} 'type' must be a non-empty string.")
+    for key in spec:
+        if key in COMMON_FIELD_KEYS:
+            continue
+        matches = difflib.get_close_matches(key, COMMON_FIELD_KEYS, n=1, cutoff=0.8)
+        if matches:
+            raise ConfigError(_unknown_key_message(f"types.{name}", key, COMMON_FIELD_KEYS))
     transforms = spec.get("transforms", [])
     if not isinstance(transforms, list):
         raise ConfigError(f"Type spec {name!r} 'transforms' must be a list.")

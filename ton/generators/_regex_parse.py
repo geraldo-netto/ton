@@ -248,6 +248,8 @@ class _Parser:
             hi = self._parse_class_atom()
             if hi[0] is not LITERAL:
                 raise RegexParseError("bad character range")
+            if hi[1] < item[1]:
+                raise RegexParseError("bad character range")
             return (RANGE, (item[1], hi[1]))
         return item
 

@@ -101,6 +101,8 @@ def test_control_and_literal_escapes() -> None:
         "(?=x)",  # unsupported group extension
         "(abc",  # missing close paren
         "[a-\\d]",  # bad character range
+        "[z-a]",  # reversed character range
+        "[z-a0]",  # reversed range must not disappear beside valid members
         "a\\",  # trailing backslash
         "a)",  # leftover close paren
     ],
@@ -110,7 +112,7 @@ def test_vendored_parser_rejects_bad_patterns(pattern: str) -> None:
         RegexGenerator().prepare({"pattern": pattern})
 
 
-@pytest.mark.parametrize("pattern", ["[]", "[z-a]", "[^ -~]"])
+@pytest.mark.parametrize("pattern", ["[]", "[^ -~]"])
 def test_rejects_invalid_character_classes_at_prepare(pattern: str) -> None:
     with pytest.raises(ValueError, match="character class"):
         RegexGenerator().prepare({"pattern": pattern})

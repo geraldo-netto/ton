@@ -48,7 +48,6 @@ Last full rescan: 2026-07-13 (all categories).
 | REL-022 | open | S | Decide and document the Engine iteration contract: reproducible re-iteration or explicit single-shot refusal; record the generator-state implications in the API docs. |
 | REL-026 | open | S | Implement the chosen iteration-state lifecycle for RNG, ProofChecker, counters, and generator-owned prepared state. |
 | REL-027 | open | S | Add repeated-iteration tests covering seeded random fields, `sequence`, proof state, and the chosen failure/reproducibility behavior. |
-| REL-024 | open | S | `generators/_regex_parse.py:236` `_parse_class_member` accepts a reversed range: `[z-a]` builds `RANGE(122,97)` and `regex.py:235` `_flatten_range` expands `range(122,98)` to `[]`. Alone it is caught as an empty class, but `[z-a0]` silently prepares with a one-character pool, so `{"pattern":"[z-a0]{4}"}` always emits "0000" where `re` would reject the pattern. Raise `RegexParseError("bad character range")` when `hi < lo`. |
 | REL-025 | open | S | `_engine.py:497` wraps a row-time generator crash in `TemplateError`, but `cli.py:290` `_execute` only catches `OSError` / `ProofError` / `ValidationError`, so it falls through to the `_run` catch-all: a plugin generator raising on row 500 exits 3 with "ton: unexpected error: TemplateError: ..." instead of the documented config-error exit 2. Catch `TemplateError` in `_execute`. |
 
 ## performance

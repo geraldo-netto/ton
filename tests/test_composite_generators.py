@@ -15,7 +15,7 @@ import pytest
 from ton import api
 from ton._engine import Engine, TemplateError
 from ton._logging import LogEvent
-from ton.generators.base import Generator, prepare_child_spec
+from ton.generators.base import Generator, PreparationContext, prepare_child_spec
 from ton.generators.one_of import OneOfGenerator
 from ton.generators.sequence_of import (
     MAX_SEQUENCE_OF_COUNT,
@@ -280,6 +280,17 @@ def test_prepare_child_spec_rejects_missing_type_field() -> None:
 def test_prepare_child_spec_rejects_unknown_type() -> None:
     with pytest.raises(ValueError, match="unknown type"):
         prepare_child_spec("custom", "'spec'", {"type": "nope"}, {})
+
+
+def test_preparation_context_resolves_children_through_shared_registry() -> None:
+    registry = {"string": api.build_extension_catalog().get_data_type("string")}
+    context = PreparationContext(registry)
+
+    generator, prepared = context.prepare_child(
+        "custom", "'spec'", {"type": "string", "values": ["x"]}
+    )
+
+    assert generator.generate(prepared, Random(0)) == "x"
 
 
 def test_generator_nested_type_hook_defaults_empty_and_is_extensible() -> None:

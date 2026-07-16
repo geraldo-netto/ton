@@ -37,6 +37,21 @@ from .._proof import ProofResult
 from .._transforms import TransformResult
 
 
+@dataclass(frozen=True)
+class PreparationContext:
+    """Registry-aware services available while preparing a generator spec."""
+
+    registry: Mapping[str, Generator]
+
+    def prepare_child(
+        self,
+        parent_type: str,
+        location: str,
+        nested_spec: Any,
+    ) -> tuple[Generator, Any]:
+        return prepare_child_spec(parent_type, location, nested_spec, self.registry)
+
+
 class Generator(ABC):
     """Strategy interface: produce one string value from a (prepared) spec."""
 

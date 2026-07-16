@@ -19,6 +19,7 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._registry import ExtensionCatalog, RegistryError, normalize_reference
 from ._template import UndeclaredVariableError, validate_against
+from ._transforms import fold_paired_capabilities
 from .generators.base import PreparationContext
 
 
@@ -203,11 +204,12 @@ def _validate_transforms(
         if normalized not in transforms:
             _raise_unknown_reference("transform", field_name, reference, catalog.list_transforms())
         transform = transforms[normalized]
-        if is_paired and not transform.capabilities.accepts_paired:
+        capability = fold_paired_capabilities(is_paired, (transform.capabilities,))
+        if capability.incompatible_index is not None:
             raise ConfigError(
                 f"Transform {reference!r} for {field_name!r} does not accept paired input."
             )
-        is_paired = is_paired and transform.capabilities.preserves_pairing
+        is_paired = capability.preserves_pairing
 
 
 def _validate_field_validators(

@@ -16,7 +16,7 @@ from ._registry import (
     runtime_type_name,
 )
 from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
-from ._transforms import Transform
+from ._transforms import Transform, fold_paired_capabilities
 from ._validation import Validator
 from .generators import Generator
 
@@ -151,7 +151,8 @@ class EngineCompiler:
         prepared: list[PreparedTransform] = []
         for transform_spec in spec.get("transforms", []):
             transform = self._resolve_transform(type_key, transform_spec["type"])
-            if is_paired and not transform.capabilities.accepts_paired:
+            capability = fold_paired_capabilities(is_paired, (transform.capabilities,))
+            if capability.incompatible_index is not None:
                 raise TemplateError(
                     f"Transform {transform_spec['type']!r} for variable "
                     f"{type_key!r} does not accept paired input"
@@ -174,7 +175,7 @@ class EngineCompiler:
                     "paired_input": is_paired,
                 },
             )
-            is_paired = is_paired and transform.capabilities.preserves_pairing
+            is_paired = capability.preserves_pairing
         return tuple(prepared)
 
     def _resolve_transform(self, type_key: str, reference: str) -> Transform:

@@ -67,6 +67,7 @@ class ExtensionCatalog:
         }
         self._transforms: dict[str, dict[str, Transform]] = {CORE_NAMESPACE: dict(transforms or {})}
         self._validators: dict[str, dict[str, Any]] = {CORE_NAMESPACE: dict(validators or {})}
+        self._lock = threading.RLock()
         # Flattened views are rebuilt only when a registration mutates a
         # store (PERF-003); catalog reads during config validation hit
         # the cache instead of re-running _flatten per field/transform.
@@ -78,7 +79,8 @@ class ExtensionCatalog:
         name: str,
         generator: Generator,
     ) -> None:
-        self._register(self._generators, namespace, name, generator)
+        with self._lock:
+            self._register(self._generators, namespace, name, generator)
         _log_plugin_registered("data_type", namespace, name)
 
     def register_transform(
@@ -87,24 +89,29 @@ class ExtensionCatalog:
         name: str,
         transform: Transform,
     ) -> None:
-        self._register(self._transforms, namespace, name, transform)
+        with self._lock:
+            self._register(self._transforms, namespace, name, transform)
         _log_plugin_registered("transform", namespace, name)
 
     def register_validator(self, namespace: str, name: str, validator: Any) -> None:
-        self._register(self._validators, namespace, name, validator)
+        with self._lock:
+            self._register(self._validators, namespace, name, validator)
         _log_plugin_registered("validator", namespace, name)
 
     def generators(self) -> dict[str, Generator]:
         # The catalog stores prototypes. Clone the complete flattened view
         # so aliases still share one instance within an Engine while separate
         # Engine builds never share mutable generator state.
-        return deepcopy(self._flattened("generators", self._generators))
+        with self._lock:
+            return deepcopy(self._flattened("generators", self._generators))
 
     def transforms(self) -> dict[str, Transform]:
-        return self._flattened("transforms", self._transforms)
+        with self._lock:
+            return self._flattened("transforms", self._transforms)
 
     def validators(self) -> dict[str, Any]:
-        return self._flattened("validators", self._validators)
+        with self._lock:
+            return self._flattened("validators", self._validators)
 
     def list_data_types(self) -> tuple[str, ...]:
         return tuple(sorted(self.generators()))
@@ -116,8 +123,9 @@ class ExtensionCatalog:
         return tuple(sorted(self.validators()))
 
     def namespaces(self) -> tuple[str, ...]:
-        names = set(self._generators) | set(self._transforms) | set(self._validators)
-        return tuple(sorted(names))
+        with self._lock:
+            names = set(self._generators) | set(self._transforms) | set(self._validators)
+            return tuple(sorted(names))
 
     def get_data_type(self, reference: str) -> Generator:
         return self.generators()[normalize_reference(reference)]

@@ -6,6 +6,7 @@ import inspect
 import logging
 import subprocess
 import sys
+import threading
 from random import Random
 from typing import Any, ClassVar
 from unittest import mock
@@ -256,6 +257,27 @@ def test_catalog_returns_fresh_generator_instances_per_registry() -> None:
 
     assert first["sequence"] is first["core.sequence"]
     assert first["sequence"] is not second["sequence"]
+
+
+def test_catalog_serializes_registration_and_snapshot_reads() -> None:
+    catalog = build_extension_catalog()
+    started = threading.Event()
+    completed = threading.Event()
+
+    def register() -> None:
+        started.set()
+        catalog.register_validator("plugin", "check", object())
+        completed.set()
+
+    with catalog._lock:
+        thread = threading.Thread(target=register)
+        thread.start()
+        assert started.wait(timeout=1)
+        assert not completed.wait(timeout=0.05)
+    thread.join(timeout=1)
+
+    assert completed.is_set()
+    assert "plugin.check" in catalog.validators()
 
 
 def test_extension_catalog_rejects_builtin_replacement() -> None:

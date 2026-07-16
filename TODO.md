@@ -62,7 +62,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CONC-011 | open | S | `ExtensionCatalog` has no synchronization around registration and flattened-cache rebuilds. Concurrent `generators()`/`register_*()` calls can iterate a mutating dict or publish a stale flattened snapshot after invalidation; lock mutations and cache publication or document construction-only use. |
 
 ## robustness/recovery
 

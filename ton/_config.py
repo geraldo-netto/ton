@@ -255,6 +255,7 @@ def _validate_field_spec(
     """Run the generator's prepare so per-spec errors surface (CLI-001)."""
     generator = generators[_normalize_config_reference(spec["type"])]
     _validate_extension_keys(f"types.{field_name}", spec, generator.config_keys, COMMON_FIELD_KEYS)
+    _validate_nested_generator_keys(f"types.{field_name}", spec, generators)
     try:
         PreparationContext(generators).prepare_generator(generator, spec)
     except Exception as exc:  # noqa: BLE001 - boundary; normalized to ConfigError
@@ -274,6 +275,21 @@ def _validate_extension_keys(
     if unknown:
         key = sorted(unknown)[0]
         raise ConfigError(_unknown_key_message(path, key, allowed))
+
+
+def _validate_nested_generator_keys(path: str, value: Any, generators: Mapping[str, Any]) -> None:
+    if isinstance(value, Mapping):
+        reference = value.get("type")
+        if isinstance(reference, str):
+            generator = generators.get(_normalize_config_reference(reference))
+            if generator is not None:
+                _validate_extension_keys(path, value, generator.config_keys, COMMON_FIELD_KEYS)
+        for key, nested in value.items():
+            if isinstance(nested, (Mapping, list)):
+                _validate_nested_generator_keys(f"{path}.{key}", nested, generators)
+    elif isinstance(value, list):
+        for index, nested in enumerate(value):
+            _validate_nested_generator_keys(f"{path}[{index}]", nested, generators)
 
 
 def _normalize_config_reference(reference: str) -> str:

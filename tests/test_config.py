@@ -369,3 +369,20 @@ def test_plugin_generator_may_own_custom_keys() -> None:
     catalog.register_data_type("plugin", "x", PluginGenerator())
 
     api.validate_config(payload, catalog=catalog)
+
+
+def test_nested_builtin_generator_rejects_key_typo() -> None:
+    payload = {
+        "rows": 1,
+        "format": "$a$",
+        "types": {
+            "a": {
+                "type": "sequence_of",
+                "count": 1,
+                "spec": {"type": "string", "value": ["x"]},
+            }
+        },
+    }
+
+    with pytest.raises(ConfigError, match=r"types.a.spec.value.*Did you mean 'values'"):
+        api.validate_config(payload)

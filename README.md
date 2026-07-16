@@ -266,6 +266,12 @@ Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so adjacent w
 - `encoding` — optional; the text codec used when writing to an `--output` file (default `utf-8`). Must be a codec Python recognizes. Output to stdout uses the stream's own encoding.
 - A value that the configured codec cannot represent is an output error (CLI exit `1`), not a configuration error.
 
+Unknown root keys and unknown keys owned by built-in generators/transforms are
+rejected, including inside nested composite specs. Diagnostics include the full
+config path and a suggestion for close typos. Plugin generators keep an open
+key namespace unless they declare `config_keys`; existing plugin-specific
+options therefore remain compatible.
+
 ### Type reference
 
 Twenty-three built-in types. Every output below was produced with `--seed 1` on a 4-row config of the form `{"rows": 4, "format": "$x$", "types": {"x": <spec>}}` so the examples are byte-reproducible.

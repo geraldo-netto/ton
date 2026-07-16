@@ -222,6 +222,16 @@ Public configuration helpers:
   `core.` and preserves qualified names. Invalid identifiers raise
   `RegistryError`.
 
+Public extension and provenance types:
+
+- `RegistryError` reports invalid, duplicate, or ambiguous extension
+  registrations.
+- `Transform` and `Validator` are runtime-checkable protocols for post-source
+  processing and final-value checks.
+- `Engine.provenance` returns immutable `ProvenanceRecord` entries containing
+  each field's source type, transform chain, proof settings/failure count, and
+  plugin package/version when available.
+
 Custom plugins register via three entry-point groups in any installed package: `ton.generators` (data types), `ton.transforms`, and `ton.validators`:
 
 Generator extensions implement `prepare(spec, context=None)`. Composite generators

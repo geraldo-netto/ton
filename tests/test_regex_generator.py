@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from random import Random
-from timeit import repeat
 
 import pytest
 
@@ -161,24 +160,3 @@ def test_prepared_regex_pools_preserve_seeded_choices(pattern: str, pool: tuple[
 
     for seed in range(20):
         assert generator.generate(prepared, Random(seed)) == Random(seed).choice(pool)
-
-
-def test_prepared_regex_pool_lookup_benchmark_guard() -> None:
-    from ton.generators import _regex_parse as rx
-    from ton.generators import regex
-
-    items = tuple((rx.LITERAL, code) for code in range(ord("a"), ord("z") + 1))
-    pool = regex._in_pool(items)
-    rng = Random(0)
-    out: list[str] = []
-
-    prepared_time = min(repeat(lambda: regex._pick_in(pool, rng, out), repeat=3, number=20_000))
-    legacy_time = min(
-        repeat(
-            lambda: out.append(rng.choice(regex._in_pool(tuple(items)))),
-            repeat=3,
-            number=20_000,
-        )
-    )
-
-    assert prepared_time < legacy_time

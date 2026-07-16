@@ -116,7 +116,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 | CFG-015 | open | S | Reject unknown root and common field keys during configuration validation with path-aware errors. |
 | CFG-016 | open | S | Add a declarative allowed-key contract for generators/transforms/validators and enforce it for built-ins without blocking plugin-specific keys. |
 | CFG-017 | open | S | Add typo, nested-spec, and plugin-extension tests; document unknown-key validation and migration expectations. |
-| CFG-018 | open | S | `_validate_type_spec` checks that transform entries contain `type` but not that it is a non-empty string. Add path-aware type validation before registry normalization, including transform index in the error. |
 | CFG-019 | open | S | `sequence.padWidth` has an upper cap but no lower bound; negative widths are accepted, stored, and treated as enabled even though `str.zfill` then silently performs no padding. Require `0 <= padWidth <= MAX_SEQUENCE_PAD_WIDTH`. |
 | CFG-020 | open | S | Boolean-like generator options (`padWithZero`, `uppercase`) use `bool(raw)`, so JSON strings such as `"false"` enable the option contrary to the documented boolean schema. Add a shared strict boolean coercer and apply it to built-ins. |
 

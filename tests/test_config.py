@@ -317,3 +317,12 @@ def test_unknown_key_policy_defines_root_and_common_field_keys() -> None:
     assert {"rows", "format", "types", "encoding"} == ROOT_KEYS
     assert {"type", "transforms", "validators"} == COMMON_FIELD_KEYS
     assert "Did you mean 'rows'?" in _unknown_key_message("config", "row", ROOT_KEYS)
+
+
+@pytest.mark.parametrize("reference", [123, ""])
+def test_transform_type_must_be_non_empty_string(reference: object) -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["transforms"] = [{"type": reference}]
+
+    with pytest.raises(ConfigError, match="transform 0 'type' must be a non-empty string"):
+        api.validate_config(payload)

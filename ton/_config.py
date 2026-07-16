@@ -167,6 +167,10 @@ def _validate_type_spec(name: str, spec: Any) -> None:
             raise ConfigError(
                 f"Type spec {name!r} transform {index} must be an object with a 'type' field."
             )
+        if not isinstance(transform["type"], str) or not transform["type"]:
+            raise ConfigError(
+                f"Type spec {name!r} transform {index} 'type' must be a non-empty string."
+            )
 
 
 def _validate_template_references(template: str, types: dict[str, Any]) -> None:

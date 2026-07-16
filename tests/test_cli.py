@@ -137,6 +137,13 @@ def test_cli_verbose_prints_summary_to_stderr(
     assert "rows/s" in captured.err
 
 
+def test_cli_verbose_zero_elapsed_uses_unknown_rate(capsys) -> None:
+    from ton.cli import _report
+
+    _report(0, 0.0)
+    assert "unknown rows/s" in capsys.readouterr().err
+
+
 def test_cli_unwritable_output_returns_1(
     write_config, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

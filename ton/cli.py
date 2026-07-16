@@ -464,7 +464,7 @@ def _emit_progress(rows: int, elapsed: float) -> None:
     line. Other consumers can filter by ``event="engine_progress"``
     instead of grepping stderr.
     """
-    rate = round(rows / elapsed, 1) if elapsed > 0 else None
+    rate = _rows_per_second(rows, elapsed)
     _logger.info(
         "engine_progress rows=%d elapsed=%.3fs",
         rows,
@@ -511,8 +511,13 @@ def _install_progress_handler() -> None:
 
 
 def _report(rows: int, elapsed: float) -> None:
-    rate = round(rows / elapsed, 1) if elapsed > 0 else float("inf")
+    rate = _rows_per_second(rows, elapsed)
+    rate_text = str(rate) if rate is not None else "unknown"
     print(
-        f"ton: wrote {rows} rows in {elapsed:.3f}s ({rate} rows/s)",
+        f"ton: wrote {rows} rows in {elapsed:.3f}s ({rate_text} rows/s)",
         file=sys.stderr,
     )
+
+
+def _rows_per_second(rows: int, elapsed: float) -> float | None:
+    return round(rows / elapsed, 1) if elapsed > 0 else None

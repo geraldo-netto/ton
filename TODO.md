@@ -38,7 +38,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-028 | open | S | Add a direct single-value generation fast path that skips `TransformResult`, trace tuples, type lookup, and `ProofChecker.evaluate` when the compiled plan marks them unused. |
 | PERF-029 | open | S | Add behavior parity tests and a benchmark guard for the default proof-off fast path, including paired and exception-wrapping branches. |
 | PERF-021 | open | S | Resolve regex `IN` nodes to immutable concrete character pools during prepare so generation performs no tuple-key construction or nested hashing. |
 | PERF-030 | open | S | Resolve regex `NOT_LITERAL` exclusions/pools during prepare so generation performs no per-character `frozenset` allocation. |

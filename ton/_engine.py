@@ -11,11 +11,11 @@ import threading
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any
+from typing import Any, cast
 
 from . import _config
+from ._compiler import ResolvedToken, compile_plan
 from ._compiler import TemplateError as _TemplateError
-from ._compiler import compile_plan
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import (
@@ -25,7 +25,6 @@ from ._proof import (
     TransformStep,
 )
 from ._proofcheck import ProofChecker
-from ._template import Token
 from ._transforms import Transform, TransformResult
 from ._validation import ValidationError, Validator
 from .generators import Generator
@@ -317,20 +316,25 @@ class Engine:
     def _render_row(self) -> str:
         paired_cache: dict[str, tuple[str, str]] | None = {} if self._plan.has_paired else None
         literals = self._plan.literals
-        plan_tokens = self._plan.plan_tokens
-        if not plan_tokens:
+        resolved_tokens = self._plan.resolved_tokens
+        if not resolved_tokens:
             return literals[0]
         parts: list[str] = []
-        for index, token in enumerate(plan_tokens):
+        for index, resolved in enumerate(resolved_tokens):
             parts.append(literals[index])
-            parts.append(self._resolve(token, paired_cache))
+            parts.append(self._resolve(resolved, paired_cache))
         parts.append(literals[-1])
         return "".join(parts)
 
-    def _resolve(self, token: Token, paired_cache: dict[str, tuple[str, str]] | None) -> str:
-        field = self._plan.prepared[token.type_key]
+    def _resolve(
+        self, resolved: ResolvedToken, paired_cache: dict[str, tuple[str, str]] | None
+    ) -> str:
+        token = resolved.token
+        field = resolved.field
         generator = field.generator
         try:
+            if resolved.direct and not self._proof.enabled:
+                return cast(str, generator.generate(field.source_prepared, self._rng))
             if paired_cache is not None and field.is_paired:
                 pair = paired_cache.get(token.type_key)
                 if pair is None:

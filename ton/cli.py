@@ -113,14 +113,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="With --proof-check=sample, check every Nth generated row.",
     )
     parser.add_argument(
-        "--redact-proof-failures",
-        action="store_true",
-        help=(
-            "Mask generated values and field specs in retained audit "
-            "proof-failure records so they carry no sensitive data."
-        ),
-    )
-    parser.add_argument(
         "--list-namespaces",
         action="store_true",
         help=(
@@ -378,7 +370,6 @@ def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine
             seed=args.seed,
             proof_mode=args.proof_check,
             proof_sample_rate=args.proof_sample_rate,
-            redact_proof_failures=args.redact_proof_failures,
         ),
     )
 

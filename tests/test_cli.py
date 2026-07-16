@@ -292,6 +292,7 @@ def test_cli_help_does_not_expose_internal_todo_ids(
     assert exc.value.code == 0
     assert "OBS-003" not in captured.out
     assert "--proof-check" in captured.out
+    assert "--redact-proof-failures" not in captured.out
     assert "loading is opt-in" in captured.out
 
 

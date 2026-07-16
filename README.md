@@ -62,7 +62,6 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 | `--log-level LEVEL`    | Attach a stderr handler to the `ton` logger (`debug`/`info`/`warning`/`error`/`critical`). |
 | `--proof-check MODE`   | Proof-check generated values: `off`, `sample`, `all`, or `audit` (collect, don't abort). |
 | `--proof-sample-rate N`| With `--proof-check sample`, check every `N`th generated row.                        |
-| `--redact-proof-failures` | Mask values and field specs in retained audit proof-failure records.              |
 | `--list-namespaces`    | List available namespaces, data types, transforms, and validators, then exit.        |
 | `--entry-points`       | Load trusted third-party plugins from the `ton.generators`, `ton.transforms`, and `ton.validators` entry-point groups. |
 | `--entry-point NAME`   | Allow only this trusted entry-point name; repeat for multiple names.                 |

@@ -14,11 +14,49 @@ import pytest
 from ton import api
 from ton.generators import Generator
 
+EXPECTED_PUBLIC_API = {
+    "ConfigError",
+    "Engine",
+    "EngineOptions",
+    "ExtensionCatalog",
+    "Generator",
+    "LogEvent",
+    "OutputEncodingError",
+    "PairedGenerator",
+    "ProofError",
+    "ProvenanceRecord",
+    "RegistryError",
+    "TemplateError",
+    "Transform",
+    "UndeclaredVariableError",
+    "ValidationError",
+    "Validator",
+    "build_extension_catalog",
+    "build_registry",
+    "chunk_rows",
+    "configure_stderr",
+    "derive_rng",
+    "derive_seed",
+    "fork_engine",
+    "generate",
+    "generate_from_file",
+    "load_config",
+    "logger",
+    "normalize_reference",
+    "open_output_path",
+    "output_encoding",
+    "validate_config",
+}
+
 
 def test_generate_yields_iterator(basic_config: dict) -> None:
     rows = list(api.generate(basic_config, seed=0))
     assert len(rows) == 4
     assert all(row.isdigit() for row in rows)
+
+
+def test_public_api_surface_matches_supported_checklist() -> None:
+    assert set(api.__all__) == EXPECTED_PUBLIC_API
 
 
 def test_concurrency_helpers_are_available_from_public_facade() -> None:

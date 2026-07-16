@@ -191,6 +191,23 @@ def test_engine_rejects_unknown_transform() -> None:
         Engine(config)
 
 
+def test_engine_keeps_explicitly_empty_transform_catalog() -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "identity"}],
+            }
+        },
+    }
+
+    with pytest.raises(TemplateError, match="Unknown transform"):
+        Engine(config, transforms={})
+
+
 def test_engine_preserves_paired_value_through_identity_transform() -> None:
     config = {
         "rows": 1,

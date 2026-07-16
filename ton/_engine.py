@@ -111,7 +111,9 @@ class Engine:
         self._rows: int = int(config["rows"])
         self._tokens = parse(self._template)
         self._registry = self._resolve_registry(registry)
-        self._transforms = dict(transforms or build_extension_catalog().transforms())
+        self._transforms = dict(
+            transforms if transforms is not None else build_extension_catalog().transforms()
+        )
         self._validators = dict(
             validators if validators is not None else build_extension_catalog().validators()
         )

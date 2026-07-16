@@ -45,7 +45,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-027 | open | S | Add repeated-iteration tests covering seeded random fields, `sequence`, proof state, and the chosen failure/reproducibility behavior. |
 
 ## performance
 

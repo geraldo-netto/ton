@@ -377,6 +377,23 @@ def test_engine_refuses_second_iteration_without_resetting_audit_failures() -> N
     assert len(engine.proof_failures) == 1
 
 
+def test_fresh_engines_repeat_seeded_random_and_sequence_state() -> None:
+    config = {
+        "rows": 3,
+        "format": "$random$ $id$",
+        "types": {
+            "random": {"type": "integer", "minValue": 1, "maxValue": 5},
+            "id": {"type": "sequence", "start": 10},
+        },
+    }
+
+    first = list(Engine.from_config(config, seed=42))
+    second = list(Engine.from_config(config, seed=42))
+
+    assert first == second
+    assert [row.split()[1] for row in first] == ["10", "11", "12"]
+
+
 def test_engine_audit_proof_failures_bounded_but_counted(monkeypatch: Any) -> None:
     import ton._proofcheck as proofcheck
 

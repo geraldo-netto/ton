@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+import multiprocessing
 from random import Random
 
+import pytest
+
+from ton._engine import Engine
 from ton.concurrency import derive_rng, derive_seed, fork_engine
+
+
+def _render_engine(engine: Engine) -> list[str]:
+    return list(engine)
 
 
 def test_derive_rng_is_deterministic_for_same_inputs() -> None:
@@ -70,3 +78,27 @@ def test_fork_engine_threads_worker_seed_and_proof_options() -> None:
     assert engine._seed == derive_seed(parent_seed=5, worker_id=1)
     assert engine._proof.mode == "audit"
     assert engine._proof.sample_rate == 3
+
+
+@pytest.mark.parametrize(
+    "start_method",
+    [
+        method
+        for method in ("spawn", "forkserver")
+        if method in multiprocessing.get_all_start_methods()
+    ],
+)
+def test_prepared_bytes_engine_crosses_process_boundary(start_method: str) -> None:
+    config = {
+        "rows": 2,
+        "format": "$token$",
+        "types": {"token": {"type": "bytes", "length": 4, "encoding": "base64"}},
+    }
+    engine = Engine.from_config(config, seed=17)
+    expected = list(Engine.from_config(config, seed=17))
+    context = multiprocessing.get_context(start_method)
+
+    with context.Pool(1) as pool:
+        actual = pool.apply(_render_engine, (engine,))
+
+    assert actual == expected

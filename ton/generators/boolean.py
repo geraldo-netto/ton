@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator
+from .base import Generator, coerce_string
 
 
 @dataclass(frozen=True)
@@ -23,8 +23,8 @@ class BooleanGenerator(Generator):
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> BooleanSpec:
         return BooleanSpec(
-            when_true=str(spec["whenTrue"]),
-            when_false=str(spec["whenFalse"]),
+            when_true=coerce_string(spec, "whenTrue", type_name=self.type_name),
+            when_false=coerce_string(spec, "whenFalse", type_name=self.type_name),
         )
 
     def generate(self, prepared: BooleanSpec, rng: Random) -> str:

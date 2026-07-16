@@ -319,6 +319,17 @@ def coerce_float(
         raise ValueError(f"{type_name} {key!r} must be a number (got {raw!r})") from exc
 
 
+def coerce_string(
+    spec: Mapping[str, Any],
+    key: str,
+    *,
+    type_name: str,
+    default: Any = _MISSING,
+) -> str:
+    """Read ``spec[key]`` and coerce it to ``str`` with uniform missing-key errors."""
+    return str(_value_or_default(spec, key, type_name, default))
+
+
 def require_min_le_max(type_name: str, lo: Any, hi: Any) -> None:
     """Raise when ``hi < lo``. Centralizes the bounds check used by the
     integer / decimal / date / timestamp_unix generators (TODO DUP-004).

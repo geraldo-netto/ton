@@ -37,6 +37,15 @@ def test_boolean_returns_one_of_two_literals() -> None:
     assert _draw(BooleanGenerator(), spec) in {"Y", "N"}
 
 
+@pytest.mark.parametrize("missing", ["whenTrue", "whenFalse"])
+def test_boolean_reports_required_literal(missing: str) -> None:
+    spec = {"whenTrue": "Y", "whenFalse": "N"}
+    del spec[missing]
+
+    with pytest.raises(ValueError, match=rf"boolean '{missing}' is required"):
+        BooleanGenerator().prepare(spec)
+
+
 def test_integer_within_bounds_and_padded() -> None:
     spec = {"minValue": 1, "maxValue": 9999, "padWithZero": True}
     value = _draw(IntegerGenerator(), spec)

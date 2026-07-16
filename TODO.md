@@ -116,7 +116,6 @@ Last full rescan: 2026-07-13 (all categories).
 | CFG-011 | open | S | `generators/boolean.py:26` reads `spec["whenTrue"]` / `spec["whenFalse"]` directly, so a missing key surfaces as `Invalid spec for 'x': KeyError: 'whenTrue'` instead of the uniform "<type> 'key' is required" message every other generator produces via `base.coerce_*` / `require_*`. |
 | CFG-012 | open | S | Validation limits that reject configs are undocumented: `_config.MAX_ROWS` (1e9), `regex.MAX_TOTAL_EXPANSION` (`generators/regex.py:51`), `_regex_parse.MAX_GROUP_NESTING` (`:97`), `sequence.MAX_SEQUENCE_PAD_WIDTH`. README:785 mentions only `MAX_UNBOUNDED_REPEAT` / `MAX_LITERAL_REPEAT`. |
 | CFG-013 | open | S | `_config.MAX_ROW_WIDTH_GUIDANCE:46` is dead: defined and documented as the worst-case row-width ceiling, referenced by nothing, enforced nowhere. Either enforce it or drop it. |
-| CFG-014 | open | S | Two of the three shipped example configs are never executed by the suite: only `examples/dna.json` is run (`tests/test_coverage_fillers.py:38`); `examples/hwmetrics.json` and `examples/winhash.json` can rot unnoticed while README advertises all three. |
 
 ## data governance
 

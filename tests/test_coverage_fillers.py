@@ -32,10 +32,11 @@ def test_python_m_ton_runs_cli() -> None:
     assert "ton" in result.stdout.lower()
 
 
-def test_python_m_ton_with_example_config() -> None:
+@pytest.mark.parametrize("example", ["dna.json", "hwmetrics.json", "winhash.json"])
+def test_python_m_ton_with_example_config(example: str) -> None:
     """End-to-end smoke through the __main__ entry point."""
     result = subprocess.run(
-        [sys.executable, "-m", "ton", "examples/dna.json", "--seed", "1"],
+        [sys.executable, "-m", "ton", f"examples/{example}", "--seed", "1"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

@@ -64,6 +64,17 @@ def test_weighted_rejects_zero_total() -> None:
         WeightedGenerator().prepare({"values": ["A", "B"], "weights": [0, 0]})
 
 
+@pytest.mark.parametrize("weight", [float("nan"), float("inf"), float("-inf")])
+def test_weighted_rejects_non_finite_weights(weight: float) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        WeightedGenerator().prepare({"values": ["A", "B"], "weights": [weight, 1]})
+
+
+def test_weighted_rejects_non_finite_total() -> None:
+    with pytest.raises(ValueError, match="total must be finite"):
+        WeightedGenerator().prepare({"values": ["A", "B"], "weights": [1e308, 1e308]})
+
+
 # ---------------------------------------------------------------------------
 # Composite form: 'choices' with nested type specs (any registered type).
 # ---------------------------------------------------------------------------

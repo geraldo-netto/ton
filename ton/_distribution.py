@@ -5,6 +5,7 @@ from __future__ import annotations
 from bisect import bisect
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from math import isfinite
 from random import Random
 from typing import Any, cast
 
@@ -98,9 +99,14 @@ def _coerce_weight(index: int, choice: Mapping[str, Any], label: str) -> float:
 
 
 def validate_weights(weights: Sequence[float], label: str) -> None:
+    if not all(isfinite(weight) for weight in weights):
+        raise ValueError(f"{label} 'weights' must be finite")
     if any(weight < 0 for weight in weights):
         raise ValueError(f"{label} 'weights' must be non-negative")
-    if sum(weights) <= 0:
+    total = sum(weights)
+    if not isfinite(total):
+        raise ValueError(f"{label} 'weights' total must be finite")
+    if total <= 0:
         raise ValueError(f"{label} 'weights' must sum to a positive number")
 
 

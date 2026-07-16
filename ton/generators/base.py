@@ -267,6 +267,14 @@ def require_string_tuple(spec: Mapping[str, Any], key: str = "values") -> tuple[
 _MISSING = object()
 
 
+def _value_or_default(spec: Mapping[str, Any], key: str, type_name: str, default: Any) -> Any:
+    if default is _MISSING:
+        if key not in spec:
+            raise ValueError(f"{type_name} {key!r} is required")
+        return spec[key]
+    return spec.get(key, default)
+
+
 def coerce_int(
     spec: Mapping[str, Any],
     key: str,
@@ -281,12 +289,7 @@ def coerce_int(
     / char / bytes / text / sequence / uuid generators so their per-field
     coercion + validation surface stays centralized (TODO DUP-006).
     """
-    if default is _MISSING:
-        if key not in spec:
-            raise ValueError(f"{type_name} {key!r} is required")
-        raw = spec[key]
-    else:
-        raw = spec.get(key, default)
+    raw = _value_or_default(spec, key, type_name, default)
     if isinstance(raw, bool):
         raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})")
     if isinstance(raw, int):
@@ -309,12 +312,7 @@ def coerce_float(
     default: Any = _MISSING,
 ) -> float:
     """Read ``spec[key]`` and coerce to ``float`` with a uniform error message."""
-    if default is _MISSING:
-        if key not in spec:
-            raise ValueError(f"{type_name} {key!r} is required")
-        raw = spec[key]
-    else:
-        raw = spec.get(key, default)
+    raw = _value_or_default(spec, key, type_name, default)
     try:
         return float(raw)
     except (TypeError, ValueError) as exc:

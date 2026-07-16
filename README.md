@@ -961,6 +961,7 @@ Library code emits structured INFO events on a single logger named `ton`. Attach
 | `output_special_file_rejected`        | `-o` target was not a regular file or FIFO          |
 | `resume_overshoot`                    | `--resume-from` exceeded `total_rows`               |
 | `cli_unexpected_error`                | CLI top-level catch-all (traceback in handler)      |
+| `cli_failed`                          | terminal CLI failure with safe category/counts      |
 
 ## Safety notes
 

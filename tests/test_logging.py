@@ -12,11 +12,28 @@ import pytest
 
 from ton import api
 from ton._engine import Engine
-from ton._logging import LOGGER_NAME, LogEvent, configure_stderr, logger
+from ton._logging import LOGGER_NAME, LogEvent, configure_stderr, logger, terminal_failure_fields
 from ton._proof import ProofResult
 from ton._registry import clear_default_registry_cache, default_registry
 from ton._transforms import TransformResult
 from ton.generators import Generator
+
+
+def test_terminal_failure_schema_is_safe_and_complete() -> None:
+    fields = terminal_failure_fields(
+        "output", 1, rows_written=3, total_rows=10, error_type="OSError"
+    )
+
+    assert fields == {
+        "event": "cli_failed",
+        "error_category": "output",
+        "exit_code": 1,
+        "rows_written": 3,
+        "total_rows": 10,
+        "error_type": "OSError",
+    }
+    with pytest.raises(ValueError, match="unknown terminal"):
+        terminal_failure_fields("other", 1, rows_written=0, total_rows=0, error_type="X")
 
 
 def test_logger_name_is_ton() -> None:

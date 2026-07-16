@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
+from typing import Any
 
 LOGGER_NAME = "ton"
 
@@ -65,6 +66,31 @@ class LogEvent(str, Enum):
     OUTPUT_SPECIAL_FILE_REJECTED = "output_special_file_rejected"
     RESUME_OVERSHOOT = "resume_overshoot"
     CLI_UNEXPECTED_ERROR = "cli_unexpected_error"
+    CLI_FAILED = "cli_failed"
+
+
+FAILURE_CATEGORIES = frozenset(("validation", "proof", "output", "unexpected"))
+
+
+def terminal_failure_fields(
+    category: str,
+    exit_code: int,
+    *,
+    rows_written: int,
+    total_rows: int,
+    error_type: str,
+) -> dict[str, Any]:
+    """Build the safe, stable payload for one terminal CLI failure."""
+    if category not in FAILURE_CATEGORIES:
+        raise ValueError(f"unknown terminal failure category {category!r}")
+    return {
+        "event": LogEvent.CLI_FAILED.value,
+        "error_category": category,
+        "exit_code": exit_code,
+        "rows_written": rows_written,
+        "total_rows": total_rows,
+        "error_type": error_type,
+    }
 
 
 def configure_stderr(

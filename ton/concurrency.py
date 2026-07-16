@@ -16,9 +16,8 @@ A multi-process generator can then do::
     from ton import api, concurrency
 
     config = api.load_config("examples/dna.json")
-    rows_per_worker = config["rows"] // workers
-
     def work(worker_id: int) -> list[str]:
+        rows_per_worker = concurrency.chunk_rows(config["rows"], workers, worker_id)
         eng = concurrency.fork_engine(config, parent_seed=42,
                                       worker_id=worker_id,
                                       rows=rows_per_worker)
@@ -48,6 +47,16 @@ from ._transforms import Transform
 from .generators import Generator
 
 _UINT64_MODULUS = 1 << 64
+
+
+def chunk_rows(total_rows: int, workers: int, worker_id: int) -> int:
+    """Return this worker's share without dropping remainder rows."""
+    if workers < 1:
+        raise ValueError("workers must be >= 1")
+    if not 0 <= worker_id < workers:
+        raise ValueError(f"worker_id must be in [0, {workers})")
+    base, remainder = divmod(total_rows, workers)
+    return base + (1 if worker_id < remainder else 0)
 
 
 def derive_seed(parent_seed: int, worker_id: int) -> int:

@@ -8,11 +8,24 @@ from random import Random
 import pytest
 
 from ton._engine import Engine
-from ton.concurrency import derive_rng, derive_seed, fork_engine
+from ton.concurrency import chunk_rows, derive_rng, derive_seed, fork_engine
 
 
 def _render_engine(engine: Engine) -> list[str]:
     return list(engine)
+
+
+def test_chunk_rows_distributes_remainder_without_dropping_rows() -> None:
+    chunks = [chunk_rows(10, 4, worker_id) for worker_id in range(4)]
+
+    assert chunks == [3, 3, 2, 2]
+    assert sum(chunks) == 10
+
+
+@pytest.mark.parametrize("workers, worker_id", [(0, 0), (2, -1), (2, 2)])
+def test_chunk_rows_rejects_invalid_worker_coordinates(workers: int, worker_id: int) -> None:
+    with pytest.raises(ValueError):
+        chunk_rows(10, workers, worker_id)
 
 
 def test_derive_rng_is_deterministic_for_same_inputs() -> None:

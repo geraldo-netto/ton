@@ -144,6 +144,26 @@ def test_cli_verbose_zero_elapsed_uses_unknown_rate(capsys) -> None:
     assert "unknown rows/s" in capsys.readouterr().err
 
 
+def test_progress_does_not_lower_ton_logger_level(write_config) -> None:
+    import logging
+
+    from ton.api import logger
+
+    logger.setLevel(logging.ERROR)
+    try:
+        assert main([str(write_config()), "--progress", "1"]) == 0
+        assert logger.level == logging.ERROR
+    finally:
+        logger.setLevel(logging.NOTSET)
+
+
+def test_progress_handler_ignores_other_events(capsys) -> None:
+    from ton.cli import _ProgressJSONHandler
+
+    _ProgressJSONHandler().emit(logging.LogRecord("ton", logging.INFO, "", 0, "x", (), None))
+    assert capsys.readouterr().err == ""
+
+
 def test_cli_unwritable_output_returns_1(
     write_config, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

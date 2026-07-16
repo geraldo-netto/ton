@@ -327,7 +327,9 @@ def test_progress_handler_install_idempotent(
     config = write_config()
     cli_main([str(config), "--seed", "0", "--progress", "2"])
     cli_main([str(config), "--seed", "0", "--progress", "2"])
-    progress_handlers = [h for h in cli._logger.handlers if isinstance(h, cli._ProgressJSONHandler)]
+    progress_handlers = [
+        h for h in cli._progress_logger.handlers if isinstance(h, cli._ProgressJSONHandler)
+    ]
     assert len(progress_handlers) == 1
     # Drain captured output so subsequent tests do not see this run's JSON.
     capsys.readouterr()

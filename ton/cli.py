@@ -26,6 +26,8 @@ from .api import (
 )
 from .api import logger as _logger
 
+_progress_logger = logging.getLogger("ton.progress")
+
 _LOG_LEVELS = {
     "debug": logging.DEBUG,
     "info": logging.INFO,
@@ -465,17 +467,19 @@ def _emit_progress(rows: int, elapsed: float) -> None:
     instead of grepping stderr.
     """
     rate = _rows_per_second(rows, elapsed)
+    extra = {
+        "event": LogEvent.ENGINE_PROGRESS.value,
+        "rows": rows,
+        "elapsed_seconds": round(elapsed, 3),
+        "rows_per_second": rate,
+    }
     _logger.info(
         "engine_progress rows=%d elapsed=%.3fs",
         rows,
         elapsed,
-        extra={
-            "event": LogEvent.ENGINE_PROGRESS.value,
-            "rows": rows,
-            "elapsed_seconds": round(elapsed, 3),
-            "rows_per_second": rate,
-        },
+        extra=extra,
     )
+    _progress_logger.info("engine_progress rows=%d elapsed=%.3fs", rows, elapsed, extra=extra)
 
 
 class _ProgressJSONHandler(logging.Handler):
@@ -502,12 +506,12 @@ class _ProgressJSONHandler(logging.Handler):
 
 def _install_progress_handler() -> None:
     """Attach :class:`_ProgressJSONHandler` to the ``ton`` logger once."""
-    for handler in _logger.handlers:
+    for handler in _progress_logger.handlers:
         if isinstance(handler, _ProgressJSONHandler):
             return
-    _logger.addHandler(_ProgressJSONHandler())
-    if _logger.level == logging.NOTSET or _logger.level > logging.INFO:
-        _logger.setLevel(logging.INFO)
+    _progress_logger.addHandler(_ProgressJSONHandler())
+    _progress_logger.setLevel(logging.INFO)
+    _progress_logger.propagate = False
 
 
 def _report(rows: int, elapsed: float) -> None:

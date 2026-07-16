@@ -86,7 +86,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| PLUG-014 | open | M | Catalog generator prototypes are deep-copied per registry, but transforms and validators are returned as shared instances and their lifecycle/statelessness contract is undocumented. Define one extension-instance policy and test two Engines built from a reused catalog with stateful transform/validator fixtures. |
 
 ## CLI / option integrity
 

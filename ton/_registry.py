@@ -109,11 +109,11 @@ class ExtensionCatalog:
 
     def transforms(self) -> dict[str, Transform]:
         with self._lock:
-            return self._flattened("transforms", self._transforms)
+            return deepcopy(self._flattened("transforms", self._transforms))
 
     def validators(self) -> dict[str, Any]:
         with self._lock:
-            return self._flattened("validators", self._validators)
+            return deepcopy(self._flattened("validators", self._validators))
 
     def list_data_types(self) -> tuple[str, ...]:
         return tuple(sorted(self.generators()))

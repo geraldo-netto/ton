@@ -39,6 +39,10 @@ Entry-point loading is opt-in. When enabled, TON loads:
 Entry-point names may be qualified (`acme.customer_id`) or unqualified
 (`customer_id`, which is placed in the `plugin` namespace).
 
+Catalog registrations are prototypes. Each registry snapshot deep-copies
+generators, transforms, and validators, preserving qualified/bare aliases
+within that snapshot while isolating mutable extension state between Engines.
+
 ## Generation Pipeline
 
 For each template field, `Engine` prepares an explicit pipeline:

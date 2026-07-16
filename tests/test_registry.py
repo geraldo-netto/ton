@@ -257,6 +257,17 @@ def test_catalog_returns_fresh_generator_instances_per_registry() -> None:
     assert first["sequence"] is not second["sequence"]
 
 
+def test_catalog_returns_fresh_transform_and_validator_instances() -> None:
+    catalog = build_extension_catalog()
+    first_transforms, second_transforms = catalog.transforms(), catalog.transforms()
+    first_validators, second_validators = catalog.validators(), catalog.validators()
+
+    assert first_transforms["identity"] is first_transforms["core.identity"]
+    assert first_transforms["identity"] is not second_transforms["identity"]
+    assert first_validators["non_empty"] is first_validators["core.non_empty"]
+    assert first_validators["non_empty"] is not second_validators["non_empty"]
+
+
 def test_catalog_serializes_registration_and_snapshot_reads() -> None:
     catalog = build_extension_catalog()
     started = threading.Event()

@@ -7,6 +7,7 @@ import stat
 from pathlib import Path
 from random import Random
 from typing import Any
+from unittest import mock
 
 import pytest
 
@@ -142,6 +143,28 @@ def test_public_output_sink_no_clobber_publishes_new_file(tmp_path: Path) -> Non
         stream.write("generated\n")
 
     assert output.read_text(encoding="utf-8") == "generated\n"
+
+
+def test_atomic_output_fsyncs_parent_directory(tmp_path: Path) -> None:
+    output = tmp_path / "rows.txt"
+
+    with (
+        mock.patch("ton._output._fsync_directory") as fsync_directory,
+        api.open_output_path(str(output)) as stream,
+    ):
+        stream.write("row\n")
+
+    fsync_directory.assert_called_once_with(str(tmp_path))
+
+
+def test_directory_fsync_is_noop_on_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    from ton import _output
+
+    monkeypatch.setattr(_output.os, "name", "nt")
+    with mock.patch.object(_output.os, "open") as open_directory:
+        _output._fsync_directory(".")
+
+    open_directory.assert_not_called()
 
 
 def test_public_output_sink_matches_cli_symlink_policy(tmp_path: Path) -> None:

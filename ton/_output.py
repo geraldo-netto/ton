@@ -92,6 +92,7 @@ def atomic_output(
         else:
             os.replace(tmp_name, path)
         tmp_name = ""
+        _fsync_directory(directory)
     finally:
         if tmp_name:
             with suppress(FileNotFoundError):
@@ -127,3 +128,15 @@ def target_mode(path: str) -> int:
         current = os.umask(0)
         os.umask(current)
         return 0o666 & ~current
+
+
+def _fsync_directory(directory: str) -> None:
+    """Persist a published directory entry where directory fsync is supported."""
+    if os.name == "nt":
+        return
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    descriptor = os.open(directory, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)

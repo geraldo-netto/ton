@@ -85,6 +85,7 @@ def test_resolve_reference_handles_bare_and_core_qualified_catalogs() -> None:
     assert resolve_reference({"core.string": value}, "string") is value
     assert runtime_type_name("core.string") == "string"
     assert runtime_type_name("string") == "string"
+    assert runtime_type_name(42) == "42"
 
 
 def test_discover_returns_only_concrete_named_subclasses() -> None:

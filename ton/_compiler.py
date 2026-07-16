@@ -15,7 +15,7 @@ from ._registry import (
     normalize_reference,
     runtime_type_name,
 )
-from ._template import Token, UndeclaredVariableError, parse, split_segments, validate_against
+from ._template import Token, parse, split_segments
 from ._transforms import Transform, fold_paired_capabilities
 from ._validation import Validator
 from .generators import Generator
@@ -115,10 +115,6 @@ class EngineCompiler:
         return make_registry(needed)
 
     def _validate(self) -> None:
-        try:
-            validate_against(self.template, self.types.keys())
-        except UndeclaredVariableError as exc:
-            raise TemplateError(str(exc)) from exc
         for token in self.tokens:
             type_name = runtime_type_name(self.types[token.type_key]["type"])
             if type_name not in self.registry:

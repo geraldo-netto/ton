@@ -10,6 +10,7 @@ from typing import Any, ClassVar
 import pytest
 
 from ton._compiler import CompiledPlan
+from ton._config import ConfigError
 from ton._engine import Engine, ProofError, TemplateError
 from ton._proof import ProofResult
 from ton._transforms import (
@@ -106,7 +107,7 @@ def test_engine_is_deterministic_for_a_seed(basic_config: dict) -> None:
 
 def test_engine_rejects_unknown_template_var(basic_config: dict) -> None:
     basic_config["format"] = "$missing$"
-    with pytest.raises(TemplateError):
+    with pytest.raises(ConfigError):
         Engine(basic_config)
 
 

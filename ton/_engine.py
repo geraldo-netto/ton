@@ -81,6 +81,7 @@ class Engine:
         milestone_rows: int = 0,
         redact_proof_failures: bool = False,
     ) -> None:
+        _config.validate_structure(config)
         plan = compile_plan(
             config,
             registry=registry,

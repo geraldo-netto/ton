@@ -210,24 +210,24 @@ def test_mac_oui_non_hex_rejected() -> None:
 
 
 def test_validate_root_rejects_non_dict() -> None:
-    from ton._config import ConfigError, _validate
+    from ton._config import ConfigError, validate_structure
 
     with pytest.raises(ConfigError, match="JSON object"):
-        _validate([1, 2, 3])
+        validate_structure([1, 2, 3])
 
 
 def test_validate_format_rejects_non_string() -> None:
-    from ton._config import ConfigError, _validate
+    from ton._config import ConfigError, validate_structure
 
     with pytest.raises(ConfigError, match="'format' must"):
-        _validate({"rows": 1, "format": 42, "types": {"a": {"type": "string"}}})
+        validate_structure({"rows": 1, "format": 42, "types": {"a": {"type": "string"}}})
 
 
 def test_validate_types_rejects_non_dict() -> None:
-    from ton._config import ConfigError, _validate
+    from ton._config import ConfigError, validate_structure
 
     with pytest.raises(ConfigError, match="'types' must"):
-        _validate({"rows": 1, "format": "$a$", "types": []})
+        validate_structure({"rows": 1, "format": "$a$", "types": []})
 
 
 # ---------------------------------------------------------------------------

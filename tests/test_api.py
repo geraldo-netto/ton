@@ -140,3 +140,16 @@ def test_output_encoding_error_carries_codec_and_field_context() -> None:
     assert error.encoding == "ascii"
     assert error.field_name == "city"
     assert "field 'city'" in str(error)
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {},
+        {"rows": True, "format": "$x$", "types": {"x": {"type": "string", "values": ["x"]}}},
+        {"rows": 1, "format": 123, "types": {"x": {"type": "string", "values": ["x"]}}},
+    ],
+)
+def test_in_memory_generation_uses_structural_validation(config: dict) -> None:
+    with pytest.raises(api.ConfigError):
+        list(api.generate(config))

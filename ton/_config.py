@@ -66,7 +66,7 @@ def load(path: str | Path) -> dict[str, Any]:
     with config_path.open(encoding="utf-8") as fh:
         data = json.load(fh)
 
-    _validate(data)
+    validate_structure(data)
     return cast(dict[str, Any], data)
 
 
@@ -78,7 +78,7 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
     generation time -- otherwise ``--validate`` reports a bad-bounds
     config as valid and the real run fails (CLI-001).
     """
-    _validate(data)
+    validate_structure(data)
     generators = catalog.generators()
     for field_name, spec in data["types"].items():
         _validate_type_reference(field_name, spec["type"], catalog)
@@ -97,7 +97,8 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
     )
 
 
-def _validate(data: Any) -> None:
+def validate_structure(data: Any) -> None:
+    """Validate the config shape shared by file and in-memory entry points."""
     _validate_root(data)
     _validate_rows(data["rows"])
     _validate_format(data["format"])

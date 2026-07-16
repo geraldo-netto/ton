@@ -113,7 +113,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CFG-010 | open | S | Define the unknown-key policy and canonical allowed root/field keys, including extension-owned namespaces and error-message suggestions for typos. |
 | CFG-015 | open | S | Reject unknown root and common field keys during configuration validation with path-aware errors. |
 | CFG-016 | open | S | Add a declarative allowed-key contract for generators/transforms/validators and enforce it for built-ins without blocking plugin-specific keys. |
 | CFG-017 | open | S | Add typo, nested-spec, and plugin-extension tests; document unknown-key validation and migration expectations. |

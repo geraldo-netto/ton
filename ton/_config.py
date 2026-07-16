@@ -10,6 +10,7 @@ validation surfaces cannot drift (TODO REL-011).
 from __future__ import annotations
 
 import codecs
+import difflib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -28,6 +29,16 @@ class ConfigError(ValueError):
 
 
 _REQUIRED_TOP_LEVEL = ("rows", "format", "types")
+ROOT_KEYS = frozenset((*_REQUIRED_TOP_LEVEL, "encoding"))
+COMMON_FIELD_KEYS = frozenset(("type", "transforms", "validators"))
+
+
+def _unknown_key_message(path: str, key: str, allowed: frozenset[str]) -> str:
+    """Return a stable unknown-key diagnostic with a typo suggestion."""
+    matches = difflib.get_close_matches(key, allowed, n=1, cutoff=0.6)
+    suggestion = f" Did you mean {matches[0]!r}?" if matches else ""
+    return f"Unknown key {path}.{key}.{suggestion} Allowed keys: {', '.join(sorted(allowed))}."
+
 
 #: Defensive upper bound on row count. Type-specific upper bounds
 #: belong to the relevant generator's ``prepare`` method.

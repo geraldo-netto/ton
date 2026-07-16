@@ -309,3 +309,11 @@ def test_validate_config_accepts_core_identity_transform() -> None:
     payload["types"]["a"]["transforms"] = [{"type": "identity"}]
 
     api.validate_config(payload)
+
+
+def test_unknown_key_policy_defines_root_and_common_field_keys() -> None:
+    from ton._config import COMMON_FIELD_KEYS, ROOT_KEYS, _unknown_key_message
+
+    assert {"rows", "format", "types", "encoding"} == ROOT_KEYS
+    assert {"type", "transforms", "validators"} == COMMON_FIELD_KEYS
+    assert "Did you mean 'rows'?" in _unknown_key_message("config", "row", ROOT_KEYS)

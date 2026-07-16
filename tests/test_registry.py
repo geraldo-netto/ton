@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import inspect
 import logging
+import subprocess
+import sys
 from random import Random
 from typing import Any, ClassVar
 from unittest import mock
@@ -24,6 +26,27 @@ from ton._registry import (
 )
 from ton._transforms import BaseTransform
 from ton.generators import Generator
+
+
+@pytest.mark.parametrize(
+    "imports",
+    [
+        "import ton.transforms; import ton.generators",
+        "import ton.transforms.distribution; import ton.generators",
+        "import ton.generators; import ton.transforms",
+        "import ton._registry; ton._registry.default_registry()",
+    ],
+)
+def test_public_packages_import_cleanly_in_fresh_interpreter(imports: str) -> None:
+    completed = subprocess.run(
+        [sys.executable, "-c", imports],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
 
 #: Every built-in type that ships with TON. If this list grows or
 #: shrinks, the registry should reflect it without anyone editing

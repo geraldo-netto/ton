@@ -145,6 +145,7 @@ class Engine:
         self._milestone_rows = max(0, int(milestone_rows))
         self._rows_emitted = 0
         self._iteration_lock = threading.Lock()
+        self._iteration_started = False
         _logger.info(
             "engine_constructed rows=%d types=%d paired=%s",
             self._rows,
@@ -428,6 +429,9 @@ class Engine:
         if not self._iteration_lock.acquire(blocking=False):
             raise RuntimeError("Engine instances cannot be iterated concurrently")
         try:
+            if self._iteration_started:
+                raise RuntimeError("Engine instances are single-shot and cannot be iterated twice")
+            self._iteration_started = True
             milestone = self._milestone_rows
             self._rows_emitted = 0
             self._proof.reset()

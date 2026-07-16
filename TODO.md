@@ -45,7 +45,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-026 | open | S | Implement the chosen iteration-state lifecycle for RNG, ProofChecker, counters, and generator-owned prepared state. |
 | REL-027 | open | S | Add repeated-iteration tests covering seeded random fields, `sequence`, proof state, and the chosen failure/reproducibility behavior. |
 
 ## performance

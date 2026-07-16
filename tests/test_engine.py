@@ -351,7 +351,7 @@ def test_engine_audit_proof_mode_records_failures_without_stopping() -> None:
     assert engine.proof_failures[0].spec == {"type": "failing"}
 
 
-def test_engine_audit_proof_failures_reset_between_iterations() -> None:
+def test_engine_refuses_second_iteration_without_resetting_audit_failures() -> None:
     class FailingGenerator(Generator):
         type_name = "failing"
 
@@ -372,7 +372,8 @@ def test_engine_audit_proof_failures_reset_between_iterations() -> None:
 
     assert list(engine) == ["bad"]
     assert len(engine.proof_failures) == 1
-    assert list(engine) == ["bad"]
+    with pytest.raises(RuntimeError, match="single-shot"):
+        list(engine)
     assert len(engine.proof_failures) == 1
 
 

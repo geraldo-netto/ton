@@ -36,6 +36,11 @@ class PreparedField:
         last = self.transforms[-1].transform
         return bool(self.generator.is_paired and last.capabilities.preserves_pairing)
 
+    @cached_property
+    def is_direct(self) -> bool:
+        """Whether proof-off generation needs only the source generator call."""
+        return not self.is_paired and not self.transforms and not self.validators
+
 
 @dataclass(frozen=True)
 class TransformStep:

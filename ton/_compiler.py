@@ -36,6 +36,16 @@ class CompiledPlan:
     has_paired: bool
     literals: tuple[str, ...]
     plan_tokens: tuple[Token, ...]
+    resolved_tokens: tuple[ResolvedToken, ...]
+
+
+@dataclass(frozen=True)
+class ResolvedToken:
+    """A template token with its prepared field and static fast-path eligibility."""
+
+    token: Token
+    field: PreparedField
+    direct: bool
 
 
 class TemplateError(ValueError):
@@ -65,6 +75,10 @@ class EngineCompiler:
         self._validate()
         prepared = self._build_prepared()
         literals, plan_tokens = split_segments(self.template)
+        resolved_tokens = tuple(
+            ResolvedToken(token, prepared[token.type_key], prepared[token.type_key].is_direct)
+            for token in plan_tokens
+        )
         return CompiledPlan(
             template=self.template,
             types=self.types,
@@ -77,6 +91,7 @@ class EngineCompiler:
             has_paired=any(prepared[token.type_key].is_paired for token in self.tokens),
             literals=tuple(literals),
             plan_tokens=tuple(plan_tokens),
+            resolved_tokens=resolved_tokens,
         )
 
     def _resolve_registry(

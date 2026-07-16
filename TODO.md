@@ -38,7 +38,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-020 | open | S | Extend the compiled field/token plan with flags and resolved references needed to identify the no-transform, no-validator, proof-off path once at prepare time. |
 | PERF-028 | open | S | Add a direct single-value generation fast path that skips `TransformResult`, trace tuples, type lookup, and `ProofChecker.evaluate` when the compiled plan marks them unused. |
 | PERF-029 | open | S | Add behavior parity tests and a benchmark guard for the default proof-off fast path, including paired and exception-wrapping branches. |
 | PERF-021 | open | S | Resolve regex `IN` nodes to immutable concrete character pools during prepare so generation performs no tuple-key construction or nested hashing. |

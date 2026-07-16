@@ -30,6 +30,15 @@ def test_compiled_plan_is_immutable() -> None:
     assert CompiledPlan.__dataclass_params__.frozen is True
 
 
+def test_compiled_tokens_resolve_direct_generation_fields(basic_config: dict) -> None:
+    engine = Engine(basic_config, rng=Random(0))
+
+    resolved = engine._plan.resolved_tokens
+    assert len(resolved) == 1
+    assert resolved[0].field is engine._plan.prepared[resolved[0].token.type_key]
+    assert resolved[0].direct is True
+
+
 def test_engine_runtime_state_uses_compiled_plan(basic_config: dict) -> None:
     engine = Engine.from_config(basic_config, seed=1)
 

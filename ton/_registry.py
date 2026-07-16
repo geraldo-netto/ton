@@ -18,6 +18,7 @@ from __future__ import annotations
 import inspect
 import threading
 from collections.abc import Container, Iterable, Iterator, Mapping
+from copy import deepcopy
 from importlib.metadata import entry_points
 from typing import Any, TypeVar
 
@@ -93,7 +94,10 @@ class ExtensionCatalog:
         _log_plugin_registered("validator", namespace, name)
 
     def generators(self) -> dict[str, Generator]:
-        return self._flattened("generators", self._generators)
+        # The catalog stores prototypes. Clone the complete flattened view
+        # so aliases still share one instance within an Engine while separate
+        # Engine builds never share mutable generator state.
+        return deepcopy(self._flattened("generators", self._generators))
 
     def transforms(self) -> dict[str, Transform]:
         return self._flattened("transforms", self._transforms)

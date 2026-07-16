@@ -222,6 +222,11 @@ for row in api.generate(config_dict,
     ...
 ```
 
+`ExtensionCatalog` treats registered generator instances as prototypes. Each
+`catalog.generators()` call returns fresh deep-copied instances, so reusing a
+catalog across Engines does not share generator state. Generator attributes
+must therefore support `copy.deepcopy`.
+
 A broken plugin is isolated: load failures are logged as `entry_point_failed` and skipped; one bad package never aborts the whole catalog build.
 Entry points execute installed package code while loading, so TON loads them only when explicitly requested, either through `api.build_extension_catalog(include_entry_points=True)` or the CLI `--entry-points` / `--entry-point NAME` flags. (`api.build_registry` remains as a deprecated generator-only shim.)
 

@@ -60,7 +60,12 @@ class PreparationContext:
 
 
 class Generator(ABC):
-    """Strategy interface: produce one string value from a (prepared) spec."""
+    """Strategy interface: produce one string value from a prepared spec.
+
+    Catalog registration treats an instance as a prototype and deep-copies
+    it for each registry view. Generator state may therefore be Engine-local,
+    but every attribute must support :func:`copy.deepcopy`.
+    """
 
     #: JSON ``type`` discriminator handled by this generator.
     type_name: str = ""

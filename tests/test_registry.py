@@ -248,6 +248,16 @@ def test_catalog_returns_isolated_flattened_views_until_registration() -> None:
     assert "acme.widget" in catalog.generators()
 
 
+def test_catalog_returns_fresh_generator_instances_per_registry() -> None:
+    catalog = build_extension_catalog()
+
+    first = catalog.generators()
+    second = catalog.generators()
+
+    assert first["sequence"] is first["core.sequence"]
+    assert first["sequence"] is not second["sequence"]
+
+
 def test_extension_catalog_rejects_builtin_replacement() -> None:
     catalog = build_extension_catalog()
 

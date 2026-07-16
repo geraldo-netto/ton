@@ -342,6 +342,25 @@ def test_cli_proof_error_returns_2(
     assert "proof failed" in captured.err
 
 
+def test_cli_row_time_template_error_returns_2(
+    monkeypatch, write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from ton import cli
+    from ton.api import TemplateError
+
+    def _boom(*args, **kwargs):
+        raise TemplateError("generator failed on row")
+
+    monkeypatch.setattr(cli, "_stream", _boom)
+    config = write_config()
+    exit_code = main([str(config)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "invalid config" in captured.err
+    assert "unexpected error" not in captured.err
+
+
 def test_cli_atomic_output_keeps_existing_file_on_failure(
     monkeypatch, write_config, tmp_path: Path
 ) -> None:

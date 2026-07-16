@@ -305,6 +305,9 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
     except ValidationError as exc:
         print(f"ton: validation failed: {exc}", file=sys.stderr)
         return 2
+    except TemplateError as exc:
+        print(f"ton: invalid config: {exc}", file=sys.stderr)
+        return 2
     if args.verbose:
         _report(rows_written, time.perf_counter() - started)
     if args.proof_check == "audit":

@@ -23,7 +23,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CX-012 | open | S | Extract template parsing, registry resolution, validation, and field preparation from `Engine.__init__` into a compiler that returns the compiled plan. |
 | CX-013 | open | S | Reduce `Engine.__init__` to runtime-state initialization from the compiled plan and add focused compiler/constructor tests. |
 | CX-011 | open | S | Near the CC<=10 limit (all at 9, none over): `generators/regex.py:98` `_reject_oversized_repeats`, `_logging.py:70` `configure_stderr`, `_config.py:158` `_validate_type_spec`. Watch on next change. |
 

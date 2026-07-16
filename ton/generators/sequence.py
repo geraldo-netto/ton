@@ -56,6 +56,8 @@ class SequenceGenerator(Generator):
         if step == 0:
             raise ValueError("sequence 'step' must be non-zero")
         pad_width = coerce_int(spec, "padWidth", type_name="sequence", default=0)
+        if pad_width < 0:
+            raise ValueError("sequence 'padWidth' must be >= 0")
         assert_below_cap(
             "sequence",
             "padWidth",

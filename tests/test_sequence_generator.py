@@ -33,6 +33,11 @@ def test_sequence_rejects_zero_step() -> None:
         SequenceGenerator().prepare({"step": 0})
 
 
+def test_sequence_rejects_negative_pad_width() -> None:
+    with pytest.raises(ValueError, match="padWidth.*>= 0"):
+        SequenceGenerator().prepare({"padWidth": -1})
+
+
 def test_sequence_through_engine() -> None:
     config = {
         "rows": 5,

@@ -28,6 +28,7 @@ from ._transforms import IdentityTransform, Transform
 # Importing ``ton.generators`` imports every concrete-generator submodule,
 # which is what populates Generator.__subclasses__() below.
 from .generators import BUILTIN_GENERATOR_CLASSES, Generator
+from .transforms import DistributionTransform
 
 #: Entry-point group third-party packages publish to expose a Generator
 #: class. The entry-point *name* becomes the JSON ``type`` discriminator;
@@ -165,8 +166,6 @@ def normalize_reference(reference: str) -> str:
 
 def build_extension_catalog() -> ExtensionCatalog:
     """Return a catalog containing the built-in data types."""
-    from .transforms import DistributionTransform
-
     return ExtensionCatalog(
         transforms={
             "distribution": DistributionTransform(),

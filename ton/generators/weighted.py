@@ -50,14 +50,14 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar
 
-from .._proof import ProofResult
-from .._transforms import TransformResult
-from ..transforms.distribution import (
+from .._distribution import (
     WeightedChoiceSet,
     cumulative_weights,
     prepare_distribution,
     validate_weights,
 )
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from .base import Generator
 
 

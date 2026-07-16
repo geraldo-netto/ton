@@ -48,6 +48,7 @@ from ._config import ConfigError
 from ._config import output_encoding as _output_encoding
 from ._engine import Engine, EngineOptions, ProofError, TemplateError
 from ._logging import LogEvent, configure_stderr, logger
+from ._output import open_output_path
 from ._proof import ProvenanceRecord
 from ._registry import (
     ExtensionCatalog,
@@ -88,6 +89,7 @@ __all__ = [
     "load_config",
     "logger",
     "normalize_reference",
+    "open_output_path",
     "output_encoding",
     "validate_config",
 ]

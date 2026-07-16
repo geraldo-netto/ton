@@ -71,3 +71,29 @@ def atomic_output(
         if tmp_name:
             with suppress(FileNotFoundError):
                 os.unlink(tmp_name)
+
+
+@contextmanager
+def open_output_path(
+    path: str,
+    *,
+    no_clobber: bool = False,
+    encoding: str = "utf-8",
+) -> Iterator[TextIO]:
+    """Open a validated path with FIFO or atomic regular-file semantics."""
+    if validate_output_target(path, no_clobber=no_clobber):
+        with open(path, "w", encoding=encoding) as stream:
+            yield stream
+        return
+    with atomic_output(path, encoding=encoding, mode=target_mode(path)) as stream:
+        yield stream
+
+
+def target_mode(path: str) -> int:
+    """Preserve destination permissions or apply the process file-creation mask."""
+    try:
+        return stat.S_IMODE(os.stat(path).st_mode)
+    except FileNotFoundError:
+        current = os.umask(0)
+        os.umask(current)
+        return 0o666 & ~current

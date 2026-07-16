@@ -431,7 +431,7 @@ def test_open_output_streams_existing_fifo(tmp_path: Path) -> None:
     )
     opened = mock.mock_open()
     with (
-        mock.patch("ton.cli.os.stat", return_value=fifo_stat),
+        mock.patch("ton._output.os.stat", return_value=fifo_stat),
         mock.patch("builtins.open", opened),
         _open_output(str(fifo)) as writer,
     ):

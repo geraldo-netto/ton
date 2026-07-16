@@ -5,8 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
-import stat
 import sys
 import time
 from collections.abc import Iterator, Sequence
@@ -14,7 +12,7 @@ from contextlib import contextmanager
 from typing import TextIO
 
 from . import __version__, api
-from ._output import atomic_output, validate_output_target
+from ._output import open_output_path
 from .api import (
     ConfigError,
     Engine,
@@ -401,11 +399,7 @@ def _open_output(
         with _reconfigured_stdout(encoding) as stream:
             yield stream
         return
-    if validate_output_target(path, no_clobber=no_clobber):
-        with open(path, "w", encoding=encoding) as fh:
-            yield fh
-        return
-    with atomic_output(path, encoding=encoding, mode=_target_mode(path)) as stream:
+    with open_output_path(path, no_clobber=no_clobber, encoding=encoding) as stream:
         yield stream
 
 
@@ -429,20 +423,6 @@ def _reconfigured_stdout(encoding: str) -> Iterator[TextIO]:
             restore["errors"] = old_errors
         if restore:
             reconfigure(**restore)
-
-
-def _target_mode(path: str) -> int:
-    """Mode the replaced file should end up with (ROB-001).
-
-    Preserves an existing destination's permission bits; for a new file
-    applies the process umask to the 0666 default the way ``open`` would.
-    """
-    try:
-        return stat.S_IMODE(os.stat(path).st_mode)
-    except FileNotFoundError:
-        current = os.umask(0)
-        os.umask(current)
-        return 0o666 & ~current
 
 
 def _stream(

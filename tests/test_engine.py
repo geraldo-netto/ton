@@ -93,6 +93,18 @@ def test_engine_rejects_concurrent_iteration(basic_config: dict) -> None:
     assert list(iterator) != []
 
 
+def test_engine_pickle_state_excludes_and_rebuilds_iteration_lock(basic_config: dict) -> None:
+    engine = Engine(basic_config, rng=Random(0))
+
+    state = engine.__getstate__()
+    assert "_iteration_lock" not in state
+
+    restored = object.__new__(Engine)
+    restored.__setstate__(state)
+    assert restored._iteration_lock.acquire(blocking=False)
+    restored._iteration_lock.release()
+
+
 def test_engine_applies_transform_chain_to_single_value() -> None:
     class PrefixTransform(BaseTransform):
         type_name: ClassVar[str] = "prefix"

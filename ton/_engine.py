@@ -407,6 +407,17 @@ class Engine:
         self._iteration_started = True
         return self._iterate()
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Return pickle state without the process-local iteration lock."""
+        state = self.__dict__.copy()
+        state.pop("_iteration_lock", None)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore pickle state with a new process-local iteration lock."""
+        self.__dict__.update(state)
+        self._iteration_lock = threading.Lock()
+
     def _iterate(self) -> Iterator[str]:
         try:
             milestone = self._milestone_rows

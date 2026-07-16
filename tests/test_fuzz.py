@@ -173,8 +173,12 @@ def _spec_regex(rng: Random) -> dict[str, Any]:
     }
 
 
-def _spec_lmhash(rng: Random) -> dict[str, Any]:
-    return {"type": "lmhash", "values": [f"word{i}" for i in range(rng.randint(1, 5))]}
+def _spec_ntlm(rng: Random) -> dict[str, Any]:
+    return {
+        "type": "hash",
+        "algorithm": "ntlm",
+        "values": [f"word{i}" for i in range(rng.randint(1, 5))],
+    }
 
 
 def _spec_hash(rng: Random) -> dict[str, Any]:
@@ -206,7 +210,7 @@ _SPEC_FACTORIES: list[tuple[str, Callable[[Random], dict[str, Any]]]] = [
     ("text", _spec_text),
     ("regex", _spec_regex),
     ("hash", _spec_hash),
-    ("lmhash", _spec_lmhash),
+    ("ntlm", _spec_ntlm),
 ]
 
 
@@ -245,7 +249,7 @@ _BAD_SPEC_MUTATIONS: list[tuple[str, dict[str, Any]]] = [
     ("char", {"type": "char", "values": [], "maxChar": 2}),
     ("string", {"type": "string", "values": []}),
     ("hash", {"type": "hash", "algorithm": "bcrypt", "rounds": 3, "values": ["secret"]}),
-    ("lmhash", {"type": "lmhash", "values": []}),
+    ("ntlm", {"type": "hash", "algorithm": "ntlm", "values": []}),
     ("uuid", {"type": "uuid", "version": 7}),
     ("sequence", {"type": "sequence", "step": 0}),
     ("weighted", {"type": "weighted", "values": ["A"], "weights": [-1]}),

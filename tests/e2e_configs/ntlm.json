@@ -1,3 +1,3 @@
 {"rows": 100, "format": "$word[id]$|$word$",
- "types": {"word": {"type": "lmhash",
+ "types": {"word": {"type": "hash", "algorithm": "ntlm",
                      "values": ["password", "secret", "admin"]}}}

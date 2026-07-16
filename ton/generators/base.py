@@ -166,7 +166,7 @@ class PairedGenerator(Generator):
     """Generator that emits a pair of related values for a single row.
 
     Use this when ``$name$`` and ``$name[id]$`` in the template must
-    refer to two facets of the same draw (canonical example: ``lmhash``
+    refer to two facets of the same draw (canonical example: ``hash``
     -- ``$word$`` is the hash, ``$word[id]$`` is the plaintext).
 
     ``generate_pair`` returns ``(id_value, primary_value)``. The engine
@@ -211,7 +211,7 @@ class WordPairSpec:
 
     Hashing happens once at prepare time; the row hot path is a single
     ``rng.choice`` against this tuple. Shared by the ``hash`` and
-    ``lmhash`` generators (DUP-002).
+    digest algorithms.
     """
 
     pairs: tuple[tuple[str, str], ...]
@@ -222,7 +222,7 @@ class PairedWordPoolGenerator(PairedGenerator):
 
     Subclasses build a :class:`WordPairSpec` in ``prepare`` (hashing each
     word once) and inherit the shared draw. Extracted so ``hash`` and
-    ``lmhash`` no longer duplicate the identical ``generate_pair`` /
+    paired generators no longer duplicate the identical ``generate_pair`` /
     ``pairs`` spec (DUP-002).
     """
 
@@ -239,7 +239,7 @@ def pad_with_zero(value: str, width: int) -> str:
 def require_non_empty_values(spec: Mapping[str, Any]) -> list[Any]:
     """Return ``spec['values']`` after asserting it is a non-empty list.
 
-    Common validator for string-pool / char / lmhash generators.
+    Common validator for string-pool, char, and hash generators.
     Raises ``ValueError`` (the config layer translates this to
     ``ConfigError``) so the failure happens at engine construction,
     not on the first row.
@@ -257,7 +257,7 @@ def require_string_tuple(spec: Mapping[str, Any], key: str = "values") -> tuple[
     """Return ``spec[key]`` as a non-empty ``Tuple[str, ...]``.
 
     Combines the non-empty-list check with the ``tuple(str(v) for v in ...)``
-    coercion that was repeated in five generators (string / char / lmhash /
+    coercion that was repeated in five generators (string / char / hash /
     weighted / identity). Raises ``ValueError`` on a missing, non-list,
     or empty value.
     """

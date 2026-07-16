@@ -480,15 +480,15 @@ def test_cli_resume_overshoot_warns_and_empties(
 
 
 # ---------------------------------------------------------------------------
-# lmhash._select_md4_backend: stdlib MD4 available path
+# hash._select_md4_backend: stdlib MD4 available path
 # ---------------------------------------------------------------------------
 
 
-def test_lmhash_uses_stdlib_md4_when_available(monkeypatch) -> None:
+def test_ntlm_uses_stdlib_md4_when_available(monkeypatch) -> None:
     """Force ``hashlib.new('md4')`` to succeed and pick the stdlib branch."""
     import hashlib as hashlib_mod
 
-    from ton.generators import lmhash as lmhash_mod
+    from ton.generators import hash as hash_mod
 
     class _FakeHasher:
         def __init__(self, data: bytes = b"") -> None:
@@ -502,8 +502,8 @@ def test_lmhash_uses_stdlib_md4_when_available(monkeypatch) -> None:
             return hashlib_mod.new(name, data)
         return _FakeHasher(data)
 
-    monkeypatch.setattr(lmhash_mod.hashlib, "new", _fake_new)
-    backend = lmhash_mod._select_md4_backend()
+    monkeypatch.setattr(hash_mod.hashlib, "new", _fake_new)
+    backend = hash_mod._select_md4_backend()
     assert backend(b"hello") == b"\x00" * 16
 
 

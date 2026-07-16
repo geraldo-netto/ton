@@ -63,7 +63,14 @@ def test_validators_run_on_paired_values() -> None:
     config = {
         "rows": 1,
         "format": "$w$",
-        "types": {"w": {"type": "lmhash", "values": ["secret"], "validators": ["plugin.check"]}},
+        "types": {
+            "w": {
+                "type": "hash",
+                "algorithm": "ntlm",
+                "values": ["secret"],
+                "validators": ["plugin.check"],
+            }
+        },
     }
     engine = Engine(config, validators=catalog.validators())
     with pytest.raises(ValidationError):

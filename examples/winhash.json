@@ -4,7 +4,8 @@
   "format": "$word[id]$ -> $word$",
   "types": {
     "word": {
-      "type": "lmhash",
+      "type": "hash",
+      "algorithm": "ntlm",
       "values": ["AMD", "Intel", "ARM"]
     }
   }

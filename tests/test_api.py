@@ -89,7 +89,7 @@ def test_build_registry_includes_builtins() -> None:
         registry = api.build_registry(include_entry_points=False)
     assert "integer" in registry
     assert "date" in registry
-    assert "lmhash" in registry
+    assert "hash" in registry
 
 
 def test_build_registry_warns_pointing_at_catalog() -> None:

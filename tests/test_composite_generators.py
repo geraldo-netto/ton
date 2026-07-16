@@ -90,7 +90,7 @@ def test_one_of_rejects_paired_child() -> None:
         "types": {
             "v": {
                 "type": "oneOf",
-                "choices": [{"type": "lmhash", "values": ["a"]}],
+                "choices": [{"type": "hash", "algorithm": "ntlm", "values": ["a"]}],
             }
         },
     }
@@ -225,7 +225,7 @@ def test_sequence_of_rejects_paired_child() -> None:
             "v": {
                 "type": "sequence_of",
                 "count": 2,
-                "spec": {"type": "lmhash", "values": ["a"]},
+                "spec": {"type": "hash", "algorithm": "ntlm", "values": ["a"]},
             }
         },
     }
@@ -373,7 +373,10 @@ def test_weighted_rejects_paired_child_type() -> None:
             "v": {
                 "type": "weighted",
                 "choices": [
-                    {"weight": 1, "spec": {"type": "lmhash", "values": ["a"]}},
+                    {
+                        "weight": 1,
+                        "spec": {"type": "hash", "algorithm": "ntlm", "values": ["a"]},
+                    },
                 ],
             }
         },

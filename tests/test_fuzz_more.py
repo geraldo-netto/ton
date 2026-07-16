@@ -272,11 +272,17 @@ def test_regex_output_property_across_many_seeds(pattern: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_lmhash_paired_within_row_stays_consistent() -> None:
+def test_ntlm_paired_within_row_stays_consistent() -> None:
     config = {
         "rows": 100,
         "format": "$w[id]$=$w$",
-        "types": {"w": {"type": "lmhash", "values": ["alpha", "bravo", "charlie"]}},
+        "types": {
+            "w": {
+                "type": "hash",
+                "algorithm": "ntlm",
+                "values": ["alpha", "bravo", "charlie"],
+            }
+        },
     }
     seen_pairs: set[tuple[str, str]] = set()
     for row in api.generate(config, seed=0):

@@ -274,7 +274,7 @@ def _check_regex(rows: list[str], config: dict[str, Any]) -> None:
         assert matcher.match(r), r
 
 
-def _check_lmhash(rows: list[str], config: dict[str, Any]) -> None:
+def _check_ntlm(rows: list[str], config: dict[str, Any]) -> None:
     spec = config["types"]["word"]
     plain_pool = set(spec["values"])
     hex_pattern = re.compile(r"^[0-9a-f]{32}$")
@@ -334,7 +334,7 @@ _CHECKERS: dict[str, Callable[[list[str], dict[str, Any]], None]] = {
     "text.json": _check_text,
     "regex.json": _check_regex,
     "hash.json": _check_hash,
-    "lmhash.json": _check_lmhash,
+    "ntlm.json": _check_ntlm,
 }
 
 

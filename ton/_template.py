@@ -6,7 +6,7 @@ A template is a string with variables wrapped in ``$``::
 
 A variable may carry a ``[id]`` suffix (e.g. ``$word[id]$``); the suffix
 asks the engine for the *source* value of a paired generator (currently
-``lmhash``) rather than its primary output.
+``hash``) rather than its primary output.
 
 To include a literal ``$`` in the template, double it: ``$$``. The
 sequence ``$$`` is consumed by the parser and rendered as a single

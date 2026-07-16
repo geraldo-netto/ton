@@ -77,7 +77,7 @@ def test_paired_fields_and_generator_errors_bypass_direct_path() -> None:
         {
             "rows": 1,
             "format": "$word[id]$:$word$",
-            "types": {"word": {"type": "lmhash", "values": ["secret"]}},
+            "types": {"word": {"type": "hash", "algorithm": "ntlm", "values": ["secret"]}},
         }
     )
     assert paired._plan.resolved_tokens[0].direct is False
@@ -151,17 +151,17 @@ def test_engine_wraps_unexpected_prepare_error_as_template_error() -> None:
         Engine(config, registry=registry)
 
 
-def test_engine_pairs_lmhash_within_a_row() -> None:
+def test_engine_pairs_ntlm_within_a_row() -> None:
     config = {
         "rows": 3,
         "format": "$word[id]$=$word$",
-        "types": {"word": {"type": "lmhash", "values": ["alpha", "beta"]}},
+        "types": {"word": {"type": "hash", "algorithm": "ntlm", "values": ["alpha", "beta"]}},
     }
     for row in Engine(config, rng=Random(0)):
         plain, _, digest = row.partition("=")
-        from ton.generators.lmhash import LMHashGenerator
+        from ton.generators.hash import _ntlm_digest
 
-        expected = LMHashGenerator._nt_hash(plain)
+        expected = _ntlm_digest(plain)
         assert digest == expected
 
 
@@ -319,7 +319,8 @@ def test_engine_preserves_paired_value_through_identity_transform() -> None:
         "format": "$word[id]$=$word$",
         "types": {
             "word": {
-                "type": "lmhash",
+                "type": "hash",
+                "algorithm": "ntlm",
                 "values": ["alpha"],
                 "transforms": [{"type": "identity"}],
             }
@@ -339,7 +340,8 @@ def test_engine_rejects_transform_that_cannot_accept_paired_input() -> None:
         "format": "$word[id]$=$word$",
         "types": {
             "word": {
-                "type": "lmhash",
+                "type": "hash",
+                "algorithm": "ntlm",
                 "values": ["alpha"],
                 "transforms": [{"type": "plugin.unpaired"}],
             }

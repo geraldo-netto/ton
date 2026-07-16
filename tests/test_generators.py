@@ -16,7 +16,6 @@ from ton.generators import (
     DecimalGenerator,
     HashGenerator,
     IntegerGenerator,
-    LMHashGenerator,
     StringGenerator,
 )
 from ton.generators.base import coerce_float
@@ -197,9 +196,9 @@ def test_decimal_rounded_output_stays_inside_bounds() -> None:
         assert 0.0 <= float(value) <= 0.99
 
 
-def test_lmhash_rejects_empty_values() -> None:
+def test_ntlm_rejects_empty_values() -> None:
     with pytest.raises(ValueError):
-        LMHashGenerator().prepare({"values": []})
+        HashGenerator().prepare({"algorithm": "ntlm", "values": []})
 
 
 @pytest.mark.parametrize(
@@ -214,6 +213,7 @@ def test_lmhash_rejects_empty_values() -> None:
             "4421696dc4d93dd0619d682ce56b4d64a9ef097761ced99"
             "e0f67265b5f76085e5b0ee7ca4696b2ad6fe2b2",
         ),
+        ("ntlm", "878d8014606cda29677a44efa1353fc7"),
     ],
 )
 def test_hash_generator_algorithms(algorithm: str, expected: str) -> None:
@@ -332,9 +332,9 @@ def test_date_prepare_parses_bounds_once() -> None:
         DateGenerator().generate(prepared, rng)
 
 
-def test_lmhash_pair_consistency() -> None:
-    gen = LMHashGenerator()
-    prepared = gen.prepare({"values": ["secret"]})
+def test_ntlm_pair_consistency() -> None:
+    gen = HashGenerator()
+    prepared = gen.prepare({"algorithm": "ntlm", "values": ["secret"]})
     plain, digest = gen.generate_pair(prepared, _rng())
     assert plain == "secret"
     assert digest == "878d8014606cda29677a44efa1353fc7"
@@ -342,9 +342,9 @@ def test_lmhash_pair_consistency() -> None:
 
 def test_paired_generator_default_returns_primary() -> None:
     """generate() default keeps the primary half (ARCH-005)."""
-    gen = LMHashGenerator()
-    prepared = gen.prepare({"values": ["secret"]})
-    # LMHashGenerator does not flip generate_returns_id, so generate()
+    gen = HashGenerator()
+    prepared = gen.prepare({"algorithm": "ntlm", "values": ["secret"]})
+    # HashGenerator does not flip generate_returns_id, so generate()
     # returns the hash (primary) not the plaintext (id).
     assert gen.generate(prepared, _rng()) == "878d8014606cda29677a44efa1353fc7"
 

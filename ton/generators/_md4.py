@@ -2,11 +2,11 @@
 
 OpenSSL 3 disables MD4 in its default provider, so ``hashlib.new("md4", ...)``
 fails on most modern Linux distributions. This module is a self-contained
-implementation that we fall back to so the lmhash generator keeps working
+implementation that we fall back to so the NTLM hash algorithm keeps working
 without optional dependencies.
 
 MD4 is cryptographically broken; we use it here only because the Windows
-NT hash format (the entire point of the ``lmhash`` type) is defined as
+NT hash format (selected with ``algorithm: "ntlm"``) is defined as
 ``MD4(password.encode("utf-16le"))``. Do not use this for anything that
 needs security.
 """

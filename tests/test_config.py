@@ -244,7 +244,8 @@ def test_validate_config_rejects_incompatible_transform_chain() -> None:
         "format": "$word$;$word[id]$",
         "types": {
             "word": {
-                "type": "lmhash",
+                "type": "hash",
+                "algorithm": "ntlm",
                 "values": ["secret"],
                 "transforms": [{"type": "plugin.unpaired"}],
             }
@@ -286,7 +287,8 @@ def test_config_and_engine_agree_on_paired_transform_chains() -> None:
             "format": "$word$",
             "types": {
                 "word": {
-                    "type": "lmhash",
+                    "type": "hash",
+                    "algorithm": "ntlm",
                     "values": ["secret"],
                     "transforms": [{"type": reference} for reference in chain],
                 }

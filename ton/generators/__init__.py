@@ -30,7 +30,6 @@ from .decimal import DecimalGenerator
 from .hash import HashGenerator
 from .identity import EmailGenerator, NameGenerator, PhoneGenerator
 from .integer import IntegerGenerator
-from .lmhash import LMHashGenerator
 from .network import IPv4Generator, IPv6Generator, MACGenerator
 from .one_of import OneOfGenerator
 from .regex import RegexGenerator
@@ -58,7 +57,6 @@ BUILTIN_GENERATOR_CLASSES: tuple[type[Generator], ...] = (
     IPv4Generator,
     IPv6Generator,
     IntegerGenerator,
-    LMHashGenerator,
     MACGenerator,
     NameGenerator,
     OneOfGenerator,
@@ -84,7 +82,6 @@ BUILTIN_GENERATOR_CONFIG_KEYS: dict[str, frozenset[str]] = {
     "ipv4": frozenset(("cidr",)),
     "ipv6": frozenset(("cidr",)),
     "integer": frozenset(("minValue", "maxValue", "padWithZero")),
-    "lmhash": frozenset(("values",)),
     "mac": frozenset(("separator", "uppercase", "oui")),
     "name": frozenset(("style",)),
     "oneOf": frozenset(("choices",)),
@@ -115,7 +112,6 @@ __all__ = [
     "IPv4Generator",
     "IPv6Generator",
     "IntegerGenerator",
-    "LMHashGenerator",
     "MACGenerator",
     "NameGenerator",
     "OneOfGenerator",

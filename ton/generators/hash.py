@@ -4,17 +4,37 @@ Picks a plaintext word from ``values`` and hashes it with a selected
 ``hashlib`` algorithm. The ``hash`` type is paired: ``$word$`` renders
 the digest and ``$word[id]$`` renders the plaintext used for that row.
 
-``lmhash`` remains a separate Windows NT-hash specialty because it uses
-MD4 over UTF-16LE input, not the byte-oriented algorithms here.
+The ``ntlm`` algorithm produces the Windows NT hash: MD4 over UTF-16LE
+plaintext. It is intentionally available only for synthetic fixtures.
 """
 
 from __future__ import annotations
 
+import binascii
 import hashlib
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from ._md4 import md4 as _pure_md4
 from .base import PairedWordPoolGenerator, WordPairSpec, coerce_int, require_string_tuple
+
+
+def _select_md4_backend() -> Callable[[bytes], bytes]:
+    """Select an MD4 backend, falling back when OpenSSL disables MD4."""
+    try:
+        hashlib.new("md4", b"").digest()
+    except ValueError:
+        return _pure_md4
+    return lambda data: hashlib.new("md4", data).digest()
+
+
+_MD4: Callable[[bytes], bytes] = _select_md4_backend()
+
+
+def _ntlm_digest(plaintext: str) -> str:
+    """Return the canonical Windows NT hash for ``plaintext``."""
+    return binascii.hexlify(_MD4(plaintext.encode("utf-16le"))).decode("ascii")
+
 
 _HASHERS: dict[str, Callable[[bytes], str]] = {
     "md5": lambda data: hashlib.md5(data, usedforsecurity=False).hexdigest(),
@@ -22,7 +42,7 @@ _HASHERS: dict[str, Callable[[bytes], str]] = {
     "sha256": lambda data: hashlib.sha256(data).hexdigest(),
     "sha512": lambda data: hashlib.sha512(data).hexdigest(),
 }
-_ALGORITHMS = tuple(sorted((*_HASHERS, "bcrypt")))
+_ALGORITHMS = tuple(sorted((*_HASHERS, "bcrypt", "ntlm")))
 _BCRYPT_ALPHABET = b"./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 MAX_BCRYPT_ROUNDS = 12
 
@@ -46,13 +66,15 @@ class HashGenerator(PairedWordPoolGenerator):
                     f"hash 'rounds' must be between 4 and MAX_BCRYPT_ROUNDS ({MAX_BCRYPT_ROUNDS})"
                 )
             return WordPairSpec(pairs=tuple((word, _bcrypt_digest(word, rounds)) for word in words))
+        if algorithm == "ntlm":
+            return WordPairSpec(pairs=tuple((word, _ntlm_digest(word)) for word in words))
         hash_one = _HASHERS[algorithm]
         return WordPairSpec(pairs=tuple((word, hash_one(word.encode("utf-8"))) for word in words))
 
 
 def _bcrypt_digest(plaintext: str, rounds: int) -> str:
     try:
-        import bcrypt
+        import bcrypt  # pyright: ignore[reportMissingImports]
     except ImportError as exc:
         raise ValueError("hash algorithm 'bcrypt' requires installing ton[bcrypt]") from exc
     salt = _bcrypt_salt(plaintext, rounds)

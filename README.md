@@ -500,7 +500,7 @@ common
 common
 ```
 
-Composite `choices` may themselves nest `weighted` / `oneOf` / `sequence_of`. Paired generators (`hash`, `lmhash`) cannot be used as a composite child — the `[id]` half would be unreachable from outside the wrapper, so the engine rejects such configs at construction time.
+Composite `choices` may themselves nest `weighted` / `oneOf` / `sequence_of`. Paired generators (`hash`) cannot be used as a composite child — the `[id]` half would be unreachable from outside the wrapper, so the engine rejects such configs at construction time.
 
 #### Transform chains
 
@@ -881,11 +881,11 @@ KAA-8063
 
 #### `hash` (paired)
 
-Generic byte-oriented digest drawn from a fixed plaintext list. **Paired**: a single row may reference both the digest (`$word$`) and the plaintext (`$word[id]$`). `lmhash` remains separate because it is the Windows NT-hash specialty.
+Digest drawn from a fixed plaintext list. **Paired**: a single row may reference both the digest (`$word$`) and the plaintext (`$word[id]$`).
 
 | field       | type     | description                                          |
 |-------------|----------|------------------------------------------------------|
-| `algorithm` | string   | `md5`, `sha1`, `sha256` (default), `sha512`, or `bcrypt` |
+| `algorithm` | string   | `md5`, `sha1`, `sha256` (default), `sha512`, `bcrypt`, or `ntlm` |
 | `values`    | string[] | non-empty plaintext pool                            |
 | `rounds`    | int      | bcrypt cost (default `12`; range `4`–`12`)          |
 
@@ -907,19 +907,16 @@ password -> 5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8
 secret -> 2bb80d537b1da3e38bd30361aa855686bde0eacd7162fef6a25fe97bf527a25b
 ```
 
-#### `lmhash` (paired)
+#### NTLM hashes
 
-Canonical Windows NT hash (MD4 of UTF-16LE plaintext) drawn from a fixed word list. **Paired**: a single row may reference both the hash (`$word$`) and the plaintext that produced it (`$word[id]$`). Intentionally insecure — use only for synthetic credential fixtures.
-
-| field    | type     | description                |
-|----------|----------|----------------------------|
-| `values` | string[] | non-empty plaintext pool   |
+Set `algorithm` to `ntlm` for the canonical Windows NT hash (MD4 of UTF-16LE plaintext). It is intentionally insecure and should only be used for synthetic credential fixtures.
 
 ```json
 {
   "rows": 4,
   "format": "$word[id]$ -> $word$",
-  "types": {"word": {"type": "lmhash", "values": ["password", "secret", "admin"]}}
+  "types": {"word": {"type": "hash", "algorithm": "ntlm",
+                     "values": ["password", "secret", "admin"]}}
 }
 ```
 
@@ -932,7 +929,7 @@ secret -> 878d8014606cda29677a44efa1353fc7
 
 ### Paired references (`$name[id]$`)
 
-Any **paired** generator (currently `hash` and `lmhash`; third parties can opt in via `PairedGenerator`) returns a `(id_value, primary_value)` tuple per row. The template engine routes:
+Any **paired** generator (currently `hash`; third parties can opt in via `PairedGenerator`) returns a `(id_value, primary_value)` tuple per row. The template engine routes:
 
 - `$name$` → `primary_value`
 - `$name[id]$` → `id_value`
@@ -971,7 +968,7 @@ Library code emits structured INFO events on a single logger named `ton`. Attach
 - `--no-clobber` upgrades the silent overwrite to a hard refusal.
 - Regular `-o PATH` writes are staged through a same-directory temp file and atomically replace the final path only after generation succeeds. FIFO targets remain direct streams.
 - Third-party generators from the `ton.generators` entry-point group are opt-in and sandboxed per-entry: `ImportError`, construction failures, and non-`Generator` factories are logged and skipped instead of aborting the registry build. Entry point names and values are sanitized to printable ASCII before being logged (control codes / unicode lookalikes become `?`).
-- `lmhash` uses MD4 by design (it is the canonical NT-hash). Treat its output as fixture data, never as a credential.
+- `hash` with `algorithm: "ntlm"` uses MD4 by design. Treat its output as fixture data, never as a credential.
 
 ## Bundled example configs
 

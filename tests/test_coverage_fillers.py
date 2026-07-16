@@ -88,9 +88,8 @@ def test_walk_subclasses_dedups_diamond_inheritance() -> None:
     from ton.generators import Generator
 
     # The Generator subclass tree already contains diamond-ish edges
-    # because PairedGenerator subclasses (LMHashGenerator) are reached
-    # both via Generator->LMHashGenerator (no) and Generator->
-    # PairedGenerator->LMHashGenerator. The walker should yield each
+    # because PairedGenerator subclasses can be reached through multiple
+    # inheritance paths. The walker should yield each
     # class exactly once regardless of how many paths reach it.
     seen = list(_walk_subclasses(Generator))
     assert len(seen) == len(set(seen))

@@ -60,7 +60,7 @@ _ANY_POOL = tuple(c for c in _PRINTABLE_ASCII if c != "\n")
 
 @dataclass(frozen=True)
 class RegexSpec:
-    parsed: Any  # list of vendored (op, arg) nodes
+    parsed: tuple[tuple[Any, Any], ...]
 
 
 class RegexGenerator(Generator):
@@ -82,7 +82,7 @@ class RegexGenerator(Generator):
                 "regex 'pattern' can expand beyond MAX_TOTAL_EXPANSION "
                 f"({MAX_TOTAL_EXPANSION}) characters per row"
             )
-        return RegexSpec(parsed=parsed)
+        return RegexSpec(parsed=_prepare_nodes(cast(Iterable[tuple[Any, Any]], parsed)))
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:
         parts: list[str] = []
@@ -93,6 +93,22 @@ class RegexGenerator(Generator):
 # ---------------------------------------------------------------------------
 # AST -> string
 # ---------------------------------------------------------------------------
+
+
+def _prepare_nodes(seq: Iterable[tuple[Any, Any]]) -> tuple[tuple[Any, Any], ...]:
+    """Freeze the parsed AST and resolve character classes before generation."""
+    prepared: list[tuple[Any, Any]] = []
+    for op, arg in seq:
+        if op is rx.IN:
+            arg = _in_pool(tuple(arg))
+        elif op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
+            arg = (arg[0], arg[1], _prepare_nodes(arg[2]))
+        elif op is rx.BRANCH:
+            arg = (arg[0], tuple(_prepare_nodes(alt) for alt in arg[1]))
+        elif op is rx.SUBPATTERN:
+            arg = (arg[0], arg[1], arg[2], _prepare_nodes(arg[3]))
+        prepared.append((op, arg))
+    return tuple(prepared)
 
 
 def _reject_oversized_repeats(seq: Iterable[tuple[Any, Any]]) -> None:
@@ -206,8 +222,8 @@ def _emit_repeat(arg: tuple[int, int, Any], rng: Random, out: list[str]) -> None
         _emit_into(sub, rng, out)
 
 
-def _pick_in(items: Iterable[tuple[Any, Any]], rng: Random, out: list[str]) -> None:
-    out.append(rng.choice(_in_pool(tuple(items))))
+def _pick_in(pool: tuple[str, ...], rng: Random, out: list[str]) -> None:
+    out.append(rng.choice(pool))
 
 
 @lru_cache(maxsize=256)

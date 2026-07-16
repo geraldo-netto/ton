@@ -123,3 +123,13 @@ def test_rejects_excessive_group_nesting_at_prepare() -> None:
 
     with pytest.raises(ValueError, match="MAX_GROUP_NESTING"):
         RegexGenerator().prepare({"pattern": pattern})
+
+
+def test_character_classes_are_resolved_during_prepare(monkeypatch) -> None:
+    from ton.generators import regex
+
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": "([a-z]|[0-9]){3}"})
+    monkeypatch.setattr(regex, "_in_pool", lambda items: pytest.fail("resolved class again"))
+
+    assert re.fullmatch(r"([a-z]|[0-9]){3}", generator.generate(prepared, Random(0)))

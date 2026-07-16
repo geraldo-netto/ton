@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import os
 import stat
 import sys
@@ -12,7 +13,49 @@ from unittest import mock
 
 import pytest
 
+from ton.api import ProofError, ValidationError
 from ton.cli import main
+
+
+@pytest.mark.parametrize(
+    "error,category,exit_code",
+    [
+        (OSError("disk"), "output", 1),
+        (ProofError("bad"), "proof", 2),
+        (ValidationError("bad"), "validation", 2),
+    ],
+)
+def test_cli_terminal_failure_categories(
+    error, category, exit_code, monkeypatch, write_config, caplog
+) -> None:
+    from ton import cli
+
+    monkeypatch.setattr(cli, "_stream", lambda *args, **kwargs: (_ for _ in ()).throw(error))
+    with caplog.at_level(logging.ERROR, logger="ton"):
+        assert main([str(write_config())]) == exit_code
+
+    failures = [record for record in caplog.records if getattr(record, "event", "") == "cli_failed"]
+    assert len(failures) == 1
+    assert failures[0].error_category == category
+
+
+def test_cli_structured_log_distinguishes_completion(write_config, caplog) -> None:
+    with caplog.at_level(logging.INFO, logger="ton"):
+        assert main([str(write_config())]) == 0
+    events = [getattr(record, "event", "") for record in caplog.records]
+    assert "engine_completed" in events
+    assert "cli_failed" not in events
+
+
+def test_cli_structured_log_marks_unexpected_crash(monkeypatch, write_config, caplog) -> None:
+    from ton import cli
+
+    monkeypatch.setattr(cli, "_build_engine", lambda *args: (_ for _ in ()).throw(RuntimeError()))
+    with caplog.at_level(logging.ERROR, logger="ton"):
+        assert main([str(write_config())]) == 3
+    failures = [record for record in caplog.records if getattr(record, "event", "") == "cli_failed"]
+    assert len(failures) == 1
+    assert failures[0].error_category == "unexpected"
 
 
 def test_cli_writes_rows_to_stdout(write_config, capsys: pytest.CaptureFixture[str]) -> None:

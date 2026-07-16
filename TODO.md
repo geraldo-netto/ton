@@ -29,7 +29,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-011 | open | M | `_config.validate_with_catalog` and `_compiler.EngineCompiler` independently resolve types/transforms/validators and prepare generator specs. The duplicate pipelines already differ in exception mapping and catalog access; extract one canonical compilation/validation service used by `--validate` and Engine construction. |
 
 ## reliability/correctness
 

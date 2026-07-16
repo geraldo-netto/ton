@@ -16,12 +16,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
+from ._compiler import TemplateError, compile_plan
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._registry import ExtensionCatalog, RegistryError, normalize_reference
 from ._template import UndeclaredVariableError, validate_against
-from ._transforms import fold_paired_capabilities
-from .generators.base import PreparationContext
 
 
 class ConfigError(ValueError):
@@ -83,10 +82,25 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
     transforms = catalog.transforms()
     validators = catalog.validators()
     for field_name, spec in data["types"].items():
-        _validate_type_reference(field_name, spec["type"], generators)
-        _validate_transforms(field_name, spec, generators, transforms)
-        _validate_field_validators(field_name, spec, validators)
-        _validate_field_spec(field_name, spec, generators)
+        generator = generators.get(_normalize_config_reference(spec["type"]))
+        if generator is not None:
+            _validate_extension_keys(
+                f"types.{field_name}", spec, generator.config_keys, COMMON_FIELD_KEYS
+            )
+            _validate_nested_generator_keys(f"types.{field_name}", spec, generators)
+        for transform_spec in spec.get("transforms", []):
+            transform = transforms.get(_normalize_config_reference(transform_spec["type"]))
+            if transform is not None:
+                _validate_extension_keys(
+                    f"types.{field_name}.transforms",
+                    transform_spec,
+                    transform.config_keys,
+                    frozenset(("type",)),
+                )
+    try:
+        compile_plan(data, registry=generators, transforms=transforms, validators=validators)
+    except TemplateError as exc:
+        raise ConfigError(str(exc)) from exc
     _logger.info(
         "config_validated types=%d",
         len(data["types"]),
@@ -184,6 +198,14 @@ def _validate_type_spec(name: str, spec: Any) -> None:
             raise ConfigError(
                 f"Type spec {name!r} transform {index} 'type' must be a non-empty string."
             )
+    _validate_validator_refs(name, spec.get("validators", []))
+
+
+def _validate_validator_refs(name: str, validators: Any) -> None:
+    if not isinstance(validators, list):
+        raise ConfigError(f"Type spec {name!r} 'validators' must be a list.")
+    if any(not isinstance(reference, str) for reference in validators):
+        raise ConfigError(f"Type spec {name!r} validator refs must be strings.")
 
 
 def _validate_template_references(template: str, types: dict[str, Any]) -> None:
@@ -192,75 +214,6 @@ def _validate_template_references(template: str, types: dict[str, Any]) -> None:
         validate_against(template, types.keys())
     except UndeclaredVariableError as exc:
         raise ConfigError(str(exc)) from exc
-
-
-def _validate_type_reference(
-    field_name: str,
-    reference: str,
-    generators: Mapping[str, Any],
-) -> None:
-    normalized = _normalize_config_reference(reference)
-    if normalized not in generators:
-        _raise_unknown_reference("type", field_name, reference, tuple(sorted(generators)))
-
-
-def _validate_transforms(
-    field_name: str,
-    spec: dict[str, Any],
-    generators: Mapping[str, Any],
-    transforms: Mapping[str, Any],
-) -> None:
-    generator = generators[_normalize_config_reference(spec["type"])]
-    is_paired = bool(generator.is_paired)
-    for transform_spec in spec.get("transforms", []):
-        reference = transform_spec["type"]
-        normalized = _normalize_config_reference(reference)
-        if normalized not in transforms:
-            _raise_unknown_reference("transform", field_name, reference, tuple(sorted(transforms)))
-        transform = transforms[normalized]
-        _validate_extension_keys(
-            f"types.{field_name}.transforms",
-            transform_spec,
-            transform.config_keys,
-            frozenset(("type",)),
-        )
-        capability = fold_paired_capabilities(is_paired, (transform.capabilities,))
-        if capability.incompatible_index is not None:
-            raise ConfigError(
-                f"Transform {reference!r} for {field_name!r} does not accept paired input."
-            )
-        is_paired = capability.preserves_pairing
-
-
-def _validate_field_validators(
-    field_name: str,
-    spec: dict[str, Any],
-    available: Mapping[str, Any],
-) -> None:
-    """Validate a field's ``validators`` references against ``catalog`` (PLUG-001)."""
-    references = spec.get("validators", [])
-    if not isinstance(references, list):
-        raise ConfigError(f"Type spec {field_name!r} 'validators' must be a list.")
-    for reference in references:
-        if not isinstance(reference, str):
-            raise ConfigError(f"Type spec {field_name!r} validator refs must be strings.")
-        if _normalize_config_reference(reference) not in available:
-            _raise_unknown_reference("validator", field_name, reference, tuple(sorted(available)))
-
-
-def _validate_field_spec(
-    field_name: str,
-    spec: dict[str, Any],
-    generators: Mapping[str, Any],
-) -> None:
-    """Run the generator's prepare so per-spec errors surface (CLI-001)."""
-    generator = generators[_normalize_config_reference(spec["type"])]
-    _validate_extension_keys(f"types.{field_name}", spec, generator.config_keys, COMMON_FIELD_KEYS)
-    _validate_nested_generator_keys(f"types.{field_name}", spec, generators)
-    try:
-        PreparationContext(generators).prepare_generator(generator, spec)
-    except Exception as exc:  # noqa: BLE001 - boundary; normalized to ConfigError
-        raise ConfigError(f"Invalid spec for {field_name!r}: {exc}") from exc
 
 
 def _validate_extension_keys(
@@ -298,25 +251,3 @@ def _normalize_config_reference(reference: str) -> str:
         return normalize_reference(reference)
     except RegistryError as exc:
         raise ConfigError(str(exc)) from exc
-
-
-def _raise_unknown_reference(
-    kind: str,
-    field_name: str,
-    reference: str,
-    available: tuple[str, ...],
-) -> None:
-    namespace = _unknown_namespace(reference, available)
-    detail = f" Unknown namespace {namespace!r}." if namespace else ""
-    raise ConfigError(
-        f"Unknown {kind} {reference!r} for {field_name!r}.{detail} "
-        f"Available {kind}s: {', '.join(available) or '(none)'}."
-    )
-
-
-def _unknown_namespace(reference: str, available: tuple[str, ...]) -> str | None:
-    if "." not in reference:
-        return None
-    namespace = reference.split(".", 1)[0]
-    known = {item.split(".", 1)[0] for item in available if "." in item}
-    return namespace if namespace not in known else None

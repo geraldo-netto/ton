@@ -118,7 +118,11 @@ class EngineCompiler:
         for token in self.tokens:
             type_name = runtime_type_name(self.types[token.type_key]["type"])
             if type_name not in self.registry:
-                raise TemplateError(f"Unknown type {type_name!r} for variable {token.type_key!r}")
+                available = ", ".join(sorted(self.registry)) or "(none)"
+                raise TemplateError(
+                    f"Unknown type {type_name!r} for variable {token.type_key!r}. "
+                    f"Available types: {available}."
+                )
 
     def _build_prepared(self) -> dict[str, PreparedField]:
         from .generators.base import PreparationContext

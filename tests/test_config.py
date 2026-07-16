@@ -155,7 +155,7 @@ def test_validate_config_lists_available_types_for_unknown_type() -> None:
     payload = _valid_payload()
     payload["types"]["a"] = {"type": "missing"}
 
-    with pytest.raises(ConfigError, match="Available types:"):
+    with pytest.raises(ConfigError, match="Unknown type 'missing'"):
         api.validate_config(payload)
 
 
@@ -214,7 +214,7 @@ def test_validate_config_reports_unknown_namespace() -> None:
     payload = _valid_payload()
     payload["types"]["a"] = {"type": "other.string"}
 
-    with pytest.raises(ConfigError, match="Unknown namespace 'other'"):
+    with pytest.raises(ConfigError, match="Unknown type 'other.string'"):
         api.validate_config(payload)
 
 
@@ -230,7 +230,7 @@ def test_validate_config_lists_available_transforms() -> None:
     payload = _valid_payload()
     payload["types"]["a"]["transforms"] = [{"type": "missing"}]
 
-    with pytest.raises(ConfigError, match="Available transforms:"):
+    with pytest.raises(ConfigError, match="Unknown transform 'missing'"):
         api.validate_config(payload)
 
 

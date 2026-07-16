@@ -701,7 +701,7 @@ Random bytes encoded for transport.
 
 | field      | type   | description                                 |
 |------------|--------|---------------------------------------------|
-| `length`   | int    | raw byte count (1 ≤ N ≤ `MAX_BYTES_LENGTH`) |
+| `length`   | int    | raw byte count (default `16`; 1 ≤ N ≤ `MAX_BYTES_LENGTH`) |
 | `encoding` | string | `hex` (default), `base64`, or `base32`      |
 
 ```json
@@ -841,7 +841,7 @@ Lorem-style words, sentences, or paragraphs (single-line output, safe inside CSV
 | field   | type   | description                                          |
 |---------|--------|------------------------------------------------------|
 | `unit`  | string | `words` (default), `sentences`, or `paragraphs`      |
-| `count` | int    | how many units (1 ≤ N ≤ `MAX_TEXT_COUNT`)            |
+| `count` | int    | how many units (default `5`; 1 ≤ N ≤ `MAX_TEXT_COUNT`) |
 
 ```json
 {"type": "text", "unit": "words", "count": 6}
@@ -881,6 +881,7 @@ Generic byte-oriented digest drawn from a fixed plaintext list. **Paired**: a si
 |-------------|----------|------------------------------------------------------|
 | `algorithm` | string   | `md5`, `sha1`, `sha256` (default), `sha512`, or `bcrypt` |
 | `values`    | string[] | non-empty plaintext pool                            |
+| `rounds`    | int      | bcrypt cost (default `12`; range `4`–`12`)          |
 
 `bcrypt` requires the optional `ton[bcrypt]` extra and accepts `rounds` from `4` to `12` (default `12`). TON derives a stable bcrypt salt from the plaintext so synthetic fixtures remain reproducible.
 

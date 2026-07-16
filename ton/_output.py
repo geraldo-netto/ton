@@ -13,6 +13,23 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 
 
+class OutputEncodingError(OSError):
+    """A configured codec could not encode generated output.
+
+    Encoding failures are output errors, not invalid configuration: the
+    codec is valid, but a generated value is not representable in it.
+    ``field_name`` identifies a field when the failing value can be traced
+    before row rendering; otherwise it is ``None`` for the rendered row.
+    """
+
+    def __init__(self, encoding: str, reason: str, *, field_name: str | None = None) -> None:
+        self.encoding = encoding
+        self.field_name = field_name
+        self.reason = reason
+        context = f"field {field_name!r}" if field_name is not None else "rendered row"
+        super().__init__(f"cannot encode {context} as {encoding!r}: {reason}")
+
+
 def validate_output_target(path: str, *, no_clobber: bool = False) -> bool:
     """Validate ``path`` and return whether it names an existing FIFO."""
     if os.path.islink(path):

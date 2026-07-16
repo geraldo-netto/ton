@@ -260,6 +260,7 @@ Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so adjacent w
 - `format` — the template; any `$name$` segment is a variable that must be declared in `types`. `$$` renders a literal `$`. A trailing `[id]` (e.g. `$word[id]$`) requests the paired-id facet of a paired generator — see [Paired references](#paired-references-nameid) below.
 - `types` — a map of variable name to type spec.
 - `encoding` — optional; the text codec used when writing to an `--output` file (default `utf-8`). Must be a codec Python recognizes. Output to stdout uses the stream's own encoding.
+- A value that the configured codec cannot represent is an output error (CLI exit `1`), not a configuration error.
 
 ### Type reference
 

@@ -132,3 +132,11 @@ def test_public_output_sink_matches_cli_symlink_policy(tmp_path: Path) -> None:
 
     assert link.is_symlink()
     assert target.read_text(encoding="utf-8") == "old\n"
+
+
+def test_output_encoding_error_carries_codec_and_field_context() -> None:
+    error = api.OutputEncodingError("ascii", "ordinal not in range", field_name="city")
+
+    assert error.encoding == "ascii"
+    assert error.field_name == "city"
+    assert "field 'city'" in str(error)

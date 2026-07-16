@@ -6,7 +6,7 @@ Open review findings tracked per categories in
 Status values: `open`, `in-progress`.
 Effort values: `S` (<=1h), `M` (1-4h), `L` (>4h).
 
-Last full rescan: 2026-07-13 (all categories).
+Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 ## security
 
@@ -18,6 +18,7 @@ Last full rescan: 2026-07-13 (all categories).
 | SEC-015 | open | S | Add boundary and adversarial nesting tests proving composite expansion is accepted at the cap and rejected above it without materializing output. |
 | SEC-011 | open | S | `generators/hash.py:48` bcrypt-hashes every entry of an unbounded `values` list at prepare time (up to 2^12 rounds each). `--validate` runs `prepare`, so a "validate only, no rows" invocation performs unbounded KDF work (1000 words ~= minutes of CPU). Cap `values` length for bcrypt or hash lazily. |
 | SEC-012 | open | S | `_output.py:85` `target_mode` flips the process-wide umask to 0 and restores it to read it. In an embedding/threaded process any file created in that window lands at 0666/0777. Derive the mode without mutating global umask. |
+| SEC-016 | open | S | `DecimalGenerator.prepare` computes `10 ** decimals` with no upper bound. A local or uploaded config such as `{"decimals": 1000000000}` can consume unbounded CPU/memory during normal construction or `--validate`; define and enforce a decimal precision cap before exponentiation. |
 
 ## code complexity
 
@@ -28,16 +29,27 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| DUP-010 | open | S | Composite-child validation/preparation is implemented twice in `generators/base.py:prepare_child_spec` and `_distribution.py:_prepare_child`, including type lookup, paired rejection, and composite dispatch. Consolidate on the `PreparationContext` path so `oneOf`/`sequence_of` and weighted/distribution cannot drift. |
+| DUP-011 | open | M | `_config.validate_with_catalog` and `_compiler.EngineCompiler` independently resolve types/transforms/validators and prepare generator specs. The duplicate pipelines already differ in exception mapping and catalog access; extract one canonical compilation/validation service used by `--validate` and Engine construction. |
 
 ## reliability/correctness
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| REL-020 | open | S | Proof sampling is off by one: `ProofChecker.should_check` tests `rows_emitted % sample_rate == 0` before yielding, so rate 2 checks rows 1, 3, 5 while CLI/docs promise every 2nd row (2, 4, ...). Define the cadence and use the one-based row number consistently. |
+| REL-021 | open | S | `Engine.rows_emitted` is incremented only after the generator resumes from each `yield`; immediately after `next(iter(engine))` it still reports 0 although one row has been delivered. Move accounting to the yield boundary and preserve proof/milestone row numbering. |
+| REL-022 | open | S | Weighted configs accept `NaN` and infinities because `validate_weights` checks only `< 0` and `sum(...) <= 0`. Cumulative weights become `nan`/`inf`, and `bisect` silently selects an arbitrary branch; reject every non-finite weight and non-finite total. |
+| REL-023 | open | S | `test_prepared_regex_pool_lookup_benchmark_guard` asserts wall-clock ordering between two microbenchmarks inside the functional suite. Scheduler/CPU noise can reverse a small timing delta and make CI flaky; replace it with a deterministic operation/allocation guard or a separately reported benchmark lane. |
+| REL-024 | open | M | `Engine` / `api.generate` do not run `_config` structural validation. Invalid in-memory configs therefore get coerced (`rows=True`, non-string `format`) or leak `KeyError`/`TypeError`, while file-backed configs raise `ConfigError`; define one validation contract for all construction paths. |
+| REL-025 | open | S | CI runs `ruff format --check` with `continue-on-error: true`, while the repository pre-commit hook treats the same check as mandatory. Formatting failures can merge despite the documented local/CI parity; make the CI step blocking or document the intentional difference. |
 
 ## performance
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| PERF-032 | open | S | `ExtensionCatalog.generators()` deep-copies every generator prototype on every call, and catalog validation calls it repeatedly per field (`_validate_type_reference`, `_validate_transforms`, list operations). Cache name-only views and create one Engine-scoped registry snapshot per validation/build. |
+| PERF-033 | open | S | `CompiledPlan` retains unused `template`, `registry`, `transforms`, `validators`, and `plan_tokens` fields after compilation. Remove dead runtime state so each Engine does not keep redundant mappings/plugin objects alive. |
+| PERF-034 | open | S | Proof audit detail suppression is only decided before building all failures for a field. When source plus transform failures cross `MAX_AUDIT_SAMPLE`, specs for over-cap failures are still copied; pass a remaining-detail budget or build records lazily per failure. |
 
 ## scalability
 
@@ -55,11 +67,15 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| CONC-010 | open | S | `fork_engine` offsets nested sequences by `worker_id * worker_rows`; uneven shards use different `worker_rows`, producing overlaps/gaps (10 rows / 3 workers starts at 0, 3, 6 instead of 0, 4, 7). Compute the prefix sum implied by `chunk_rows`. |
+| CONC-011 | open | S | `ExtensionCatalog` has no synchronization around registration and flattened-cache rebuilds. Concurrent `generators()`/`register_*()` calls can iterate a mutating dict or publish a stale flattened snapshot after invalidation; lock mutations and cache publication or document construction-only use. |
 
 ## robustness/recovery
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| ROB-010 | open | M | `--no-clobber` is a check-then-replace policy: after `validate_output_target` sees no file, `atomic_output` eventually calls `os.replace` and overwrites any file created in between. Use an atomic exclusive publish operation and add a race regression test. |
+| ROB-011 | open | S | Atomic output fsyncs the temporary file but not its parent directory after `os.replace`. A crash/power loss can therefore lose the newly published directory entry despite a successful return; fsync the directory on supported platforms with a documented fallback. |
 
 ## architecture/modularity/SOLID
 
@@ -70,6 +86,7 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| DEC-010 | open | S | `ton.api` claims to be the only supported public facade, but README examples require `from ton import concurrency` and `ton.concurrency` exposes public helpers independently. Decide whether concurrency is supported, then re-export/document it through the facade or narrow the facade claim. |
 
 ## business/design patterns/DDD
 
@@ -81,6 +98,8 @@ Last full rescan: 2026-07-13 (all categories).
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
 | PLUG-010 | open | S | Reserved `core` namespace is not reserved. `_registry.py:147` only blocks *replacing* an existing core name, so an entry point named `core.foo` (or `catalog.register_data_type("core", "foo", ...)`) lands in the core namespace and `_flatten:134` promotes it to the bare alias `foo`. Verified. Contradicts `docs/architecture.md:12-31` ("plugins register additional namespaced types", built-ins isolated in `core`). Reject `core` for non-built-in registration. |
+| PLUG-014 | open | M | Catalog generator prototypes are deep-copied per registry, but transforms and validators are returned as shared instances and their lifecycle/statelessness contract is undocumented. Define one extension-instance policy and test two Engines built from a reused catalog with stateful transform/validator fixtures. |
+| PLUG-015 | open | S | Validator entry points receive no runtime contract check: any object is registered, listed, and accepted by config validation, then fails at row generation with a missing `validate`/`type_name` attribute. Validate the `Validator` protocol during direct and entry-point registration, matching generator/transform handling. |
 
 ## CLI / option integrity
 
@@ -88,6 +107,7 @@ Last full rescan: 2026-07-13 (all categories).
 |---------|--------|--------|-------------|
 | CLI-015 | open | S | Translate `UnicodeEncodeError` from stdout and file streaming into the chosen domain error and documented CLI exit code without the unexpected-error banner. |
 | CLI-016 | open | S | Add CLI tests for non-encodable literals/generated values on stdout and atomic file output, including partial-file cleanup. |
+| CLI-017 | open | S | A transform spec with a non-string `type` reaches `normalize_reference`, raises `AttributeError`, and makes `ton config.json --validate` exit 3 with an unexpected-error banner. Map malformed transform references to the normal invalid-config exit 2 path. |
 
 ## configuration discoverability
 
@@ -97,11 +117,16 @@ Last full rescan: 2026-07-13 (all categories).
 | CFG-015 | open | S | Reject unknown root and common field keys during configuration validation with path-aware errors. |
 | CFG-016 | open | S | Add a declarative allowed-key contract for generators/transforms/validators and enforce it for built-ins without blocking plugin-specific keys. |
 | CFG-017 | open | S | Add typo, nested-spec, and plugin-extension tests; document unknown-key validation and migration expectations. |
+| CFG-018 | open | S | `_validate_type_spec` checks that transform entries contain `type` but not that it is a non-empty string. Add path-aware type validation before registry normalization, including transform index in the error. |
+| CFG-019 | open | S | `sequence.padWidth` has an upper cap but no lower bound; negative widths are accepted, stored, and treated as enabled even though `str.zfill` then silently performs no padding. Require `0 <= padWidth <= MAX_SEQUENCE_PAD_WIDTH`. |
+| CFG-020 | open | S | Boolean-like generator options (`padWithZero`, `uppercase`) use `bool(raw)`, so JSON strings such as `"false"` enable the option contrary to the documented boolean schema. Add a shared strict boolean coercer and apply it to built-ins. |
 
 ## data governance
 
 | id     | status | effort | description |
 |--------|--------|--------|-------------|
+| DG-010 | open | M | Structured `prepare_failed`, `generate_failed`, `entry_point_failed`, and CLI unexpected-error diagnostics interpolate arbitrary exception text. Plugin/config exceptions can therefore place source values or secrets into logs; define safe diagnostic fields and sanitize/redact exception messages at trust boundaries. |
+| DG-011 | open | S | The tracked-file governance test detects only a small marker set and Unix `/home`/`/backups` paths. Add representative cloud/token formats and Windows user paths without embedding live-secret-shaped literals directly in the repository. |
 
 ## dependency
 
@@ -113,6 +138,7 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| PLAT-012 | open | S | Date format validation rejects platform-specific flags but accepts unsupported/platform-dependent directives such as `%s`; `strftime` may expand them on Unix and reject or render them literally on Windows. Define and validate a portable directive allowlist across the declared OS matrix. |
 
 ## observability
 
@@ -133,10 +159,10 @@ Last full rescan: 2026-07-13 (all categories).
 |---------|--------|--------|-------------|
 | DOC-010 | open | S | `README.md:78-80` documents chunked generation as three `--resume-from 0/500000/1000000` runs, but the CLI has no row-limit option: each run generates *all* `rows` and only skips a prefix, so chunk-0 contains the whole dataset and the chunks overlap. Either document `fork_engine` for chunking or add a `--max-rows`/`--limit` flag. |
 | DOC-020 | open | S | `README.md:256` ("Output to stdout uses the stream's own encoding") is false: `cli._open_output:398` routes stdout through `_reconfigured_stdout(encoding)`, applying the config's `encoding` to stdout as well. Verified: `{"encoding": "ascii"}` with a non-ASCII `format` crashes on stdout. |
-| DOC-021 | open | S | `README.md:435` says a field's `validators` entries are "a built-in or namespaced validator name" — TON ships **no** built-in validators (`catalog.list_validators()` is empty), so only plugin-provided names can ever resolve. |
 | DOC-022 | open | S | Document public helper functions `validate_config`, `output_encoding`, and `normalize_reference` with signatures, behavior, and errors. |
 | DOC-025 | open | S | Document public extension/error/value types `RegistryError`, `Transform`, `Validator`, and `ProvenanceRecord`, plus `Engine.provenance`. |
 | DOC-026 | open | S | Complete `generate` / `generate_from_file` documentation for `validators=`, `proof_mode`, `proof_sample_rate`, and `redact_proof_failures`, with a minimal example. |
 | DOC-027 | open | S | Add a documentation/API-surface test or checklist that compares `api.__all__` with the supported-surface and README references. |
-| DOC-023 | open | S | README type-reference tables omit shipped defaults and caps: `bytes.length` defaults to 16 (table implies required), `text.count` defaults to 5, `sequence.padWidth` is capped by `MAX_SEQUENCE_PAD_WIDTH`, `hash.rounds` is absent from the field table. |
-| DOC-024 | open | S | `README.md:59` `--batch-rows` ("Rows buffered per `write()` syscall") describes an implementation that does not exist — see CLI-011; the value is a flush interval. |
+| DOC-023 | open | S | README type-reference tables omit shipped defaults/caps: `bytes.length` defaults to 16 (table implies required), `text.count` defaults to 5, and `hash.rounds` is absent from the field table. |
+| DOC-028 | open | S | README's UUID section says UUID1 uses the host clock/node and ignores the seed, but `UUIDGenerator` constructs both v1 and v4 from seeded random bytes specifically to avoid host-data leakage. Correct the behavior and reproducibility text. |
+| DOC-029 | open | S | The public API overview and exception list omit the exported `OutputEncodingError`, including when callers should catch it and its `encoding` / `field_name` context attributes. |

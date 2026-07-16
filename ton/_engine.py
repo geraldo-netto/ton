@@ -88,13 +88,7 @@ class Engine:
             transforms=transforms,
             validators=validators,
         )
-        self._template = plan.template
-        self._types = plan.types
-        self._rows = plan.rows
-        self._tokens = plan.tokens
-        self._registry = plan.registry
-        self._transforms = plan.transforms
-        self._validators = plan.validators
+        self._plan = plan
         self._rng = rng if rng is not None else Random()
         self._proof = ProofChecker(
             mode=proof_mode,
@@ -103,24 +97,20 @@ class Engine:
             redact=redact_proof_failures,
         )
         self._seed = seed
-        self._prepared = plan.prepared
-        self._has_paired = plan.has_paired
-        self._literals = plan.literals
-        self._plan_tokens = plan.plan_tokens
         self._milestone_rows = max(0, int(milestone_rows))
         self._rows_emitted = 0
         self._iteration_lock = threading.Lock()
         self._iteration_started = False
         _logger.info(
             "engine_constructed rows=%d types=%d paired=%s",
-            self._rows,
-            len(self._types),
-            self._has_paired,
+            plan.rows,
+            len(plan.types),
+            plan.has_paired,
             extra={
                 "event": LogEvent.ENGINE_CONSTRUCTED.value,
-                "rows": self._rows,
-                "types": len(self._types),
-                "paired": self._has_paired,
+                "rows": plan.rows,
+                "types": len(plan.types),
+                "paired": plan.has_paired,
                 "milestone_rows": self._milestone_rows,
             },
         )
@@ -232,7 +222,7 @@ class Engine:
     @property
     def total_rows(self) -> int:
         """Total rows the engine will yield when iterated to completion."""
-        return self._rows
+        return self._plan.rows
 
     @property
     def proof_failures(self) -> tuple[ProofFailure, ...]:
@@ -249,12 +239,12 @@ class Engine:
         """Generation metadata for each prepared template field."""
         records: list[ProvenanceRecord] = []
         seen: set[str] = set()
-        for token in self._tokens:
+        for token in self._plan.tokens:
             type_key = token.type_key
             if type_key in seen:
                 continue
             seen.add(type_key)
-            field = self._prepared[type_key]
+            field = self._plan.prepared[type_key]
             generator = field.generator
             failures = self._proof.failure_counts.get(type_key, 0)
             records.append(
@@ -296,18 +286,18 @@ class Engine:
             milestone = self._milestone_rows
             self._rows_emitted = 0
             self._proof.reset()
-            for _ in range(self._rows):
+            for _ in range(self._plan.rows):
                 yield self._render_row()
                 self._rows_emitted += 1
                 if milestone and self._rows_emitted % milestone == 0:
                     _logger.info(
                         "engine_milestone rows=%d/%d",
                         self._rows_emitted,
-                        self._rows,
+                        self._plan.rows,
                         extra={
                             "event": LogEvent.ENGINE_MILESTONE.value,
                             "rows": self._rows_emitted,
-                            "total": self._rows,
+                            "total": self._plan.rows,
                         },
                     )
             _logger.info(
@@ -323,9 +313,9 @@ class Engine:
             self._iteration_lock.release()
 
     def _render_row(self) -> str:
-        paired_cache: dict[str, tuple[str, str]] | None = {} if self._has_paired else None
-        literals = self._literals
-        plan_tokens = self._plan_tokens
+        paired_cache: dict[str, tuple[str, str]] | None = {} if self._plan.has_paired else None
+        literals = self._plan.literals
+        plan_tokens = self._plan.plan_tokens
         if not plan_tokens:
             return literals[0]
         parts: list[str] = []
@@ -336,7 +326,7 @@ class Engine:
         return "".join(parts)
 
     def _resolve(self, token: Token, paired_cache: dict[str, tuple[str, str]] | None) -> str:
-        field = self._prepared[token.type_key]
+        field = self._plan.prepared[token.type_key]
         generator = field.generator
         try:
             if paired_cache is not None and field.is_paired:
@@ -407,7 +397,7 @@ class Engine:
             source_result,
             steps,
             rows_emitted=self._rows_emitted,
-            spec=self._types[type_key],
+            spec=self._plan.types[type_key],
         )
         if failure is not None:
             raise ProofError(

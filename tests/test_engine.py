@@ -29,6 +29,15 @@ def test_compiled_plan_is_immutable() -> None:
     assert CompiledPlan.__dataclass_params__.frozen is True
 
 
+def test_engine_runtime_state_uses_compiled_plan(basic_config: dict) -> None:
+    engine = Engine.from_config(basic_config, seed=1)
+
+    assert engine.total_rows == engine._plan.rows
+    assert set(engine._plan.prepared) == {"n"}
+    assert not hasattr(engine, "_types")
+    assert list(engine) != []
+
+
 def test_engine_is_deterministic_for_a_seed(basic_config: dict) -> None:
     first = list(Engine(basic_config, rng=Random(123)))
     second = list(Engine(basic_config, rng=Random(123)))
@@ -285,7 +294,7 @@ def test_engine_collects_source_proof_failure() -> None:
 
     config = {"rows": 1, "format": "$v$", "types": {"v": {"type": "proving"}}}
     engine = Engine(config, registry={"proving": ProvingGenerator()})
-    field = engine._prepared["v"]
+    field = engine._plan.prepared["v"]
 
     failures = engine._proof.build_failures("v", field, TransformResult("bad"), ())
 
@@ -319,7 +328,7 @@ def test_engine_collects_transform_proof_failure() -> None:
         },
     }
     engine = Engine(config, transforms={"plugin.failproof": FailingProofTransform()})
-    field = engine._prepared["v"]
+    field = engine._plan.prepared["v"]
     source = TransformResult("x")
     _, steps = engine._apply_transforms_with_trace(field, source)
 

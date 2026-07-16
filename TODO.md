@@ -45,7 +45,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-020 | open | S | `generators/decimal.py:38-39` derives the step range with `math.ceil(min*scale)` / `math.floor(max*scale)` on binary floats, so representation error shifts the bounds. Verified: `{"minValue":0.07,"maxValue":0.07,"decimals":2}` -> `0.07*100 == 7.000000000000001` -> `min_step=8 > max_step=7` -> prepare raises "decimal range contains no value representable with 2 decimal place(s)" for a valid config; `{"minValue":0.07,"maxValue":0.29,"decimals":2}` yields `min_step=8, max_step=28`, so 0.07 and 0.29 are never emitted. 134/2000 two-decimal values are affected. Compute steps from the decimal string / integer math instead of float multiply. |
 | REL-021 | open | S | `generators/decimal.py:64-66` draws `rng.uniform(min,max)` then rounds to the step grid, so the two boundary steps get half the probability of interior ones. Verified: `{"minValue":0,"maxValue":0.2,"decimals":1}` over 60k draws -> 0.0 25%, 0.1 50%, 0.2 25% (uniform would be 33/33/33). `round()` also uses banker's rounding, biasing exact .5 ties. Draw `rng.randint(min_step, max_step)` instead. |
 | REL-022 | open | S | Decide and document the Engine iteration contract: reproducible re-iteration or explicit single-shot refusal; record the generator-state implications in the API docs. |
 | REL-026 | open | S | Implement the chosen iteration-state lifecycle for RNG, ProofChecker, counters, and generator-owned prepared state. |

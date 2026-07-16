@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 from random import Random
 from typing import Any
 
@@ -35,8 +35,8 @@ class DecimalGenerator(Generator):
         if decimals < 0:
             raise ValueError(f"decimal 'decimals' must be >= 0 (got {decimals})")
         scale = 10**decimals
-        min_step = math.ceil(min_value * scale)
-        max_step = math.floor(max_value * scale)
+        min_step = int((Decimal(str(min_value)) * scale).to_integral_value(rounding=ROUND_CEILING))
+        max_step = int((Decimal(str(max_value)) * scale).to_integral_value(rounding=ROUND_FLOOR))
         if min_step > max_step:
             raise ValueError(
                 f"decimal range contains no value representable with {decimals} decimal place(s)"

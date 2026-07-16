@@ -103,6 +103,19 @@ def test_decimal_rejects_range_without_representable_rounded_value() -> None:
         DecimalGenerator().prepare({"minValue": 0.1, "maxValue": 0.9, "decimals": 0})
 
 
+def test_decimal_step_bounds_do_not_shift_from_binary_float_error() -> None:
+    prepared = DecimalGenerator().prepare({"minValue": 0.07, "maxValue": 0.29, "decimals": 2})
+
+    assert prepared.min_step == 7
+    assert prepared.max_step == 29
+
+
+def test_decimal_accepts_equal_representable_fractional_bounds() -> None:
+    prepared = DecimalGenerator().prepare({"minValue": 0.07, "maxValue": 0.07, "decimals": 2})
+
+    assert DecimalGenerator().generate(prepared, Random(0)) == "0.07"
+
+
 def test_coerce_float_uses_default_when_optional_key_is_missing() -> None:
     assert coerce_float({}, "value", type_name="test", default=1.5) == 1.5
 

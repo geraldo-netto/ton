@@ -36,7 +36,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-021 | open | S | `Engine.rows_emitted` is incremented only after the generator resumes from each `yield`; immediately after `next(iter(engine))` it still reports 0 although one row has been delivered. Move accounting to the yield boundary and preserve proof/milestone row numbering. |
 | REL-023 | open | S | `test_prepared_regex_pool_lookup_benchmark_guard` asserts wall-clock ordering between two microbenchmarks inside the functional suite. Scheduler/CPU noise can reverse a small timing delta and make CI flaky; replace it with a deterministic operation/allocation guard or a separately reported benchmark lane. |
 | REL-025 | open | S | CI runs `ruff format --check` with `continue-on-error: true`, while the repository pre-commit hook treats the same check as mandatory. Formatting failures can merge despite the documented local/CI parity; make the CI step blocking or document the intentional difference. |
 

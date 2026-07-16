@@ -28,6 +28,16 @@ def test_engine_yields_requested_row_count(basic_config: dict) -> None:
     assert len(rows) == 5
 
 
+def test_rows_emitted_updates_at_each_yield(basic_config: dict) -> None:
+    engine = Engine(basic_config, rng=Random(0))
+    rows = iter(engine)
+
+    next(rows)
+
+    assert engine.rows_emitted == 1
+    rows.close()
+
+
 def test_compiled_plan_is_immutable() -> None:
     assert CompiledPlan.__dataclass_params__.frozen is True
 

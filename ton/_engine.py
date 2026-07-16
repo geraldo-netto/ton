@@ -289,7 +289,7 @@ class Engine:
             self._rows_emitted = 0
             self._proof.reset()
             for _ in range(self._plan.rows):
-                yield self._render_row()
+                row = self._render_row()
                 self._rows_emitted += 1
                 if milestone and self._rows_emitted % milestone == 0:
                     _logger.info(
@@ -302,6 +302,7 @@ class Engine:
                             "total": self._plan.rows,
                         },
                     )
+                yield row
             _logger.info(
                 "engine_completed rows=%d",
                 self._rows_emitted,

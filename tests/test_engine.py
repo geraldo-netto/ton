@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from random import Random
 from typing import Any, ClassVar
 
@@ -37,6 +38,55 @@ def test_compiled_tokens_resolve_direct_generation_fields(basic_config: dict) ->
     assert len(resolved) == 1
     assert resolved[0].field is engine._plan.prepared[resolved[0].token.type_key]
     assert resolved[0].direct is True
+
+
+def test_direct_generation_matches_slow_path_and_skips_proof_objects(
+    basic_config: dict, monkeypatch: Any
+) -> None:
+    direct = Engine.from_config(basic_config, seed=7)
+    slow = Engine.from_config(basic_config, seed=7)
+    slow._plan = replace(
+        slow._plan,
+        resolved_tokens=tuple(replace(token, direct=False) for token in slow._plan.resolved_tokens),
+    )
+
+    assert list(direct) == list(slow)
+
+    guarded = Engine.from_config(basic_config, seed=7)
+    monkeypatch.setattr(
+        guarded._proof,
+        "evaluate",
+        lambda *args, **kwargs: pytest.fail("direct path evaluated proof"),
+    )
+    assert len(list(guarded)) == basic_config["rows"]
+
+
+def test_paired_fields_and_generator_errors_bypass_direct_path() -> None:
+    paired = Engine(
+        {
+            "rows": 1,
+            "format": "$word[id]$:$word$",
+            "types": {"word": {"type": "lmhash", "values": ["secret"]}},
+        }
+    )
+    assert paired._plan.resolved_tokens[0].direct is False
+    plain, digest = list(paired)[0].split(":")
+    assert plain == "secret"
+    assert digest
+
+    class BrokenGenerator(Generator):
+        type_name = "broken"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            del prepared, rng
+            raise RuntimeError("boom")
+
+    broken = Engine(
+        {"rows": 1, "format": "$v$", "types": {"v": {"type": "broken"}}},
+        registry={"broken": BrokenGenerator()},
+    )
+    with pytest.raises(TemplateError, match="BrokenGenerator.*RuntimeError: boom"):
+        list(broken)
 
 
 def test_engine_runtime_state_uses_compiled_plan(basic_config: dict) -> None:

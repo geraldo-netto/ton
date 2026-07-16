@@ -133,15 +133,15 @@ class EngineCompiler:
                 )
             except Exception as exc:  # noqa: BLE001
                 _logger.warning(
-                    "prepare_failed type_key=%s generator_type=%s error=%s",
+                    "prepare_failed type_key=%s generator_type=%s error_type=%s",
                     token.type_key,
                     type(generator).__name__,
-                    exc,
+                    type(exc).__name__,
                     extra={
                         "event": LogEvent.PREPARE_FAILED.value,
                         "type_key": token.type_key,
                         "generator_type": type(generator).__name__,
-                        "error": f"{type(exc).__name__}: {exc}",
+                        "error_type": type(exc).__name__,
                     },
                 )
                 raise TemplateError(

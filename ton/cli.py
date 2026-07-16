@@ -191,7 +191,7 @@ def _run(args: argparse.Namespace) -> int:
         # attached via ``--log-level`` (TODO OBS-008); the print line
         # keeps the v1 "ton: ..." stderr contract for users without a
         # log handler configured.
-        _logger.exception(
+        _logger.error(
             "cli_unexpected_error type=%s",
             type(exc).__name__,
             extra={"event": LogEvent.CLI_UNEXPECTED_ERROR.value, "error_type": type(exc).__name__},

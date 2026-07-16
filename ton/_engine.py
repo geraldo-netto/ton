@@ -351,17 +351,17 @@ class Engine:
             # the CLI's catch-all (TODO REL-014). Log an identifying
             # event before letting it propagate as TemplateError.
             _logger.error(
-                "generate_failed type_key=%s generator_type=%s row=%d error=%s",
+                "generate_failed type_key=%s generator_type=%s row=%d error_type=%s",
                 token.type_key,
                 type(generator).__name__,
                 self._rows_emitted + 1,
-                exc,
+                type(exc).__name__,
                 extra={
                     "event": LogEvent.GENERATE_FAILED.value,
                     "type_key": token.type_key,
                     "generator_type": type(generator).__name__,
                     "row": self._rows_emitted + 1,
-                    "error": f"{type(exc).__name__}: {exc}",
+                    "error_type": type(exc).__name__,
                 },
             )
             raise TemplateError(

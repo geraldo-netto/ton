@@ -388,7 +388,8 @@ def test_registry_skips_broken_entry_point(
     events = [
         r for r in caplog.records if getattr(r, "event", None) == _LE.ENTRY_POINT_FAILED.value
     ]
-    assert events and getattr(events[0], "error", "").startswith("ImportError")
+    assert events and getattr(events[0], "error_type", "") == "ImportError"
+    assert "missing dep" not in events[0].getMessage()
 
 
 # ---------------------------------------------------------------------------

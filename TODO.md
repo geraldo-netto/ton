@@ -96,7 +96,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id     | status | effort | description |
 |--------|--------|--------|-------------|
-| DG-010 | open | M | Structured `prepare_failed`, `generate_failed`, `entry_point_failed`, and CLI unexpected-error diagnostics interpolate arbitrary exception text. Plugin/config exceptions can therefore place source values or secrets into logs; define safe diagnostic fields and sanitize/redact exception messages at trust boundaries. |
 | DG-011 | open | S | The tracked-file governance test detects only a small marker set and Unix `/home`/`/backups` paths. Add representative cloud/token formats and Windows user paths without embedding live-secret-shaped literals directly in the repository. |
 
 ## dependency

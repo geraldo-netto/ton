@@ -498,17 +498,17 @@ def _log_entry_point_failed(ep: object, exc: Exception) -> None:
     safe_value = _sanitize_for_log(getattr(ep, "value", ""))
     dist_name, dist_version = _entry_point_dist(ep)
     _logger.warning(
-        "entry_point_failed name=%s value=%s error=%s",
+        "entry_point_failed name=%s value=%s error_type=%s",
         safe_name,
         safe_value,
-        exc,
+        type(exc).__name__,
         extra={
             "event": LogEvent.ENTRY_POINT_FAILED.value,
             "ep_name": safe_name,
             "value": safe_value,
             "dist_name": dist_name,
             "dist_version": dist_version,
-            "error": f"{type(exc).__name__}: {exc}",
+            "error_type": type(exc).__name__,
         },
     )
 

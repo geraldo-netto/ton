@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import multiprocessing
+from pathlib import Path
 from random import Random
 
 import pytest
 
 from ton._engine import Engine
-from ton.concurrency import chunk_rows, derive_rng, derive_seed, fork_engine
+from ton.concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write_shard
 
 
 def _render_engine(engine: Engine) -> list[str]:
     return list(engine)
+
+
+def _write_worker_shard(args: tuple[dict, str, int, int]) -> int:
+    config, path, worker_id, workers = args
+    return write_shard(config, path, parent_seed=7, worker_id=worker_id, workers=workers)
 
 
 def test_chunk_rows_distributes_remainder_without_dropping_rows() -> None:
@@ -193,3 +199,34 @@ def test_prepared_bytes_engine_crosses_process_boundary(start_method: str) -> No
         actual = pool.apply(_render_engine, (engine,))
 
     assert actual == expected
+
+
+def test_multiprocess_shards_stream_exact_order_and_counts(tmp_path) -> None:
+    workers = 3
+    config = {
+        "rows": 10,
+        "format": "$id$",
+        "types": {"id": {"type": "sequence", "start": 0}},
+    }
+    paths = [str(tmp_path / f"part-{worker}.txt") for worker in range(workers)]
+    context = multiprocessing.get_context("spawn")
+    with context.Pool(workers) as pool:
+        counts = pool.map(
+            _write_worker_shard,
+            [(config, paths[worker], worker, workers) for worker in range(workers)],
+        )
+
+    assert counts == [4, 3, 3]
+    rows = [line for path in paths for line in Path(path).read_text().splitlines()]
+    assert rows == [str(value) for value in range(10)]
+
+
+def test_write_shard_streams_without_returning_rows(tmp_path) -> None:
+    config = {
+        "rows": 2,
+        "format": "$id$",
+        "types": {"id": {"type": "sequence", "start": 5}},
+    }
+    path = tmp_path / "part.txt"
+    assert write_shard(config, str(path), parent_seed=1, worker_id=0, workers=1) == 2
+    assert path.read_text().splitlines() == ["5", "6"]

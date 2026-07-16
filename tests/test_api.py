@@ -38,6 +38,7 @@ EXPECTED_PUBLIC_API = {
     "derive_rng",
     "derive_seed",
     "fork_engine",
+    "write_shard",
     "generate",
     "generate_from_file",
     "load_config",

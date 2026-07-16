@@ -46,6 +46,7 @@ from typing import Any
 from ._engine import Engine, EngineOptions
 from ._logging import LogEvent
 from ._logging import logger as _logger
+from ._output import open_output_path
 from ._transforms import Transform
 from ._validation import Validator
 from .generators import Generator
@@ -149,6 +150,32 @@ def fork_engine(
         },
     )
     return engine
+
+
+def write_shard(
+    config: Mapping[str, Any],
+    path: str,
+    *,
+    parent_seed: int,
+    worker_id: int,
+    workers: int,
+    encoding: str = "utf-8",
+) -> int:
+    """Stream one deterministic worker shard to ``path`` in bounded memory."""
+    rows = chunk_rows(int(config["rows"]), workers, worker_id)
+    engine = fork_engine(
+        config,
+        parent_seed=parent_seed,
+        worker_id=worker_id,
+        workers=workers,
+        rows=rows,
+    )
+    written = 0
+    with open_output_path(path, encoding=encoding) as stream:
+        for row in engine:
+            stream.write(f"{row}\n")
+            written += 1
+    return written
 
 
 def _chunk_offset(total_rows: int, workers: int, worker_id: int) -> int:

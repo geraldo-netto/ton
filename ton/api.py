@@ -64,7 +64,7 @@ from ._registry import (
 from ._template import UndeclaredVariableError
 from ._transforms import Transform
 from ._validation import ValidationError, Validator
-from .concurrency import chunk_rows, derive_rng, derive_seed, fork_engine
+from .concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write_shard
 from .generators import Generator, PairedGenerator
 
 __all__ = [
@@ -91,6 +91,7 @@ __all__ = [
     "derive_rng",
     "derive_seed",
     "fork_engine",
+    "write_shard",
     "generate",
     "generate_from_file",
     "load_config",

@@ -80,7 +80,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CONC-012 | open | S | `fork_engine` does not offset stateful generators: every worker's `sequence` counter restarts at `start`, so the documented recipe emits duplicate ids across workers. The caveat exists in `generators/sequence.py:13-17`, but not in the `concurrency.py:13-33` recipe users actually copy. Offset `start` by `worker_id * rows` in `fork_engine` (or refuse to fork a config containing a `sequence` without an explicit offset). |
 
 ## robustness/recovery
 

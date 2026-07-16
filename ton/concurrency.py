@@ -37,6 +37,7 @@ from __future__ import annotations
 import hashlib
 import struct
 from collections.abc import Mapping
+from copy import deepcopy
 from random import Random
 from typing import Any
 
@@ -108,6 +109,8 @@ def fork_engine(
     """
     seed = derive_seed(parent_seed, worker_id)
     rng = Random(seed)
+    worker_rows = int(config["rows"] if rows is None else rows)
+    config = _offset_sequences(config, worker_id * worker_rows)
     if rows is not None:
         config = {**config, "rows": rows}
     engine = Engine.from_options(
@@ -137,3 +140,21 @@ def fork_engine(
         },
     )
     return engine
+
+
+def _offset_sequences(config: Mapping[str, Any], offset: int) -> dict[str, Any]:
+    copied = deepcopy(dict(config))
+    for spec in copied.get("types", {}).values():
+        _offset_sequence_spec(spec, offset)
+    return copied
+
+
+def _offset_sequence_spec(value: Any, offset: int) -> None:
+    if isinstance(value, dict):
+        if value.get("type") == "sequence":
+            value["start"] = int(value.get("start", 1)) + offset
+        for nested in value.values():
+            _offset_sequence_spec(nested, offset)
+    elif isinstance(value, list):
+        for nested in value:
+            _offset_sequence_spec(nested, offset)

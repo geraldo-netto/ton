@@ -62,6 +62,21 @@ def test_fork_engine_reproducible_per_worker() -> None:
     assert first == second
 
 
+def test_fork_engine_offsets_sequence_ranges_without_mutating_config() -> None:
+    config = {
+        "rows": 3,
+        "format": "$id$",
+        "types": {"id": {"type": "sequence", "start": 10}},
+    }
+
+    first = list(fork_engine(config, parent_seed=1, worker_id=0, rows=3))
+    second = list(fork_engine(config, parent_seed=1, worker_id=1, rows=3))
+
+    assert first == ["10", "11", "12"]
+    assert second == ["13", "14", "15"]
+    assert config["types"]["id"]["start"] == 10
+
+
 def test_derive_seed_matches_derive_rng() -> None:
     seed = derive_seed(parent_seed=7, worker_id=1)
     assert derive_rng(parent_seed=7, worker_id=1).random() == Random(seed).random()

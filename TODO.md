@@ -138,4 +138,3 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-029 | open | S | The public API overview and exception list omit the exported `OutputEncodingError`, including when callers should catch it and its `encoding` / `field_name` context attributes. |

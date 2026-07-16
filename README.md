@@ -183,7 +183,7 @@ for row in api.generate(config_dict, seed=42):
 # Exceptions, Engine, and the LogEvent enum are all re-exported:
 try:
     rows = list(api.generate(bad_config))
-except (api.ConfigError, api.TemplateError) as exc:
+except (api.ConfigError, api.TemplateError, api.OutputEncodingError) as exc:
     ...
 ```
 
@@ -231,6 +231,11 @@ Public extension and provenance types:
 - `Engine.provenance` returns immutable `ProvenanceRecord` entries containing
   each field's source type, transform chain, proof settings/failure count, and
   plugin package/version when available.
+
+`OutputEncodingError` is the public output-domain error for a value that a
+configured text codec cannot represent. Its `encoding` attribute names the
+codec, `field_name` identifies the source field when known (otherwise `None`
+for a rendered row), and the message includes the codec failure reason.
 
 `generate(config, *, seed=None, registry=None, transforms=None,
 validators=None, proof_mode="off", proof_sample_rate=1,

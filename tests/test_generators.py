@@ -310,6 +310,14 @@ def test_date_rejects_non_portable_format_directive() -> None:
         DateGenerator().prepare(spec)
 
 
+@pytest.mark.parametrize("directive", ["%s", "%Q", "%"])
+def test_date_rejects_unsupported_directives(directive: str) -> None:
+    with pytest.raises(ValueError, match="non-portable"):
+        DateGenerator().prepare(
+            {"minValue": "2000-01-01", "maxValue": "2000-12-31", "format": directive}
+        )
+
+
 def test_date_rejects_non_string_format() -> None:
     spec = {"minValue": "2000-01-01", "maxValue": "2000-12-31", "format": 123}
     with pytest.raises(ValueError, match="must be a string"):

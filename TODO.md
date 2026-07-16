@@ -110,7 +110,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| PLAT-012 | open | S | Date format validation rejects platform-specific flags but accepts unsupported/platform-dependent directives such as `%s`; `strftime` may expand them on Unix and reject or render them literally on Windows. Define and validate a portable directive allowlist across the declared OS matrix. |
 
 ## observability
 

@@ -269,6 +269,15 @@ def test_cli_help_does_not_expose_internal_todo_ids(
     assert "loading is opt-in" in captured.out
 
 
+def test_cli_proof_choices_share_proof_checker_modes() -> None:
+    from ton import cli
+    from ton._proofcheck import PROOF_MODES
+
+    action = next(action for action in cli._build_parser()._actions if action.dest == "proof_check")
+
+    assert action.choices == PROOF_MODES
+
+
 def test_cli_list_namespaces_without_config(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["--list-namespaces"])
     captured = capsys.readouterr()

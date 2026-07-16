@@ -13,6 +13,7 @@ from typing import TextIO
 
 from . import __version__, api
 from ._output import open_output_path
+from ._proofcheck import PROOF_MODES
 from .api import (
     ConfigError,
     Engine,
@@ -104,7 +105,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--proof-check",
-        choices=("off", "sample", "all", "audit"),
+        choices=PROOF_MODES,
         default="off",
         help="Proof-check generated values: off, sampled strict checks, all rows, or audit.",
     )

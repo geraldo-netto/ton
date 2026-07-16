@@ -28,6 +28,7 @@ from ._transforms import TransformResult
 #: spec dicts) are stored, so a long run with systematic failures cannot
 #: exhaust memory (SCAL-001).
 MAX_AUDIT_SAMPLE = 1000
+PROOF_MODES = ("off", "sample", "all", "audit")
 
 
 class ProofChecker:
@@ -221,7 +222,7 @@ class ProofChecker:
 
 
 def validate_proof_mode(proof_mode: str) -> str:
-    if proof_mode not in {"off", "sample", "all", "audit"}:
+    if proof_mode not in PROOF_MODES:
         raise ValueError("proof_mode must be 'off', 'sample', 'all', or 'audit'")
     return proof_mode
 

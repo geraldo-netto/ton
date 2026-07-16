@@ -33,7 +33,30 @@ PRIVATE_OR_SECRET_RE = re.compile(
     + b"KEY|BEGIN "
     + b"RSA|BEGIN "
     + b"OPENSSH"
+    + b"|[A-Z]:\\\\Us"
+    + b"ers\\\\"
+    + b"|AK"
+    + b"IA[0-9A-Z]{16}"
+    + b"|gh"
+    + b"[pousr]_[A-Za-z0-9]{20,}"
+    + b"|xox"
+    + b"[abprs]-[A-Za-z0-9-]{10,}"
+    + b"|eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}"
 )
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        b"C:" + b"\\Users\\" + b"person\\file.txt",
+        b"AK" + b"IA" + b"1234567890ABCDEF",
+        b"gh" + b"p_" + b"0123456789abcdefghijkl",
+        b"xox" + b"b-" + b"1234567890-token",
+        b"eyJ" + b"abcdefghijk.abcdefghijkl.abcdefghijkl",
+    ],
+)
+def test_governance_pattern_detects_representative_credentials(candidate: bytes) -> None:
+    assert PRIVATE_OR_SECRET_RE.search(candidate)
 
 
 def test_tracked_text_files_do_not_contain_private_paths_or_secrets() -> None:

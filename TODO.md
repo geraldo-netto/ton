@@ -96,7 +96,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id     | status | effort | description |
 |--------|--------|--------|-------------|
-| DG-011 | open | S | The tracked-file governance test detects only a small marker set and Unix `/home`/`/backups` paths. Add representative cloud/token formats and Windows user paths without embedding live-secret-shaped literals directly in the repository. |
 
 ## dependency
 

@@ -211,6 +211,17 @@ another pass. This gives the RNG, proof checker, and stateful generators such
 as `sequence` one unambiguous lifecycle. Calling `api.generate(...)` again
 constructs a fresh Engine and reproduces seeded output.
 
+Public configuration helpers:
+
+- `validate_config(config, *, catalog=None) -> None` validates structure,
+  references, extension-owned keys, and prepared generator specs. It raises
+  `ConfigError` on invalid input and returns `None` on success.
+- `output_encoding(config) -> str` returns the configured top-level encoding,
+  or `"utf-8"` when omitted.
+- `normalize_reference(reference) -> str` qualifies bare extension names with
+  `core.` and preserves qualified names. Invalid identifiers raise
+  `RegistryError`.
+
 Custom plugins register via three entry-point groups in any installed package: `ton.generators` (data types), `ton.transforms`, and `ton.validators`:
 
 Generator extensions implement `prepare(spec, context=None)`. Composite generators

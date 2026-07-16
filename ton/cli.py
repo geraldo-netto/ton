@@ -34,10 +34,8 @@ _LOG_LEVELS = {
     "critical": logging.CRITICAL,
 }
 
-#: Default rows per write() syscall when streaming to a file. Picked to
-#: be big enough to amortize Python attribute / interpreter overhead but
-#: small enough to keep peak memory bounded for wide rows. Overridable
-#: via ``--batch-rows``.
+#: Default rows between explicit output flushes. Overridable via
+#: ``--batch-rows``.
 _DEFAULT_BATCH_ROWS = 1024
 _T = TypeVar("_T")
 
@@ -446,7 +444,7 @@ def _stream(
     batch_rows: int,
     resume_from: int,
 ) -> int:
-    """Write rows in batches, emitting a logger ``engine_progress`` event
+    """Write rows and flush periodically, emitting an ``engine_progress`` event
     every ``progress_every`` rows (TODO OBS-006). Skips the first
     ``resume_from`` rows before writing any output (TODO SCALE-003).
 
@@ -461,14 +459,11 @@ def _stream(
         count += 1
         if count <= resume_from:
             continue
-        stream.write(row)
-        stream.write("\n")
+        stream.write(f"{row}\n")
         written += 1
         if written and written % flush_at == 0:
-            # Block-buffered streams (e.g. files) still rely on the
-            # interpreter for syscall batching; the explicit flush
-            # boundary keeps wide rows from sitting in memory past
-            # ``batch_rows`` (TODO PERF-011).
+            # Block-buffered streams (e.g. files) rely on the interpreter
+            # for write batching; this controls only the flush cadence.
             stream.flush()
         if progress_every and count % progress_every == 0:
             _emit_progress(count, time.perf_counter() - started)

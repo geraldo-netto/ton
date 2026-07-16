@@ -369,9 +369,6 @@ def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine
         validators = catalog.validators()
     # Pass only --seed; from_config derives the RNG from it so the
     # Random(seed)-or-Random() idiom lives solely in the engine (DEC-002).
-    # --progress already prints JSON; reuse the same interval as the
-    # engine's logger milestone so structured handlers see the same
-    # boundaries.
     return Engine.from_options(
         config,
         EngineOptions(
@@ -381,7 +378,6 @@ def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine
             seed=args.seed,
             proof_mode=args.proof_check,
             proof_sample_rate=args.proof_sample_rate,
-            milestone_rows=args.progress,
             redact_proof_failures=args.redact_proof_failures,
         ),
     )

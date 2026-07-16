@@ -167,6 +167,19 @@ def test_cli_progress_emits_json_lines_to_stderr(
     assert "elapsed_seconds" in payload
 
 
+def test_cli_progress_does_not_enable_engine_milestones(
+    write_config, caplog: pytest.LogCaptureFixture
+) -> None:
+    config = write_config()
+
+    with caplog.at_level("INFO", logger="ton"):
+        assert main([str(config), "--seed", "0", "--progress", "2"]) == 0
+
+    events = [getattr(record, "event", None) for record in caplog.records]
+    assert "engine_progress" in events
+    assert "engine_milestone" not in events
+
+
 def test_cli_validate_checks_config_without_generating_rows(
     write_config, capsys: pytest.CaptureFixture[str]
 ) -> None:

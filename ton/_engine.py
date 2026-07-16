@@ -90,7 +90,12 @@ class TransformStep:
 
 
 class Engine:
-    """Render rows from a parsed TON config."""
+    """Render rows from a parsed TON config.
+
+    An Engine is a single-shot iterator. Construct a new Engine for each
+    pass so seeded RNG and generator-owned prepared state have one clear
+    lifecycle.
+    """
 
     def __init__(
         self,

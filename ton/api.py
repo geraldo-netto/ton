@@ -176,7 +176,11 @@ def generate(
     milestone_rows: int = 0,
     redact_proof_failures: bool = False,
 ) -> Iterator[str]:
-    """Yield generated rows for an in-memory config mapping."""
+    """Yield generated rows for an in-memory config mapping.
+
+    The returned iterator is single-shot. Call :func:`generate` again to
+    obtain a fresh Engine and repeat a seeded generation pass.
+    """
     return iter(
         Engine.from_options(
             config,

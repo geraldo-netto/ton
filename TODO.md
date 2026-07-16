@@ -45,7 +45,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-022 | open | S | Decide and document the Engine iteration contract: reproducible re-iteration or explicit single-shot refusal; record the generator-state implications in the API docs. |
 | REL-026 | open | S | Implement the chosen iteration-state lifecycle for RNG, ProofChecker, counters, and generator-owned prepared state. |
 | REL-027 | open | S | Add repeated-iteration tests covering seeded random fields, `sequence`, proof state, and the chosen failure/reproducibility behavior. |
 

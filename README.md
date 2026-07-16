@@ -197,6 +197,11 @@ engine = api.Engine.from_config(
 )
 ```
 
+An `Engine` is single-shot: iterate it once, then construct a new Engine for
+another pass. This gives the RNG, proof checker, and stateful generators such
+as `sequence` one unambiguous lifecycle. Calling `api.generate(...)` again
+constructs a fresh Engine and reproduces seeded output.
+
 Custom plugins register via three entry-point groups in any installed package: `ton.generators` (data types), `ton.transforms`, and `ton.validators`:
 
 ```toml

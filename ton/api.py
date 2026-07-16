@@ -69,6 +69,7 @@ from .generators import Generator, PairedGenerator
 __all__ = [
     "ConfigError",
     "Engine",
+    "EngineOptions",
     "Generator",
     "LogEvent",
     "PairedGenerator",

@@ -17,6 +17,7 @@ from ._proofcheck import PROOF_MODES
 from .api import (
     ConfigError,
     Engine,
+    EngineOptions,
     LogEvent,
     ProofError,
     TemplateError,
@@ -377,16 +378,18 @@ def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine
     # --progress already prints JSON; reuse the same interval as the
     # engine's logger milestone so structured handlers see the same
     # boundaries.
-    return Engine.from_config(
+    return Engine.from_options(
         config,
-        registry=registry,
-        transforms=transforms,
-        validators=validators,
-        seed=args.seed,
-        proof_mode=args.proof_check,
-        proof_sample_rate=args.proof_sample_rate,
-        milestone_rows=args.progress,
-        redact_proof_failures=args.redact_proof_failures,
+        EngineOptions(
+            registry=registry,
+            transforms=transforms,
+            validators=validators,
+            seed=args.seed,
+            proof_mode=args.proof_check,
+            proof_sample_rate=args.proof_sample_rate,
+            milestone_rows=args.progress,
+            redact_proof_failures=args.redact_proof_failures,
+        ),
     )
 
 

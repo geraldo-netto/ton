@@ -88,7 +88,6 @@ Last full rescan: 2026-07-13 (all categories).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| PAT-020 | open | S | Parameter Object is half-applied: `EngineOptions` exists but five call sites still re-enumerate the option list (see ARCH-010). Route `api.generate`, `api.generate_from_file`, `Engine.from_file`, `cli._build_engine`, `concurrency.fork_engine` through it. |
 
 ## plugin extensibility
 

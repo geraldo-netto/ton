@@ -196,17 +196,19 @@ class Engine:
         :meth:`from_config`; when ``rng`` is also given, ``rng`` wins and
         ``seed`` is recorded only as proof/provenance context.
         """
-        return cls.from_config(
+        return cls.from_options(
             _config.load(path),
-            seed=seed,
-            registry=registry,
-            transforms=transforms,
-            validators=validators,
-            rng=rng,
-            proof_mode=proof_mode,
-            proof_sample_rate=proof_sample_rate,
-            milestone_rows=milestone_rows,
-            redact_proof_failures=redact_proof_failures,
+            EngineOptions(
+                seed=seed,
+                registry=registry,
+                transforms=transforms,
+                validators=validators,
+                rng=rng,
+                proof_mode=proof_mode,
+                proof_sample_rate=proof_sample_rate,
+                milestone_rows=milestone_rows,
+                redact_proof_failures=redact_proof_failures,
+            ),
         )
 
     @property

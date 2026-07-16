@@ -20,6 +20,13 @@ def test_generate_yields_iterator(basic_config: dict) -> None:
     assert all(row.isdigit() for row in rows)
 
 
+def test_engine_options_is_public_parameter_object() -> None:
+    options = api.EngineOptions(seed=42, proof_mode="audit")
+
+    assert options.seed == 42
+    assert options.proof_mode == "audit"
+
+
 def test_generate_is_seed_deterministic(basic_config: dict) -> None:
     first = list(api.generate(basic_config, seed=42))
     second = list(api.generate(basic_config, seed=42))

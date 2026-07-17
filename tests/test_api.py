@@ -147,12 +147,13 @@ def test_public_output_sink_replaces_atomically_and_preserves_mode(tmp_path: Pat
     output = tmp_path / "rows.txt"
     output.write_text("old\n", encoding="utf-8")
     os.chmod(output, 0o640)
+    expected_mode = stat.S_IMODE(output.stat().st_mode)
 
     with api.open_output_path(str(output)) as stream:
         stream.write("new\n")
 
     assert output.read_text(encoding="utf-8") == "new\n"
-    assert stat.S_IMODE(output.stat().st_mode) == 0o640
+    assert stat.S_IMODE(output.stat().st_mode) == expected_mode
 
 
 def test_public_output_sink_rolls_back_failed_write(tmp_path: Path) -> None:
@@ -210,6 +211,23 @@ def test_directory_fsync_is_noop_on_windows(monkeypatch: pytest.MonkeyPatch) -> 
         _output._fsync_directory(".")
 
     open_directory.assert_not_called()
+
+
+def test_directory_fsync_uses_posix_file_operations(monkeypatch: pytest.MonkeyPatch) -> None:
+    from ton import _output
+
+    monkeypatch.setattr(_output.os, "name", "posix")
+    with (
+        mock.patch.object(_output.os, "open", return_value=42) as open_directory,
+        mock.patch.object(_output.os, "fsync") as fsync_directory,
+        mock.patch.object(_output.os, "close") as close_directory,
+    ):
+        _output._fsync_directory(".")
+
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    open_directory.assert_called_once_with(".", flags)
+    fsync_directory.assert_called_once_with(42)
+    close_directory.assert_called_once_with(42)
 
 
 def test_public_output_sink_matches_cli_symlink_policy(tmp_path: Path) -> None:

@@ -530,9 +530,10 @@ def test_cli_atomic_output_preserves_existing_file_mode(write_config, tmp_path: 
     out_file = tmp_path / "out.txt"
     out_file.write_text("old\n", encoding="utf-8")
     os.chmod(out_file, 0o644)
+    expected_mode = stat.S_IMODE(os.stat(out_file).st_mode)
 
     assert main([str(config), "-o", str(out_file), "--seed", "0"]) == 0
-    assert stat.S_IMODE(os.stat(out_file).st_mode) == 0o644
+    assert stat.S_IMODE(os.stat(out_file).st_mode) == expected_mode
 
 
 def test_cli_refuses_symlink_output_without_replacing_link(write_config, tmp_path: Path) -> None:
@@ -547,6 +548,7 @@ def test_cli_refuses_symlink_output_without_replacing_link(write_config, tmp_pat
     assert target.read_text(encoding="utf-8") == "old\n"
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX umask semantics")
 def test_cli_atomic_output_new_file_respects_umask(write_config, tmp_path: Path) -> None:
     config = write_config()
     out_file = tmp_path / "fresh.txt"

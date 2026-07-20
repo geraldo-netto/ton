@@ -71,30 +71,59 @@ With `--proof-check audit` the run still exits `0`; the failure count is printed
 
 Everything observability-related goes to stderr; stdout stays clean for piping. Exit codes: `0` success, `1` missing config / output error / refused special-file target, `2` invalid config or unknown variable, `3` unexpected error, `130` interrupted (Ctrl-C).
 
-### Resume / partition a long run
+### Partition a long run across processes
 
 ```python
+import shutil
+from multiprocessing import get_context
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from ton import api
 
-config = api.load_config("huge.json")
-workers = 3
-for worker_id in range(workers):
-    rows = api.chunk_rows(config["rows"], workers, worker_id)
-    engine = api.fork_engine(
+
+def write_worker(task):
+    config, path, parent_seed, worker_id, workers, encoding = task
+    return api.write_shard(
         config,
-        parent_seed=1,
+        path,
+        parent_seed=parent_seed,
         worker_id=worker_id,
         workers=workers,
-        rows=rows,
+        encoding=encoding,
     )
-    with open(f"chunk-{worker_id}.txt", "w", encoding="utf-8", newline="\n") as output:
-        for row in engine:
-            output.write(f"{row}\n")
+
+
+if __name__ == "__main__":
+    config = api.load_config("huge.json")
+    workers = 3
+    encoding = api.output_encoding(config)
+    with TemporaryDirectory(prefix="ton-shards-") as directory:
+        shards = [Path(directory) / f"part-{worker_id}.txt" for worker_id in range(workers)]
+        tasks = [
+            (config, str(path), 1, worker_id, workers, encoding)
+            for worker_id, path in enumerate(shards)
+        ]
+        with get_context("spawn").Pool(workers) as pool:
+            counts = pool.map(write_worker, tasks)
+
+        with api.open_output_path("combined.txt", encoding=encoding) as output:
+            for path in shards:
+                with path.open("r", encoding=encoding, newline="") as shard:
+                    shutil.copyfileobj(shard, output)
+
+        assert sum(counts) == config["rows"]
 ```
 
 Each shard receives an exact, non-overlapping row count and a deterministic
-worker RNG. `--resume-from` is for restarting one seeded stream: it still
-generates the skipped prefix and does not limit the number of later rows.
+worker RNG. Workers write atomically to separate files, so no worker accumulates
+its output in memory. The parent merges shards in worker-id order to preserve
+partition order. `TemporaryDirectory` removes completed shards and any
+worker-temporary files after success or failure; the final merged file is also
+published atomically.
+
+`--resume-from` is for restarting one seeded stream: it still generates the
+skipped prefix and does not limit the number of later rows.
 
 ## Architecture
 
@@ -296,14 +325,23 @@ must therefore support `copy.deepcopy`.
 A broken plugin is isolated: load failures are logged as `entry_point_failed` and skipped; one bad package never aborts the whole catalog build.
 Entry points execute installed package code while loading, so TON loads them only when explicitly requested, either through `api.build_extension_catalog(include_entry_points=True)` or the CLI `--entry-points` / `--entry-point NAME` flags. (`api.build_registry` remains as a deprecated generator-only shim.)
 
-Parallel runs use `ton.concurrency`:
+Parallel runs use the public `ton.concurrency` helpers re-exported by `ton.api`.
+`write_shard` is the bounded-memory process-pool primitive used in the complete
+merge/cleanup recipe above. Callers with their own streaming sink can instead
+construct one worker engine directly:
 
 ```python
 from ton import api, concurrency
 
 config = api.load_config("examples/dna.json")
+workers = 3
+worker_id = 0
 eng = concurrency.fork_engine(
-    config, parent_seed=42, worker_id=0, rows=1_000_000
+    config,
+    parent_seed=42,
+    worker_id=worker_id,
+    workers=workers,
+    rows=concurrency.chunk_rows(config["rows"], workers, worker_id),
 )
 for row in eng:
     ...

@@ -45,7 +45,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SCAL-014 | open | S | Rewrite the documented multiprocessing recipe to use the streaming primitive and explain output merge/cleanup behavior. |
 
 ## concurrency
 

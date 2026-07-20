@@ -105,7 +105,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| OBS-025 | open | S | Add CLI tests for clear/redacted streaming reports, paired values, large failure sets, and report-write failures; update proof-audit help/docs. |
 
 ## documentation
 

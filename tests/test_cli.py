@@ -9,12 +9,44 @@ import os
 import stat
 import sys
 from pathlib import Path
+from random import Random
+from typing import Any
 from unittest import mock
 
 import pytest
 
+from ton._engine import Engine
+from ton._proof import REDACTED, ProofResult
+from ton._proofaudit import ProofAuditWriteError
+from ton._proofcheck import MAX_AUDIT_SAMPLE
+from ton._transforms import TransformResult
 from ton.api import ProofError, ValidationError
 from ton.cli import main
+from ton.generators import Generator, PairedGenerator
+
+
+class _FailingGenerator(Generator):
+    type_name = "failing"
+
+    def generate(self, prepared: Any, rng: Random) -> str:
+        del prepared, rng
+        return "bad"
+
+    def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+        del prepared, result
+        return ProofResult(ok=False, reason="bad value")
+
+
+class _FailingPairedGenerator(PairedGenerator):
+    type_name = "failing_pair"
+
+    def generate_pair(self, prepared: Any, rng: Random) -> tuple[str, str]:
+        del prepared, rng
+        return ("plaintext", "digest")
+
+    def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+        del prepared, result
+        return ProofResult(ok=False, reason="pair mismatch")
 
 
 @pytest.mark.parametrize(
@@ -361,28 +393,11 @@ def test_cli_proof_audit_reports_clean_summary(
 def test_cli_proof_audit_reports_failure_count(
     monkeypatch, write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
-    from random import Random
-    from typing import Any
-
     from ton import cli
-    from ton._engine import Engine
-    from ton._proof import ProofResult
-    from ton._transforms import TransformResult
-    from ton.generators import Generator
-
-    class FailingGenerator(Generator):
-        type_name = "failing"
-
-        def generate(self, prepared: Any, rng: Random) -> str:
-            return "bad"
-
-        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
-            del prepared, result
-            return ProofResult(ok=False, reason="bad value")
 
     engine = Engine.from_config(
         {"rows": 2, "format": "$v$", "types": {"v": {"type": "failing"}}},
-        registry={"failing": FailingGenerator()},
+        registry={"failing": _FailingGenerator()},
         proof_mode="audit",
     )
     monkeypatch.setattr(cli, "_build_engine", lambda args, config: engine)
@@ -396,6 +411,165 @@ def test_cli_proof_audit_reports_failure_count(
     assert [record["value"] for record in records] == ["bad", "bad"]
 
 
+@pytest.mark.parametrize("redact", [False, True])
+def test_cli_proof_report_preserves_or_redacts_paired_values(
+    redact: bool,
+    monkeypatch,
+    write_config,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    from ton import cli
+
+    engines: list[Engine] = []
+
+    def build_engine(args, config) -> Engine:
+        del config
+        engine = Engine.from_config(
+            {
+                "rows": 1,
+                "format": "$credential[id]$:$credential$",
+                "types": {"credential": {"type": "failing_pair"}},
+            },
+            registry={"failing_pair": _FailingPairedGenerator()},
+            proof_mode="audit",
+            redact_proof_failures=args.redact_proof_failures,
+        )
+        engines.append(engine)
+        return engine
+
+    monkeypatch.setattr(cli, "_build_engine", build_engine)
+    report = tmp_path / "paired.jsonl"
+    argv = [
+        str(write_config()),
+        "--proof-check",
+        "audit",
+        "--proof-report",
+        str(report),
+    ]
+    if redact:
+        argv.append("--redact-proof-failures")
+
+    assert main(argv) == 0
+    captured = capsys.readouterr()
+    record = json.loads(report.read_text(encoding="utf-8"))
+    assert captured.out.strip() == "plaintext:digest"
+    assert record["redacted"] is redact
+    assert record["reason"] == "pair mismatch"
+    if redact:
+        assert record["value"] == REDACTED
+        assert record["id_value"] == REDACTED
+        assert record["spec"] is None
+        assert engines[0].proof_failures[0].value == REDACTED
+    else:
+        assert record["value"] == "digest"
+        assert record["id_value"] == "plaintext"
+        assert record["spec"] == {"type": "failing_pair"}
+        assert engines[0].proof_failures[0].value == "digest"
+
+
+def test_cli_proof_report_streams_beyond_engine_retention_sample(
+    monkeypatch, write_config, tmp_path: Path
+) -> None:
+    from ton import cli
+
+    rows = MAX_AUDIT_SAMPLE + 5
+    engine = Engine.from_config(
+        {"rows": rows, "format": "$v$", "types": {"v": {"type": "failing"}}},
+        registry={"failing": _FailingGenerator()},
+        proof_mode="audit",
+    )
+    monkeypatch.setattr(cli, "_build_engine", lambda args, config: engine)
+    report = tmp_path / "large.jsonl"
+    output = tmp_path / "rows.txt"
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    records = [json.loads(line) for line in report.read_text(encoding="utf-8").splitlines()]
+    assert len(engine.proof_failures) == MAX_AUDIT_SAMPLE
+    assert engine.proof_failure_count == rows
+    assert len(records) == rows
+    assert records[-1]["row"] == rows
+    assert records[-1]["spec"] == {"type": "failing"}
+
+
+def test_cli_proof_report_write_failure_aborts_atomic_outputs(
+    monkeypatch, write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    from ton import cli
+
+    engine = Engine.from_config(
+        {"rows": 1, "format": "$v$", "types": {"v": {"type": "failing"}}},
+        registry={"failing": _FailingGenerator()},
+        proof_mode="audit",
+    )
+    monkeypatch.setattr(cli, "_build_engine", lambda args, config: engine)
+
+    def fail_write(self, failure) -> None:
+        del self, failure
+        raise ProofAuditWriteError("disk full")
+
+    monkeypatch.setattr(cli.ProofAuditWriter, "__call__", fail_write)
+    report = tmp_path / "proof.jsonl"
+    output = tmp_path / "rows.txt"
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+    captured = capsys.readouterr()
+    assert "cannot write proof report: disk full" in captured.err
+    assert "unexpected error" not in captured.err
+    assert not report.exists()
+    assert not output.exists()
+    assert list(tmp_path.glob(".*.tmp")) == []
+
+
+def test_cli_proof_report_open_failure_returns_output_error(
+    write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    report = tmp_path / "missing" / "proof.jsonl"
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+            ]
+        )
+        == 1
+    )
+    captured = capsys.readouterr()
+    assert "cannot write proof report" in captured.err
+    assert "unexpected error" not in captured.err
+    assert not report.exists()
+
+
 def test_cli_help_does_not_expose_internal_todo_ids(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -407,6 +581,8 @@ def test_cli_help_does_not_expose_internal_todo_ids(
     assert "--proof-check" in captured.out
     assert "--proof-report" in captured.out
     assert "--redact-proof-failures" in captured.out
+    assert "JSON Lines" in captured.out
+    assert "paired ids" in captured.out
     assert "loading is opt-in" in captured.out
 
 

@@ -82,12 +82,16 @@ values satisfy their prepared spec. `Engine` supports:
 - `all`: check every row and fail on the first proof failure.
 - `audit`: check every row, collect proof failures, and keep generating.
 
-Audit failures are available through `Engine.proof_failures`. Pipeline metadata
-is available through `Engine.provenance`, which reports the source type,
-transform chain, proof mode, sample rate, and failure count per field.
+Audit failures are available through the bounded in-memory
+`Engine.proof_failures` sample. A configured proof-audit sink receives every
+failure as it is checked, independently of that retention boundary; the CLI
+uses it for `--proof-report` UTF-8 JSON Lines output. Pipeline metadata is
+available through `Engine.provenance`, which reports the source type, transform
+chain, proof mode, sample rate, and failure count per field.
 
 Structured proof-check logs include identifiers such as row, field, stage, and
-reference. They do not include raw generated values.
+reference. They do not include raw generated values. Proof reports include
+values, paired ids, and field specs unless `--redact-proof-failures` is set.
 
 ## Compatibility
 

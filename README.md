@@ -53,7 +53,7 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 |------------------------|--------------------------------------------------------------------------------------|
 | `--seed <int>`         | Seed the RNG for reproducible output.                                                |
 | `-o`, `--output PATH`  | Write rows to a file instead of stdout. Refuses non-regular targets (`/dev/*`, …).   |
-| `--no-clobber`         | Fail instead of overwriting an existing `--output` file.                             |
+| `--no-clobber`         | Fail instead of overwriting an existing `--output` or `--proof-report` file.          |
 | `--resume-from N`      | Generate and discard the first `N` rows before writing output (paired with `--seed`). |
 | `--validate`           | Validate the config and exit without generating rows.                                |
 | `--batch-rows N`       | Flush output every N written rows (default `1024`).                                  |
@@ -62,12 +62,17 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 | `--log-level LEVEL`    | Attach a stderr handler to the `ton` logger (`debug`/`info`/`warning`/`error`/`critical`). |
 | `--proof-check MODE`   | Proof-check generated values: `off`, `sample`, `all`, or `audit` (collect, don't abort). |
 | `--proof-sample-rate N`| With `--proof-check sample`, check every `N`th generated row.                        |
+| `--proof-report PATH`  | With audit mode, stream every failure as UTF-8 JSON Lines to `PATH`.                 |
+| `--redact-proof-failures` | Mask values, paired ids, and field specs in proof-report records.                 |
 | `--list-namespaces`    | List available namespaces, data types, transforms, and validators, then exit.        |
 | `--entry-points`       | Load trusted third-party plugins from the `ton.generators`, `ton.transforms`, and `ton.validators` entry-point groups. |
 | `--entry-point NAME`   | Allow only this trusted entry-point name; repeat for multiple names.                 |
 | `--version`            | Print the package version.                                                           |
 
-With `--proof-check audit` the run still exits `0`; the failure count is printed to stderr (`ton: proof-check audit: …`) and each failing row is emitted as a `proof_check_failed` log event (see `--log-level warning`).
+With `--proof-check audit` the run still exits `0`; the failure count is printed
+to stderr (`ton: proof-check audit: …`). Add `--proof-report PATH` for
+diagnostic values/specs. Each failure also emits a value-free
+`proof_check_failed` log event (see `--log-level warning`).
 
 Everything observability-related goes to stderr; stdout stays clean for piping. Exit codes: `0` success, `1` missing config / output error / refused special-file target, `2` invalid config or unknown variable, `3` unexpected error, `130` interrupted (Ctrl-C).
 
@@ -289,8 +294,8 @@ rows = api.generate_from_file(
 ```
 
 `proof_mode` is `off`, `sample`, `all`, or `audit`; sample mode checks every
-Nth row. Redaction removes values/specs only from retained audit failure
-records. It does not alter generated rows.
+Nth row. Redaction removes values/specs from retained audit failure records
+and CLI proof reports. It does not alter generated rows.
 
 Custom plugins register via three entry-point groups in any installed package: `ton.generators` (data types), `ton.transforms`, and `ton.validators`:
 
@@ -602,12 +607,26 @@ Proof checking can validate generated values during a run:
 ```bash
 ton config.json --proof-check sample --proof-sample-rate 1000
 ton config.json --proof-check all
-ton config.json --proof-check audit
+ton config.json --proof-check audit --proof-report proof-audit.jsonl
+ton config.json --proof-check audit --proof-report safe-audit.jsonl \
+  --redact-proof-failures
 ```
 
 Strict modes (`sample` and `all`) stop on the first proof failure with row,
 field, stage, and reason. Audit mode keeps generating rows and records proof
 failures for library callers via `Engine.proof_failures`.
+
+Proof reports are UTF-8 JSON Lines with one `ton.proof-audit/v1` object per
+failure. Each object contains `row`, `type_key`, `stage`, `reference`, `reason`,
+`value`, paired `id_value`, `seed`, and `spec`, plus a `redacted` boolean. The
+CLI streams every failure to the report even after the bounded in-memory
+`Engine.proof_failures` sample is full. Reports contain clear values by default;
+`--redact-proof-failures` replaces `value` and a present `id_value` with
+`"<redacted>"` and writes `spec` as `null`, while preserving diagnostic fields.
+
+Proof-report files use atomic replacement and honor `--no-clobber`. An
+open/write failure exits `1`, removes temporary report/data files, and never
+publishes a partial regular-file report.
 
 #### `oneOf`
 

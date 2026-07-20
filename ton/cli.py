@@ -84,7 +84,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-clobber",
         action="store_true",
-        help="Refuse to overwrite an existing --output file.",
+        help="Refuse to overwrite an existing --output or --proof-report file.",
     )
     parser.add_argument(
         "--resume-from",
@@ -125,7 +125,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--redact-proof-failures",
         action="store_true",
-        help="Mask values, paired ids, and field specs in --proof-report records.",
+        help="Mask values, paired ids, and field specs in --proof-report JSON Lines.",
     )
     parser.add_argument(
         "--list-namespaces",

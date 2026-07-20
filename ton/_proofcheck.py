@@ -14,7 +14,7 @@ engine's ``TemplateError``).
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from typing import Any
 
@@ -42,12 +42,15 @@ class ProofChecker:
         sample_rate: int,
         seed: int | None,
         redact: bool = False,
+        failure_sink: Callable[[ProofFailure], None] | None = None,
     ) -> None:
         self.mode = validate_proof_mode(mode)
         self.sample_rate = validate_proof_sample_rate(sample_rate)
         self.seed = seed
         #: When set, retained audit records are masked (DG-002).
         self.redact = redact
+        #: Optional bounded-memory destination for every audit failure.
+        self.failure_sink = failure_sink
         #: Bounded sample of detailed failures (see MAX_AUDIT_SAMPLE).
         self.failures: list[ProofFailure] = []
         #: Total audit failures seen, independent of the sample cap.
@@ -102,7 +105,7 @@ class ProofChecker:
             return None
         if self.mode == "audit":
             for failure in failures:
-                if len(self.failures) < MAX_AUDIT_SAMPLE:
+                if self.failure_sink is not None or len(self.failures) < MAX_AUDIT_SAMPLE:
                     failure = replace(failure, spec=dict(spec))
                 self._record_audit(failure)
                 self._log_failure(failure)
@@ -111,11 +114,14 @@ class ProofChecker:
         return failures[0]
 
     def _record_audit(self, failure: ProofFailure) -> None:
-        """Tally an audit failure, retaining detail only up to the cap (SCAL-001)."""
+        """Tally, retain a bounded sample, and stream every audit failure."""
         self.failure_count += 1
         self.failure_counts[failure.type_key] = self.failure_counts.get(failure.type_key, 0) + 1
+        visible = failure.redacted() if self.redact else failure
         if len(self.failures) < MAX_AUDIT_SAMPLE:
-            self.failures.append(failure.redacted() if self.redact else failure)
+            self.failures.append(visible)
+        if self.failure_sink is not None:
+            self.failure_sink(visible)
 
     def build_failures(
         self,

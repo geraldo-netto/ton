@@ -30,11 +30,13 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
+| DUP-018 | open | S | Proof-failure redaction is owned twice: `ProofChecker._record_audit` redacts the record, then `ProofAuditWriter.__call__` redacts it again from a separately threaded CLI flag. The writer can therefore emit `"redacted": false` for an already-redacted payload if these paths drift. Make one layer own redaction and the schema marker, then test mismatched/internal sink configurations. |
 
 ## reliability/correctness
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| REL-028 | open | S | `cli._validate_proof_report_args` compares only `abspath` strings. Two paths that resolve to the same file through a symlinked directory (or case alias on a case-insensitive platform) pass validation; the outer proof-report atomic replacement then overwrites the generated data and the CLI exits `0`. Compare canonical targets with `realpath`/`normcase` plus `samefile` where available, and add alias-path tests. |
 
 ## performance
 
@@ -65,6 +67,7 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| DEC-019 | open | S | Core `Engine` imports the infrastructure-specific `_proofaudit.ProofAuditWriteError` solely to let report failures escape its generator exception wrapper, while `_set_proof_failure_sink` is explicitly CLI-owned. Any other sink exception is misreported as `TemplateError: Generator ... raised ...`. Define a proof-layer sink/error boundary and keep report serialization/output exceptions out of `_engine.py`. |
 
 ## business/design patterns/DDD
 
@@ -80,6 +83,7 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
+| CLI-018 | open | S | `_open_proof_report` catches `OSError` around its `yield`, so errors raised by the primary `_open_output`/`_stream` body are converted to `ProofAuditWriteError`. With a valid report plus an unwritable or non-encodable data output, the CLI incorrectly prints `cannot write proof report`. Restrict translation to report open/write/finalize failures and preserve exceptions from the context body; add combined-output tests. |
 
 ## configuration discoverability
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 from collections.abc import Callable, Iterator, Sequence
@@ -14,6 +15,7 @@ from typing import TextIO, TypeVar
 from . import __version__, api
 from ._logging import terminal_failure_fields
 from ._output import OutputEncodingError, open_output_path
+from ._proofaudit import ProofAuditWriteError, ProofAuditWriter
 from ._proofcheck import PROOF_MODES
 from .api import (
     ConfigError,
@@ -116,6 +118,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="With --proof-check=sample, check every Nth generated row.",
     )
     parser.add_argument(
+        "--proof-report",
+        metavar="PATH",
+        help="With --proof-check=audit, stream every failure as UTF-8 JSON Lines to PATH.",
+    )
+    parser.add_argument(
+        "--redact-proof-failures",
+        action="store_true",
+        help="Mask values, paired ids, and field specs in --proof-report records.",
+    )
+    parser.add_argument(
         "--list-namespaces",
         action="store_true",
         help=(
@@ -203,6 +215,9 @@ def _run(args: argparse.Namespace) -> int:
 
 
 def _run_inner(args: argparse.Namespace) -> int:
+    option_error = _validate_proof_report_args(args)
+    if option_error is not None:
+        return option_error
     if args.list_namespaces:
         _print_namespaces(args)
         return 0
@@ -216,6 +231,23 @@ def _run_inner(args: argparse.Namespace) -> int:
         return built
     engine, encoding = built
     return _execute(engine, args, encoding)
+
+
+def _validate_proof_report_args(args: argparse.Namespace) -> int | None:
+    if args.redact_proof_failures and args.proof_report is None:
+        print("ton: --redact-proof-failures requires --proof-report", file=sys.stderr)
+        return 2
+    if args.proof_report is not None and args.proof_check != "audit":
+        print("ton: --proof-report requires --proof-check=audit", file=sys.stderr)
+        return 2
+    if (
+        args.proof_report is not None
+        and args.output is not None
+        and os.path.abspath(args.proof_report) == os.path.abspath(args.output)
+    ):
+        print("ton: --proof-report and --output must use different paths", file=sys.stderr)
+        return 2
+    return None
 
 
 def _validate_config(args: argparse.Namespace) -> int:
@@ -287,14 +319,26 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
         )
     started = time.perf_counter()
     try:
-        with _open_output(args.output, no_clobber=args.no_clobber, encoding=encoding) as stream:
-            rows_written = _stream(
-                engine,
-                stream,
-                progress_every=args.progress,
-                batch_rows=args.batch_rows,
-                resume_from=args.resume_from,
-            )
+        with _open_proof_report(
+            args.proof_report,
+            no_clobber=args.no_clobber,
+            redact=args.redact_proof_failures,
+        ) as failure_sink:
+            engine._set_proof_failure_sink(failure_sink)
+            with _open_output(args.output, no_clobber=args.no_clobber, encoding=encoding) as stream:
+                rows_written = _stream(
+                    engine,
+                    stream,
+                    progress_every=args.progress,
+                    batch_rows=args.batch_rows,
+                    resume_from=args.resume_from,
+                )
+    except ProofAuditWriteError as exc:
+        _log_terminal_failure(
+            "output", 1, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
+        )
+        print(f"ton: cannot write proof report: {exc}", file=sys.stderr)
+        return 1
     except OSError as exc:
         _log_terminal_failure(
             "output", 1, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
@@ -322,7 +366,7 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
     if args.verbose:
         _report(rows_written, time.perf_counter() - started)
     if args.proof_check == "audit":
-        _report_proof_audit(engine)
+        _report_proof_audit(engine, args.proof_report)
     return 0
 
 
@@ -351,7 +395,7 @@ def _log_terminal_failure(
     )
 
 
-def _report_proof_audit(engine: Engine) -> None:
+def _report_proof_audit(engine: Engine, report_path: str | None = None) -> None:
     """Print the audit proof-check summary to stderr (TODO OBS-002).
 
     Audit mode collects failures instead of aborting, so a normal run
@@ -371,8 +415,12 @@ def _report_proof_audit(engine: Engine) -> None:
         print("ton: proof-check audit: all generated values passed", file=sys.stderr)
         return
     print(
-        f"ton: proof-check audit: {count} value(s) failed; "
-        "rerun with --log-level warning for per-row proof_check_failed detail",
+        f"ton: proof-check audit: {count} value(s) failed"
+        + (
+            f"; details written to {report_path}"
+            if report_path is not None
+            else "; use --proof-report PATH for per-value detail"
+        ),
         file=sys.stderr,
     )
 
@@ -411,6 +459,7 @@ def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine
             seed=args.seed,
             proof_mode=args.proof_check,
             proof_sample_rate=args.proof_sample_rate,
+            redact_proof_failures=args.redact_proof_failures,
         ),
     )
 
@@ -436,6 +485,25 @@ def _open_output(
         return
     with open_output_path(path, no_clobber=no_clobber, encoding=encoding) as stream:
         yield stream
+
+
+@contextmanager
+def _open_proof_report(
+    path: str | None,
+    *,
+    no_clobber: bool,
+    redact: bool,
+) -> Iterator[ProofAuditWriter | None]:
+    if path is None:
+        yield None
+        return
+    try:
+        with open_output_path(path, no_clobber=no_clobber, encoding="utf-8") as stream:
+            yield ProofAuditWriter(stream, redact=redact)
+    except ProofAuditWriteError:
+        raise
+    except OSError as exc:
+        raise ProofAuditWriteError(str(exc)) from exc
 
 
 @contextmanager

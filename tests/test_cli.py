@@ -359,7 +359,7 @@ def test_cli_proof_audit_reports_clean_summary(
 
 
 def test_cli_proof_audit_reports_failure_count(
-    monkeypatch, write_config, capsys: pytest.CaptureFixture[str]
+    monkeypatch, write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     from random import Random
     from typing import Any
@@ -387,10 +387,13 @@ def test_cli_proof_audit_reports_failure_count(
     )
     monkeypatch.setattr(cli, "_build_engine", lambda args, config: engine)
     config = write_config()
-    exit_code = main([str(config), "--proof-check", "audit"])
+    report = tmp_path / "proof-report.jsonl"
+    exit_code = main([str(config), "--proof-check", "audit", "--proof-report", str(report)])
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "2 value(s) failed" in captured.err
+    records = [json.loads(line) for line in report.read_text(encoding="utf-8").splitlines()]
+    assert [record["value"] for record in records] == ["bad", "bad"]
 
 
 def test_cli_help_does_not_expose_internal_todo_ids(
@@ -402,8 +405,59 @@ def test_cli_help_does_not_expose_internal_todo_ids(
     assert exc.value.code == 0
     assert "OBS-003" not in captured.out
     assert "--proof-check" in captured.out
-    assert "--redact-proof-failures" not in captured.out
+    assert "--proof-report" in captured.out
+    assert "--redact-proof-failures" in captured.out
     assert "loading is opt-in" in captured.out
+
+
+def test_cli_proof_report_requires_audit(
+    write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    report = tmp_path / "proof-report.jsonl"
+
+    assert main([str(write_config()), "--proof-report", str(report)]) == 2
+    assert "--proof-report requires --proof-check=audit" in capsys.readouterr().err
+    assert not report.exists()
+
+
+def test_cli_redaction_requires_proof_report(
+    write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--redact-proof-failures",
+            ]
+        )
+        == 2
+    )
+    assert "--redact-proof-failures requires --proof-report" in capsys.readouterr().err
+
+
+def test_cli_rejects_shared_data_and_proof_report_path(
+    write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    output = tmp_path / "shared.jsonl"
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(output),
+                "--output",
+                str(output),
+            ]
+        )
+        == 2
+    )
+    assert "must use different paths" in capsys.readouterr().err
+    assert not output.exists()
 
 
 def test_cli_proof_choices_share_proof_checker_modes() -> None:

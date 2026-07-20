@@ -105,7 +105,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| OBS-024 | open | S | Emit retained `Engine.proof_failures` through the proof-audit report path and make `--redact-proof-failures` affect that visible output. |
 | OBS-025 | open | S | Add CLI tests for clear/redacted streaming reports, paired values, large failure sets, and report-write failures; update proof-audit help/docs. |
 
 ## documentation

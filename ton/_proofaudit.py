@@ -50,4 +50,4 @@ class ProofAuditWriter:
         try:
             self._stream.write(json.dumps(payload, ensure_ascii=True, separators=(",", ":")) + "\n")
         except OSError as exc:
-            raise ProofAuditWriteError(f"cannot write proof-audit report: {exc}") from exc
+            raise ProofAuditWriteError(str(exc)) from exc

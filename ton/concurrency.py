@@ -10,28 +10,30 @@ provides the two primitives a parallel runner needs:
 * :func:`fork_engine` -- convenience builder returning a fresh
   :class:`ton.engine.Engine` whose RNG is derived for ``worker_id``.
 
-A multi-process generator can then do::
+A multi-process generator can stream each worker directly to its own shard::
 
     from multiprocessing import Pool
     from ton import api, concurrency
 
-    def work(worker_id: int) -> list[str]:
-        config = api.load_config("examples/dna.json")
-        rows_per_worker = concurrency.chunk_rows(config["rows"], workers, worker_id)
-        eng = concurrency.fork_engine(config, parent_seed=42,
-                                      worker_id=worker_id,
-                                      workers=workers,
-                                      rows=rows_per_worker)
-        return list(eng)
+    def work(task: tuple[dict, str, int, int]) -> int:
+        config, path, worker_id, workers = task
+        return concurrency.write_shard(
+            config, path, parent_seed=42, worker_id=worker_id, workers=workers
+        )
 
     if __name__ == "__main__":
+        config = api.load_config("examples/dna.json")
+        workers = 3
+        tasks = [
+            (config, f"chunk-{worker_id}.txt", worker_id, workers)
+            for worker_id in range(workers)
+        ]
         with Pool(workers) as p:
-            for chunk in p.imap(work, range(workers)):
-                for row in chunk:
-                    print(row)
+            counts = p.map(work, tasks)
 
 The output is *deterministic* for a given (parent_seed, workers,
-worker_id) tuple.
+worker_id) tuple. Merge shard files in worker-id order to reproduce
+the partitioned row order.
 """
 
 from __future__ import annotations

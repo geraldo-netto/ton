@@ -8,6 +8,7 @@ from random import Random
 
 import pytest
 
+from ton import concurrency
 from ton._engine import Engine
 from ton.concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write_shard
 
@@ -19,6 +20,13 @@ def _render_engine(engine: Engine) -> list[str]:
 def _write_worker_shard(args: tuple[dict, str, int, int]) -> int:
     config, path, worker_id, workers = args
     return write_shard(config, path, parent_seed=7, worker_id=worker_id, workers=workers)
+
+
+def test_parallel_worker_contract_streams_shards() -> None:
+    documentation = concurrency.__doc__ or ""
+
+    assert "return list(eng)" not in documentation
+    assert "concurrency.write_shard(" in documentation
 
 
 def test_chunk_rows_distributes_remainder_without_dropping_rows() -> None:

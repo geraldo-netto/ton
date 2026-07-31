@@ -402,6 +402,31 @@ def test_catalog_entry_points_skip_wrong_plugin_kind() -> None:
     assert "acme.bad" not in catalog.list_transforms()
 
 
+def test_catalog_entry_points_require_complete_transform_protocol() -> None:
+    class IncompleteTransform:
+        def prepare(self, spec):
+            return spec
+
+        def apply(self, prepared, value, rng):
+            return value
+
+        def prove(self, prepared, before, after):
+            return True
+
+    bad = mock.Mock()
+    bad.name = "acme.incomplete"
+    bad.value = "pkg:IncompleteTransform"
+    bad.load.return_value = IncompleteTransform
+
+    def _entry_points(group: str):
+        return [bad] if group == "ton.transforms" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points()
+
+    assert "acme.incomplete" not in catalog.list_transforms()
+
+
 def test_catalog_entry_points_skip_wrong_generator_kind() -> None:
     bad = mock.Mock()
     bad.name = "acme.bad"

@@ -301,7 +301,7 @@ def _register_entry_point_plugin(
 
 
 def _is_transform(plugin: Any) -> bool:
-    return all(callable(getattr(plugin, name, None)) for name in ("prepare", "apply", "prove"))
+    return isinstance(plugin, Transform)
 
 
 def _entry_point_namespace_name(

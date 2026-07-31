@@ -1050,7 +1050,7 @@ Library code emits structured INFO events on a single logger named `ton`. Attach
 | `entry_point_loaded`                  | third-party plugin instantiated                     |
 | `entry_point_failed`                  | third-party plugin raised on load — entry skipped   |
 | `entry_points_summary`                | per-process summary of loaded / failed entries      |
-| `output_overwrite`                    | `-o` file existed and was truncated                 |
+| `output_overwrite`                    | an existing regular output was atomically replaced  |
 | `output_special_file_rejected`        | `-o` target was not a regular file or FIFO          |
 | `resume_overshoot`                    | `--resume-from` exceeded `total_rows`               |
 | `cli_unexpected_error`                | CLI top-level catch-all (traceback in handler)      |

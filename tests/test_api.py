@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import stat
 from pathlib import Path
@@ -150,17 +151,30 @@ def test_load_config_validates(tmp_path: Path) -> None:
         api.load_config(str(bad))
 
 
-def test_public_output_sink_replaces_atomically_and_preserves_mode(tmp_path: Path) -> None:
+def test_public_output_sink_replaces_atomically_and_preserves_mode(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     output = tmp_path / "rows.txt"
     output.write_text("old\n", encoding="utf-8")
     os.chmod(output, 0o640)
     expected_mode = stat.S_IMODE(output.stat().st_mode)
 
-    with api.open_output_path(str(output)) as stream:
+    with (
+        caplog.at_level(logging.WARNING, logger="ton"),
+        api.open_output_path(str(output)) as stream,
+    ):
         stream.write("new\n")
+        assert not any(
+            getattr(record, "event", "") == "output_overwrite" for record in caplog.records
+        )
 
     assert output.read_text(encoding="utf-8") == "new\n"
     assert stat.S_IMODE(output.stat().st_mode) == expected_mode
+    overwrite = [
+        record for record in caplog.records if getattr(record, "event", "") == "output_overwrite"
+    ]
+    assert len(overwrite) == 1
+    assert overwrite[0].committed is True
 
 
 def test_new_output_mode_does_not_mutate_process_umask(monkeypatch, tmp_path: Path) -> None:

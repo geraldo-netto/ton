@@ -107,7 +107,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| OBS-031 | open | S | `output_overwrite` is emitted during preflight as soon as a target exists (`_output.py:33-59`), before generation or atomic replacement. Failed/interrupted jobs leave the old file intact but still claim an overwrite; README also says the file was “truncated” (`README.md:1022`). Emit a committed-replacement event after publication and use a separate preflight warning if desired. |
 
 ## documentation
 

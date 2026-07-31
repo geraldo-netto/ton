@@ -84,11 +84,6 @@ def validate_output_target(path: str, *, no_clobber: bool = False) -> bool:
         raise OSError(f"refusing to write to special file (not a regular file): {path}")
     if no_clobber:
         raise OSError(f"refusing to overwrite existing file: {path}")
-    _logger.warning(
-        "output_overwrite path=%s",
-        path,
-        extra={"event": LogEvent.OUTPUT_OVERWRITE.value, "path": path},
-    )
     return stat.S_ISFIFO(target.st_mode)
 
 
@@ -126,8 +121,19 @@ def atomic_output(
                 published = True
                 os.unlink(tmp_name)
             else:
+                destination_existed = os.path.exists(path)
                 os.replace(tmp_name, path)
                 published = True
+                if destination_existed:
+                    _logger.warning(
+                        "output_overwrite path=%s committed=true",
+                        path,
+                        extra={
+                            "event": LogEvent.OUTPUT_OVERWRITE.value,
+                            "path": path,
+                            "committed": True,
+                        },
+                    )
             tmp_name = ""
             _fsync_directory(directory)
         except OSError as exc:

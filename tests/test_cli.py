@@ -964,7 +964,7 @@ def test_cli_row_time_template_error_returns_2(
 
 
 def test_cli_atomic_output_keeps_existing_file_on_failure(
-    monkeypatch, write_config, tmp_path: Path
+    monkeypatch, write_config, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     from ton import cli
 
@@ -976,9 +976,11 @@ def test_cli_atomic_output_keeps_existing_file_on_failure(
         raise RuntimeError("stream failed")
 
     monkeypatch.setattr(cli, "_stream", _boom)
-    assert main([str(config), "-o", str(out_file)]) == 3
+    with caplog.at_level(logging.WARNING, logger="ton"):
+        assert main([str(config), "-o", str(out_file)]) == 3
     assert out_file.read_text(encoding="utf-8") == "old\n"
     assert list(tmp_path.glob(".out.txt.*.tmp")) == []
+    assert not any(getattr(record, "event", "") == "output_overwrite" for record in caplog.records)
 
 
 def test_atomic_output_reports_post_publish_fsync_failure(monkeypatch, tmp_path: Path) -> None:

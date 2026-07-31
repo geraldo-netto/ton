@@ -102,7 +102,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| PLAT-013 | open | M | The date portability allowlist includes locale-dependent directives (`%a/%A/%b/%B/%c/%p/%x/%X/%Z`; `generators/date.py:31,64-76`). Identical seeded configs can therefore emit different text under another process locale/OS even though the CLI promises reproducible output. Either implement locale-neutral formatting for the supported contract or document and test locale dependence explicitly. |
 
 ## observability
 

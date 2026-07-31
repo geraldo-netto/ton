@@ -11,6 +11,7 @@ from unittest import mock
 
 import pytest
 
+from ton._transforms import TransformResult
 from ton.generators import (
     BooleanGenerator,
     CharGenerator,
@@ -380,6 +381,49 @@ def test_date_custom_format_and_iso_datetime_bounds() -> None:
     value = _draw(DateGenerator(), spec)
     moment = datetime.strptime(value, "%Y%m%dT%H%M")
     assert datetime(2024, 1, 1) <= moment <= datetime(2024, 1, 2)
+
+
+def test_date_formats_every_directive_without_locale_dependence() -> None:
+    spec = {
+        "minValue": "2024-01-01T13:05:06.123456+00:00",
+        "maxValue": "2024-01-01T13:05:06.123456+00:00",
+        "format": "%a|%A|%b|%B|%c|%d|%H|%I|%j|%m|%M|%p|%S|%U|%w|%W|%x|%X|%y|%Y|%z|%Z|%f|%%",
+    }
+
+    generator = DateGenerator()
+    prepared = generator.prepare(spec)
+    value = generator.generate(prepared, _rng())
+
+    assert value == (
+        "Mon|Monday|Jan|January|Mon Jan  1 13:05:06 2024|01|13|01|001|01|05|PM|06|"
+        "00|1|01|01/01/24|13:05:06|24|2024|+0000|UTC|123456|%"
+    )
+    assert generator.prove(prepared, TransformResult(value)).ok
+
+
+@pytest.mark.parametrize(
+    ("offset", "numeric", "name"),
+    [
+        ("+05:30", "+0530", "UTC+05:30"),
+        ("-02:03:04.000005", "-020304.000005", "UTC-02:03:04.000005"),
+    ],
+)
+def test_date_formats_timezone_offsets_portably(offset: str, numeric: str, name: str) -> None:
+    bound = f"2024-01-01T00:00:00{offset}"
+    assert (
+        _draw(DateGenerator(), {"minValue": bound, "maxValue": bound, "format": "%z|%Z"})
+        == f"{numeric}|{name}"
+    )
+
+
+def test_date_formats_naive_timezone_as_empty() -> None:
+    spec = {
+        "minValue": "2024-01-01T00:00:00",
+        "maxValue": "2024-01-01T00:00:00",
+        "format": "%z|%Z",
+    }
+
+    assert _draw(DateGenerator(), spec) == "|"
 
 
 def test_date_rejects_inverted_bounds() -> None:

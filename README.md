@@ -693,13 +693,19 @@ Concatenate `count` independent draws from a single child spec, joined by an opt
 
 #### `date`
 
-Uniform calendar datetime between ISO-8601 bounds, formatted with `strftime`.
+Uniform calendar datetime between ISO-8601 bounds. Formatting uses a portable,
+locale-neutral `strftime` subset so seeded output stays identical across systems.
+Names and composite forms use invariant English/C-locale spellings.
+Supported directives are `%a`, `%A`, `%b`, `%B`, `%c`, `%d`, `%H`, `%I`,
+`%j`, `%m`, `%M`, `%p`, `%S`, `%U`, `%w`, `%W`, `%x`, `%X`, `%y`, `%Y`,
+`%z`, `%Z`, `%f`, and `%%`. `%Z` renders `UTC` plus a numeric offset rather
+than a host-specific timezone abbreviation.
 
 | field       | type   | description                                       |
 |-------------|--------|---------------------------------------------------|
 | `minValue`  | string | ISO 8601 (date or datetime), inclusive            |
 | `maxValue`  | string | ISO 8601 (date or datetime), inclusive            |
-| `format`    | string | `strftime` format (default `%Y-%m-%d %H:%M:%S`)   |
+| `format`    | string | portable format (default `%Y-%m-%d %H:%M:%S`)     |
 
 ```json
 {"type": "date", "minValue": "2024-01-01", "maxValue": "2024-12-31", "format": "%Y-%m-%d %H:%M:%S"}

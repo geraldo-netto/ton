@@ -752,7 +752,7 @@ Monotonic counter, useful for primary keys / row ids. State lives on the prepare
 |------------|------|-----------------------------------|
 | `start`    | int  | first value (default `0`)         |
 | `step`     | int  | non-zero increment (default `1`)  |
-| `padWidth` | int  | zero-pad to this width (`0` off, maximum `100,000`) |
+| `padWidth` | int  | zero-pad to this width (`0` disables padding)      |
 
 ```json
 {"type": "sequence", "start": 1000, "step": 1}

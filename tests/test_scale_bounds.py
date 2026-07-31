@@ -16,7 +16,7 @@ from ton.generators.regex import (
     MAX_TOTAL_EXPANSION,
     RegexGenerator,
 )
-from ton.generators.sequence import MAX_SEQUENCE_PAD_WIDTH, SequenceGenerator
+from ton.generators.sequence import SequenceGenerator
 from ton.generators.text import TextGenerator
 
 
@@ -40,9 +40,11 @@ def test_text_honors_large_operator_requested_count() -> None:
     assert len(generator.generate(prepared, Random(0)).split()) == 10_001
 
 
-def test_sequence_rejects_pad_width_above_cap() -> None:
-    with pytest.raises(ValueError, match="MAX_SEQUENCE_PAD_WIDTH"):
-        SequenceGenerator().prepare({"padWidth": MAX_SEQUENCE_PAD_WIDTH + 1})
+def test_sequence_honors_large_operator_requested_padding() -> None:
+    generator = SequenceGenerator()
+    prepared = generator.prepare({"start": 1, "padWidth": 100_001})
+
+    assert generator.generate(prepared, Random(0)) == "0" * 100_000 + "1"
 
 
 def test_regex_rejects_oversized_literal_repeat() -> None:

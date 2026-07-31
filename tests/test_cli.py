@@ -86,7 +86,14 @@ def test_cli_structured_log_marks_unexpected_crash(monkeypatch, write_config, ca
     monkeypatch.setattr(cli, "_build_engine", lambda *args: (_ for _ in ()).throw(RuntimeError()))
     with caplog.at_level(logging.ERROR, logger="ton"):
         assert main([str(write_config())]) == 3
+    unexpected = [
+        record
+        for record in caplog.records
+        if getattr(record, "event", "") == "cli_unexpected_error"
+    ]
     failures = [record for record in caplog.records if getattr(record, "event", "") == "cli_failed"]
+    assert len(unexpected) == 1
+    assert unexpected[0].exc_info is not None
     assert len(failures) == 1
     assert failures[0].error_category == "unexpected"
 
@@ -275,6 +282,7 @@ def test_cli_unexpected_error_returns_3(
     assert exit_code == 3
     assert "unexpected error" in captured.err
     assert "RuntimeError" in captured.err
+    assert "Traceback" not in captured.err
 
 
 def test_cli_keyboard_interrupt_returns_130(

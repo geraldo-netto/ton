@@ -798,6 +798,32 @@ def test_cli_proof_choices_share_proof_checker_modes() -> None:
     assert action.choices == PROOF_MODES
 
 
+def test_cli_validate_does_not_hash_bcrypt_values(
+    monkeypatch, write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from ton.generators import hash as hash_module
+
+    digest = mock.Mock(side_effect=AssertionError("bcrypt KDF ran during validation"))
+    monkeypatch.setattr(hash_module, "_bcrypt_digest", digest)
+    config = write_config(
+        {
+            "format": "$password$",
+            "types": {
+                "password": {
+                    "type": "hash",
+                    "algorithm": "bcrypt",
+                    "rounds": 4,
+                    "values": ["secret-a", "secret-b"],
+                }
+            },
+        }
+    )
+
+    assert main([str(config), "--validate"]) == 0
+    assert "config valid" in capsys.readouterr().err
+    digest.assert_not_called()
+
+
 def test_cli_list_namespaces_without_config(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["--list-namespaces"])
     captured = capsys.readouterr()

@@ -6,6 +6,7 @@ import builtins
 from datetime import datetime
 from random import Random
 from typing import Any
+from unittest import mock
 
 import pytest
 
@@ -243,6 +244,27 @@ def test_hash_generator_bcrypt_is_deterministic() -> None:
     assert gen.generate(prepared, _rng()) == (
         "$2b$04$I5eLS1qbm8MJyuLfomTUfeuzPdxYbe9Z9taDPxzfKRS1bf.1N9wOi"
     )
+
+
+def test_hash_generator_bcrypt_hashes_selected_values_once(monkeypatch) -> None:
+    from ton.generators import hash as hash_module
+
+    words = [f"secret-{index}" for index in range(10_000)]
+    digest = mock.Mock(side_effect=lambda plaintext, rounds: f"{plaintext}:{rounds}")
+    monkeypatch.setattr(hash_module, "_bcrypt_digest", digest)
+    rng = mock.Mock()
+    rng.choice.side_effect = [words[-1], words[-1], words[0]]
+    generator = HashGenerator()
+
+    prepared = generator.prepare({"algorithm": "bcrypt", "rounds": 4, "values": words})
+
+    digest.assert_not_called()
+    assert generator.generate_pair(prepared, rng) == (words[-1], f"{words[-1]}:4")
+    assert generator.generate_pair(prepared, rng) == (words[-1], f"{words[-1]}:4")
+    assert generator.generate_pair(prepared, rng) == (words[0], f"{words[0]}:4")
+    assert digest.call_args_list == [mock.call(words[-1], 4), mock.call(words[0], 4)]
+    assert len(prepared.words) == len(words)
+    assert len(prepared.cache) == 2
 
 
 def test_hash_generator_rejects_bad_bcrypt_rounds() -> None:

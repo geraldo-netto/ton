@@ -13,6 +13,8 @@ from __future__ import annotations
 import binascii
 import hashlib
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
+from random import Random
 from typing import Any
 
 from ._md4 import md4 as _pure_md4
@@ -47,12 +49,23 @@ _BCRYPT_ALPHABET = b"./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234
 MAX_BCRYPT_ROUNDS = 12
 
 
+@dataclass(frozen=True)
+class BcryptPairSpec:
+    """Validated bcrypt pool with digests cached only after selection."""
+
+    words: tuple[str, ...]
+    rounds: int
+    cache: dict[str, str] = field(default_factory=dict, compare=False, repr=False)
+
+
 class HashGenerator(PairedWordPoolGenerator):
     """Generate ``(plaintext, digest)`` pairs from a fixed word list."""
 
     type_name = "hash"
 
-    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> WordPairSpec:
+    def prepare(
+        self, spec: Mapping[str, Any], context: Any = None
+    ) -> WordPairSpec | BcryptPairSpec:
         words = require_string_tuple(spec)
         algorithm = str(spec.get("algorithm", "sha256")).lower()
         if algorithm not in _ALGORITHMS:
@@ -65,20 +78,38 @@ class HashGenerator(PairedWordPoolGenerator):
                 raise ValueError(
                     f"hash 'rounds' must be between 4 and MAX_BCRYPT_ROUNDS ({MAX_BCRYPT_ROUNDS})"
                 )
-            return WordPairSpec(pairs=tuple((word, _bcrypt_digest(word, rounds)) for word in words))
+            _load_bcrypt()
+            return BcryptPairSpec(words=words, rounds=rounds)
         if algorithm == "ntlm":
             return WordPairSpec(pairs=tuple((word, _ntlm_digest(word)) for word in words))
         hash_one = _HASHERS[algorithm]
         return WordPairSpec(pairs=tuple((word, hash_one(word.encode("utf-8"))) for word in words))
 
+    def generate_pair(
+        self, prepared: WordPairSpec | BcryptPairSpec, rng: Random
+    ) -> tuple[str, str]:
+        if isinstance(prepared, BcryptPairSpec):
+            plaintext = rng.choice(prepared.words)
+            digest = prepared.cache.get(plaintext)
+            if digest is None:
+                digest = _bcrypt_digest(plaintext, prepared.rounds)
+                prepared.cache[plaintext] = digest
+            return plaintext, digest
+        return super().generate_pair(prepared, rng)
+
 
 def _bcrypt_digest(plaintext: str, rounds: int) -> str:
+    bcrypt = _load_bcrypt()
+    salt = _bcrypt_salt(plaintext, rounds)
+    return str(bcrypt.hashpw(plaintext.encode("utf-8"), salt).decode("ascii"))
+
+
+def _load_bcrypt() -> Any:
     try:
         import bcrypt  # pyright: ignore[reportMissingImports]
     except ImportError as exc:
         raise ValueError("hash algorithm 'bcrypt' requires installing ton[bcrypt]") from exc
-    salt = _bcrypt_salt(plaintext, rounds)
-    return bcrypt.hashpw(plaintext.encode("utf-8"), salt).decode("ascii")
+    return bcrypt
 
 
 def _bcrypt_salt(plaintext: str, rounds: int) -> bytes:

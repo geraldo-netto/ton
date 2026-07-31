@@ -209,9 +209,9 @@ class PairedGenerator(Generator):
 class WordPairSpec:
     """Precomputed ``(plaintext, digest)`` pairs for word-pool generators.
 
-    Hashing happens once at prepare time; the row hot path is a single
-    ``rng.choice`` against this tuple. Shared by the ``hash`` and
-    digest algorithms.
+    Eager hashing happens once at prepare time; the row hot path is a single
+    ``rng.choice`` against this tuple. Shared by digest algorithms and the
+    inexpensive ``hash`` algorithms; bcrypt uses its own lazy cached spec.
     """
 
     pairs: tuple[tuple[str, str], ...]

@@ -108,7 +108,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CFG-021 | open | S | The canonical validation docs promise available-name diagnostics for types and transforms (`api.py:121-129`), but `_resolve_transform` and `_resolve_validators` report only the missing reference (`_compiler.py:186-200`); the success event also omits available validators (`_config.py:105-113`). Include sorted available transforms/validators and namespace guidance consistently. |
 
 ## data governance
 

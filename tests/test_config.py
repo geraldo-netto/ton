@@ -242,8 +242,34 @@ def test_validate_config_lists_available_transforms() -> None:
     payload = _valid_payload()
     payload["types"]["a"]["transforms"] = [{"type": "missing"}]
 
-    with pytest.raises(ConfigError, match="Unknown transform 'missing'"):
+    with pytest.raises(
+        ConfigError,
+        match="Unknown transform 'missing'.*Available transforms:.*identity.*namespace.name",
+    ):
         api.validate_config(payload)
+
+
+def test_validate_config_lists_available_validators() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["validators"] = ["missing"]
+
+    with pytest.raises(
+        ConfigError,
+        match="Unknown validator 'missing'.*Available validators:.*non_empty.*namespace.name",
+    ):
+        api.validate_config(payload)
+
+
+def test_config_validated_event_lists_every_extension_kind(caplog) -> None:
+    payload = _valid_payload()
+
+    with caplog.at_level("INFO", logger="ton"):
+        api.validate_config(payload)
+
+    record = next(record for record in caplog.records if record.event == "config_validated")
+    assert "string" in record.available_types
+    assert "identity" in record.available_transforms
+    assert "non_empty" in record.available_validators
 
 
 def test_validate_config_rejects_incompatible_transform_chain() -> None:

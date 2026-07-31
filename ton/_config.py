@@ -93,6 +93,7 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
             "types": len(data["types"]),
             "available_types": catalog.list_data_types(),
             "available_transforms": catalog.list_transforms(),
+            "available_validators": catalog.list_validators(),
         },
     )
 

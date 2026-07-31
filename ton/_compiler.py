@@ -239,7 +239,10 @@ class EngineCompiler:
         normalized = normalize_reference(reference)
         transform = self.transforms.get(normalized) or self.transforms.get(reference)
         if transform is None:
-            raise TemplateError(f"Unknown transform {reference!r} for variable {type_key!r}")
+            raise TemplateError(
+                f"Unknown transform {reference!r} for variable {type_key!r}. "
+                f"{_available_extensions('transforms', self.transforms)}"
+            )
         return transform
 
     def _resolve_validators(self, type_key: str, spec: Mapping[str, Any]) -> tuple[Validator, ...]:
@@ -248,9 +251,17 @@ class EngineCompiler:
             normalized = normalize_reference(reference)
             validator = self.validators.get(normalized) or self.validators.get(reference)
             if validator is None:
-                raise TemplateError(f"Unknown validator {reference!r} for variable {type_key!r}")
+                raise TemplateError(
+                    f"Unknown validator {reference!r} for variable {type_key!r}. "
+                    f"{_available_extensions('validators', self.validators)}"
+                )
             resolved.append(validator)
         return tuple(resolved)
+
+
+def _available_extensions(kind: str, registry: Mapping[str, Any]) -> str:
+    available = ", ".join(sorted(registry)) or "(none)"
+    return f"Available {kind}: {available}. Use 'namespace.name' for plugin references."
 
 
 def compile_plan(

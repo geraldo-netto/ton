@@ -824,6 +824,32 @@ def test_cli_validate_does_not_hash_bcrypt_values(
     digest.assert_not_called()
 
 
+def test_cli_validate_defers_decimal_precision_work(
+    monkeypatch, write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from ton.generators import decimal as decimal_module
+
+    step_bounds = mock.Mock(side_effect=AssertionError("decimal precision work ran"))
+    monkeypatch.setattr(decimal_module, "_step_bounds", step_bounds)
+    config = write_config(
+        {
+            "format": "$amount$",
+            "types": {
+                "amount": {
+                    "type": "decimal",
+                    "minValue": 0.0,
+                    "maxValue": 1.0,
+                    "decimals": 1_000_000,
+                }
+            },
+        }
+    )
+
+    assert main([str(config), "--validate"]) == 0
+    assert "config valid" in capsys.readouterr().err
+    step_bounds.assert_not_called()
+
+
 def test_cli_list_namespaces_without_config(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = main(["--list-namespaces"])
     captured = capsys.readouterr()

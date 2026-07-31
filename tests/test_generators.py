@@ -137,6 +137,22 @@ def test_decimal_draws_representable_steps_uniformly() -> None:
     assert all(9_500 <= count <= 10_500 for count in counts.values())
 
 
+def test_decimal_step_bounds_are_lazy_and_cached(monkeypatch) -> None:
+    from ton.generators import decimal as decimal_module
+
+    step_bounds = mock.Mock(wraps=decimal_module._step_bounds)
+    monkeypatch.setattr(decimal_module, "_step_bounds", step_bounds)
+    generator = DecimalGenerator()
+
+    prepared = generator.prepare({"minValue": 0.0, "maxValue": 1.0, "decimals": 2})
+
+    step_bounds.assert_not_called()
+    assert prepared.scale == 100
+    generator.generate(prepared, Random(0))
+    generator.generate(prepared, Random(1))
+    step_bounds.assert_called_once_with(0.0, 1.0, 2)
+
+
 def test_coerce_float_uses_default_when_optional_key_is_missing() -> None:
     assert coerce_float({}, "value", type_name="test", default=1.5) == 1.5
 

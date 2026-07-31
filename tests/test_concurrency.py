@@ -121,6 +121,21 @@ def test_fork_engine_offsets_uneven_sequence_shards() -> None:
     assert chunks == [["0", "1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"]]
 
 
+@pytest.mark.parametrize("reference", ["sequence", "core.sequence"])
+def test_fork_engine_offsets_default_start_with_exact_step(reference: str) -> None:
+    config = {
+        "rows": 6,
+        "format": "$id$",
+        "types": {"id": {"type": reference, "step": 2}},
+    }
+
+    first = list(fork_engine(config, parent_seed=1, worker_id=0, workers=2, rows=3))
+    second = list(fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=3))
+
+    assert first == ["0", "2", "4"]
+    assert second == ["6", "8", "10"]
+
+
 def test_derive_seed_matches_derive_rng() -> None:
     seed = derive_seed(parent_seed=7, worker_id=1)
     assert derive_rng(parent_seed=7, worker_id=1).random() == Random(seed).random()

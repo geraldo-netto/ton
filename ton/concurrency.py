@@ -49,6 +49,7 @@ from ._engine import Engine, EngineOptions
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._output import open_output_path
+from ._registry import runtime_type_name
 from ._transforms import Transform
 from ._validation import Validator
 from .generators import Generator
@@ -196,8 +197,10 @@ def _offset_sequences(config: Mapping[str, Any], offset: int) -> dict[str, Any]:
 
 def _offset_sequence_spec(value: Any, offset: int) -> None:
     if isinstance(value, dict):
-        if value.get("type") == "sequence":
-            value["start"] = int(value.get("start", 1)) + offset
+        if runtime_type_name(value.get("type")) == "sequence":
+            start = int(value.get("start", 0))
+            step = int(value.get("step", 1))
+            value["start"] = start + offset * step
         for nested in value.values():
             _offset_sequence_spec(nested, offset)
     elif isinstance(value, list):

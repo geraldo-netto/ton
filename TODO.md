@@ -54,7 +54,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CONC-016 | open | S | Sequence shard offsets are correct only for bare `sequence` with explicit `start` and `step=1`: `_offset_sequence_spec` defaults `start` to 1 instead of the generator's 0, adds `offset` instead of `offset * step`, and ignores `core.sequence` (`concurrency.py:190-205`). Normalize the reference and apply the generator's exact start/step semantics; current shards shift defaults, overlap for `step=2`, and duplicate qualified sequences. |
 | CONC-017 | open | L | Sequence partitioning assumes one counter draw per output row (`concurrency.py:122-127,190-205`). Repeated placeholders (`$id$,$id$`) and `sequence` nested under `sequence_of` draw multiple times, so later workers start inside earlier workers' ranges and duplicate ids. Compute offsets from the compiled draw plan (including composite multiplicity) or assign each worker a provably disjoint counter stream. |
 
 ## robustness/recovery

@@ -586,6 +586,74 @@ def test_open_proof_report_preserves_body_proof_error(tmp_path: Path) -> None:
     assert not report.exists()
 
 
+def test_proof_report_io_preserves_existing_error() -> None:
+    from ton import cli
+
+    proof_error = ProofAuditWriteError("disk full")
+
+    def fail() -> None:
+        raise proof_error
+
+    with pytest.raises(ProofAuditWriteError) as exc:
+        cli._translate_proof_report_io(fail)
+
+    assert exc.value is proof_error
+
+
+def test_cli_proof_report_preserves_data_output_open_error(
+    write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    report = tmp_path / "proof.jsonl"
+    output = tmp_path / "missing" / "rows.txt"
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+    error = capsys.readouterr().err
+    assert "cannot write output" in error
+    assert "cannot write proof report" not in error
+    assert not report.exists()
+
+
+def test_cli_proof_report_preserves_data_encoding_error(
+    write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    config = write_config({"encoding": "ascii", "format": "$n$café"})
+    report = tmp_path / "proof.jsonl"
+    output = tmp_path / "rows.txt"
+
+    assert (
+        main(
+            [
+                str(config),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+    error = capsys.readouterr().err
+    assert "cannot write output" in error
+    assert "cannot write proof report" not in error
+    assert not report.exists()
+    assert not output.exists()
+
+
 def test_cli_help_does_not_expose_internal_todo_ids(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

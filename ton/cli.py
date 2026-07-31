@@ -495,9 +495,23 @@ def _open_proof_report(
     if path is None:
         yield None
         return
+    report = open_output_path(path, no_clobber=no_clobber, encoding="utf-8")
+    stream = _translate_proof_report_io(report.__enter__)
     try:
-        with open_output_path(path, no_clobber=no_clobber, encoding="utf-8") as stream:
-            yield ProofAuditWriter(stream)
+        yield ProofAuditWriter(stream)
+    except BaseException:
+        error = sys.exc_info()
+        suppress_error = _translate_proof_report_io(lambda: report.__exit__(*error))
+        if not suppress_error:
+            raise
+    else:
+        _translate_proof_report_io(lambda: report.__exit__(None, None, None))
+
+
+def _translate_proof_report_io(operation: Callable[[], _T]) -> _T:
+    """Map only proof-report resource I/O to its CLI-specific error."""
+    try:
+        return operation()
     except ProofAuditWriteError:
         raise
     except OSError as exc:

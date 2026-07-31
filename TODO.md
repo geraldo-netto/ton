@@ -81,7 +81,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CLI-018 | open | S | `_open_proof_report` catches `OSError` around its `yield`, so errors raised by the primary `_open_output`/`_stream` body are converted to `ProofAuditWriteError`. With a valid report plus an unwritable or non-encodable data output, the CLI incorrectly prints `cannot write proof report`. Restrict translation to report open/write/finalize failures and preserve exceptions from the context body; add combined-output tests. |
 
 ## configuration discoverability
 

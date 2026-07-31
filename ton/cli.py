@@ -10,6 +10,7 @@ import sys
 import time
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import TextIO, TypeVar
 
 from . import __version__, api
@@ -48,6 +49,11 @@ _LOG_LEVELS = {
 #: ``--batch-rows``.
 _DEFAULT_BATCH_ROWS = 1024
 _T = TypeVar("_T")
+
+
+@dataclass
+class _WriteState:
+    rows_written: int = 0
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -343,6 +349,7 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
     _warn_resume_overshoot(engine, args.resume_from)
     started = time.perf_counter()
     data_published = False
+    write_state = _WriteState()
     try:
         with _open_proof_report(
             args.proof_report,
@@ -350,16 +357,19 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
         ) as failure_sink:
             engine._set_proof_failure_sink(failure_sink)
             with _open_output(args.output, no_clobber=args.no_clobber, encoding=encoding) as stream:
-                rows_written = _stream(
+                _stream(
                     engine,
                     stream,
                     progress_every=args.progress,
                     batch_rows=args.batch_rows,
                     resume_from=args.resume_from,
+                    write_state=write_state,
                 )
             data_published = args.output is not None
     except (ProofAuditWriteError, ProofFailureSinkError) as exc:
-        return _handle_proof_report_error(engine, args, exc, data_published)
+        return _handle_proof_report_error(
+            engine, args, exc, data_published, write_state.rows_written
+        )
     except OSError as exc:
         if (
             isinstance(exc, OutputPublishedError)
@@ -370,32 +380,25 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
                 engine,
                 args,
                 PartialOutputCommitError((exc.path,), args.proof_report, exc),
+                write_state.rows_written,
             )
-        _log_terminal_failure(
-            "output", 1, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
-        )
+        _log_terminal_failure("output", 1, write_state.rows_written, engine.total_rows, exc)
         print(f"ton: cannot write output: {exc}", file=sys.stderr)
         return 1
     except ProofError as exc:
-        _log_terminal_failure(
-            "proof", 2, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
-        )
+        _log_terminal_failure("proof", 2, write_state.rows_written, engine.total_rows, exc)
         print(f"ton: proof failed: {exc}", file=sys.stderr)
         return 2
     except ValidationError as exc:
-        _log_terminal_failure(
-            "validation", 2, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
-        )
+        _log_terminal_failure("validation", 2, write_state.rows_written, engine.total_rows, exc)
         print(f"ton: validation failed: {exc}", file=sys.stderr)
         return 2
     except TemplateError as exc:
-        _log_terminal_failure(
-            "validation", 2, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
-        )
+        _log_terminal_failure("validation", 2, write_state.rows_written, engine.total_rows, exc)
         print(f"ton: invalid config: {exc}", file=sys.stderr)
         return 2
     if args.verbose:
-        _report(rows_written, time.perf_counter() - started)
+        _report(write_state.rows_written, time.perf_counter() - started)
     if args.proof_check == "audit":
         _report_proof_audit(engine, args.proof_report)
     return 0
@@ -406,6 +409,7 @@ def _handle_proof_report_error(
     args: argparse.Namespace,
     error: Exception,
     data_published: bool,
+    rows_written: int,
 ) -> int:
     if data_published and args.output is not None and args.proof_report is not None:
         published = [args.output]
@@ -415,10 +419,9 @@ def _handle_proof_report_error(
             engine,
             args,
             PartialOutputCommitError(tuple(published), args.proof_report, error),
+            rows_written,
         )
-    _log_terminal_failure(
-        "output", 1, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, error
-    )
+    _log_terminal_failure("output", 1, rows_written, engine.total_rows, error)
     print(f"ton: cannot write proof report: {error}", file=sys.stderr)
     return 1
 
@@ -427,11 +430,12 @@ def _report_partial_commit(
     engine: Engine,
     args: argparse.Namespace,
     error: PartialOutputCommitError,
+    rows_written: int,
 ) -> int:
     _log_terminal_failure(
         "output",
         1,
-        max(0, engine.rows_emitted - args.resume_from),
+        rows_written,
         engine.total_rows,
         error,
     )
@@ -610,6 +614,7 @@ def _stream(
     progress_every: int,
     batch_rows: int,
     resume_from: int,
+    write_state: _WriteState,
 ) -> int:
     """Write rows and flush periodically, emitting an ``engine_progress`` event
     every ``progress_every`` rows (TODO OBS-006). Skips the first
@@ -619,7 +624,6 @@ def _stream(
     summaries.
     """
     count = 0
-    written = 0
     started = time.perf_counter()
     flush_at = batch_rows
     for row in engine:
@@ -630,14 +634,14 @@ def _stream(
             stream.write(f"{row}\n")
         except UnicodeEncodeError as exc:
             raise OutputEncodingError(stream.encoding or "unknown", exc.reason) from exc
-        written += 1
-        if written and written % flush_at == 0:
+        write_state.rows_written += 1
+        if write_state.rows_written % flush_at == 0:
             # Block-buffered streams (e.g. files) rely on the interpreter
             # for write batching; this controls only the flush cadence.
             stream.flush()
-        if progress_every and written % progress_every == 0:
-            _emit_progress(written, time.perf_counter() - started)
-    return written
+        if progress_every and write_state.rows_written % progress_every == 0:
+            _emit_progress(write_state.rows_written, time.perf_counter() - started)
+    return write_state.rows_written
 
 
 def _emit_progress(rows: int, elapsed: float) -> None:

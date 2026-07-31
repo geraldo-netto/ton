@@ -107,7 +107,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| OBS-030 | open | S | Output-write failures derive `rows_written` from `engine.rows_emitted - resume_from` (`cli.py:350-360`), but Engine increments `rows_emitted` before yielding and `_stream` increments `written` only after a successful write (`_engine.py:299-313`, `cli.py:577-591`). A first-row encoding/write failure is logged as one row written. Preserve the actual sink count through the failure boundary. |
 | OBS-031 | open | S | `output_overwrite` is emitted during preflight as soon as a target exists (`_output.py:33-59`), before generation or atomic replacement. Failed/interrupted jobs leave the old file intact but still claim an overwrite; README also says the file was “truncated” (`README.md:1022`). Emit a committed-replacement event after publication and use a separate preflight warning if desired. |
 
 ## documentation

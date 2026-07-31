@@ -142,7 +142,7 @@ def test_cli_stdout_uses_configured_encoding(write_config, monkeypatch) -> None:
 
 
 def test_cli_non_encodable_generated_stdout_returns_output_error(
-    write_config, monkeypatch, capsys: pytest.CaptureFixture[str]
+    write_config, monkeypatch, capsys: pytest.CaptureFixture[str], caplog: pytest.LogCaptureFixture
 ) -> None:
     config = write_config(
         {
@@ -154,8 +154,11 @@ def test_cli_non_encodable_generated_stdout_returns_output_error(
     stdout = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
     monkeypatch.setattr(sys, "stdout", stdout)
 
-    assert main([str(config)]) == 1
+    with caplog.at_level(logging.ERROR, logger="ton"):
+        assert main([str(config)]) == 1
     error = capsys.readouterr().err
+    failures = [record for record in caplog.records if getattr(record, "event", "") == "cli_failed"]
+    assert failures[0].rows_written == 0
     assert "cannot write output" in error
     assert "unexpected error" not in error
 

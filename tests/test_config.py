@@ -9,7 +9,7 @@ from typing import ClassVar
 import pytest
 
 from ton import api
-from ton._config import MAX_ROWS, ConfigError, load
+from ton._config import ConfigError, load
 from ton._engine import Engine, TemplateError
 from ton._transforms import BaseTransform, TransformCapabilities
 
@@ -72,12 +72,12 @@ def test_type_spec_missing_type_field_rejected(tmp_path: Path) -> None:
         load(path)
 
 
-def test_rows_above_max_rejected(tmp_path: Path) -> None:
+def test_rows_accept_arbitrary_non_negative_integers(tmp_path: Path) -> None:
     payload = _valid_payload()
-    payload["rows"] = MAX_ROWS + 1
+    payload["rows"] = 10**100
     path = _write(tmp_path, payload)
-    with pytest.raises(ConfigError, match="MAX_ROWS"):
-        load(path)
+
+    assert load(path)["rows"] == 10**100
 
 
 def test_bad_per_spec_values_caught_at_engine_construction(tmp_path: Path) -> None:

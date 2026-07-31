@@ -32,9 +32,6 @@ ROOT_KEYS = frozenset((*_REQUIRED_TOP_LEVEL, "encoding", "maxRowWidth"))
 _unknown_key_message = unknown_key_message
 
 
-#: Defensive upper bound on row count. Type-specific upper bounds
-#: belong to the relevant generator's ``prepare`` method.
-MAX_ROWS = 1_000_000_000
 DEFAULT_MAX_ROW_WIDTH = 2_000_000
 
 
@@ -44,8 +41,8 @@ def load(path: str | Path) -> dict[str, Any]:
     Raises:
         FileNotFoundError: if ``path`` does not exist.
         ConfigError: if required keys are missing, types are wrong, the
-            row count exceeds :data:`MAX_ROWS`, or the template
-            references variables not declared in ``types``.
+            row count is invalid, or the template references variables
+            not declared in ``types``.
         json.JSONDecodeError: if the file is not valid JSON.
 
     Per-spec field validation (bounds, value lists, ...) is the
@@ -155,8 +152,6 @@ def _validate_root(data: Any) -> None:
 def _validate_rows(rows: Any) -> None:
     if not isinstance(rows, int) or isinstance(rows, bool) or rows < 0:
         raise ConfigError("'rows' must be a non-negative integer.")
-    if rows > MAX_ROWS:
-        raise ConfigError(f"'rows' exceeds MAX_ROWS ({MAX_ROWS}).")
 
 
 def _validate_format(template: Any) -> None:

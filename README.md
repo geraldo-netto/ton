@@ -371,7 +371,7 @@ Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so adjacent w
 }
 ```
 
-- `rows` — how many rows to emit (non-negative integer, maximum `1,000,000,000`).
+- `rows` — how many rows to emit (non-negative integer; no fixed maximum).
 - `format` — the template; any `$name$` segment is a variable that must be declared in `types`. `$$` renders a literal `$`. A trailing `[id]` (e.g. `$word[id]$`) requests the paired-id facet of a paired generator — see [Paired references](#paired-references-nameid) below.
 - `types` — a map of variable name to type spec.
 - `encoding` — optional; the text codec used for file output and stdout (default `utf-8`). Must be a text codec Python recognizes; stdout is temporarily reconfigured for the run and restored afterward.

@@ -53,7 +53,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SCAL-018 | open | S | `_validate_rows` rejects jobs above `MAX_ROWS = 1_000_000_000` (`_config.py:42-45,171-175`). Row iteration is already streaming, so this is a hard workload cap contrary to the repository policy. Accept arbitrary non-negative Python integers and leave duration/storage decisions to the operator. |
 | SCAL-019 | open | S | Every job has an implicit `DEFAULT_MAX_ROW_WIDTH = 2_000_000`, and `_bounded_row` rejects larger rendered rows even when `maxRowWidth` is omitted (`_config.py:45,128-135`, `_engine.py:339-344`). Make the guard opt-in (or operator-configured without a restrictive default) while retaining explicit width enforcement when requested. |
 | SCAL-020 | open | S | `CharGenerator.prepare` rejects `maxChar > 100_000` through `MAX_CHAR_LENGTH` (`generators/char.py:12-14,28-34`). Remove the hard row-size cap and make generation honor the requested count without introducing a replacement fixed limit. |
 | SCAL-021 | open | S | `BytesGenerator.prepare` rejects `length > 1_000_000` through `MAX_BYTES_LENGTH` (`generators/bytes.py:43-44,58-68`). Remove the hard size cap and use chunked generation/encoding where needed rather than rejecting a valid large byte field. |

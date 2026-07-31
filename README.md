@@ -638,6 +638,11 @@ that the destination changed and tells the operator to inspect it before
 retrying. The published file is complete; its crash-durability could not be
 confirmed.
 
+When both `--output` and `--proof-report` are requested, a late failure can
+leave the data file published while the report remains old or absent. TON calls
+this a `partial output commit`, lists the changed and failed paths, and instructs
+the operator to inspect and keep or remove them consistently before retrying.
+
 #### `oneOf`
 
 Pick uniformly between several nested type specs. Same as `weighted` with equal weights, just less typing.

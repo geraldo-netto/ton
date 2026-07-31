@@ -25,6 +25,7 @@ EXPECTED_PUBLIC_API = {
     "OutputEncodingError",
     "OutputPublishedError",
     "PairedGenerator",
+    "PartialOutputCommitError",
     "PipelineStageError",
     "ProofError",
     "ProofEvaluationError",

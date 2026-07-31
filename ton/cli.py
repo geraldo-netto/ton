@@ -14,7 +14,12 @@ from typing import TextIO, TypeVar
 
 from . import __version__, api
 from ._logging import terminal_failure_fields
-from ._output import OutputEncodingError, open_output_path
+from ._output import (
+    OutputEncodingError,
+    OutputPublishedError,
+    PartialOutputCommitError,
+    open_output_path,
+)
 from ._proofaudit import ProofAuditWriteError, ProofAuditWriter
 from ._proofcheck import PROOF_MODES, ProofFailureSinkError
 from .api import (
@@ -312,27 +317,32 @@ def _map_config_errors(operation: Callable[[], _T]) -> _T | int:
         return 2
 
 
-def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
-    if args.resume_from >= engine.total_rows and engine.total_rows > 0:
+def _warn_resume_overshoot(engine: Engine, resume_from: int) -> None:
+    if resume_from >= engine.total_rows and engine.total_rows > 0:
         # REL-018: a value that skips past every row produces a silent
         # empty file. Surface this through both stderr and the logger
         # so the user actually notices.
         _logger.warning(
             "resume_overshoot resume_from=%d total_rows=%d",
-            args.resume_from,
+            resume_from,
             engine.total_rows,
             extra={
                 "event": LogEvent.RESUME_OVERSHOOT.value,
-                "resume_from": args.resume_from,
+                "resume_from": resume_from,
                 "total_rows": engine.total_rows,
             },
         )
         print(
-            f"ton: --resume-from={args.resume_from} >= total rows "
+            f"ton: --resume-from={resume_from} >= total rows "
             f"({engine.total_rows}); output will be empty",
             file=sys.stderr,
         )
+
+
+def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
+    _warn_resume_overshoot(engine, args.resume_from)
     started = time.perf_counter()
+    data_published = False
     try:
         with _open_proof_report(
             args.proof_report,
@@ -347,13 +357,20 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
                     batch_rows=args.batch_rows,
                     resume_from=args.resume_from,
                 )
+            data_published = args.output is not None
     except (ProofAuditWriteError, ProofFailureSinkError) as exc:
-        _log_terminal_failure(
-            "output", 1, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
-        )
-        print(f"ton: cannot write proof report: {exc}", file=sys.stderr)
-        return 1
+        return _handle_proof_report_error(engine, args, exc, data_published)
     except OSError as exc:
+        if (
+            isinstance(exc, OutputPublishedError)
+            and args.output is not None
+            and args.proof_report is not None
+        ):
+            return _report_partial_commit(
+                engine,
+                args,
+                PartialOutputCommitError((exc.path,), args.proof_report, exc),
+            )
         _log_terminal_failure(
             "output", 1, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
         )
@@ -382,6 +399,44 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
     if args.proof_check == "audit":
         _report_proof_audit(engine, args.proof_report)
     return 0
+
+
+def _handle_proof_report_error(
+    engine: Engine,
+    args: argparse.Namespace,
+    error: Exception,
+    data_published: bool,
+) -> int:
+    if data_published and args.output is not None and args.proof_report is not None:
+        published = [args.output]
+        if isinstance(error.__cause__, OutputPublishedError):
+            published.append(error.__cause__.path)
+        return _report_partial_commit(
+            engine,
+            args,
+            PartialOutputCommitError(tuple(published), args.proof_report, error),
+        )
+    _log_terminal_failure(
+        "output", 1, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, error
+    )
+    print(f"ton: cannot write proof report: {error}", file=sys.stderr)
+    return 1
+
+
+def _report_partial_commit(
+    engine: Engine,
+    args: argparse.Namespace,
+    error: PartialOutputCommitError,
+) -> int:
+    _log_terminal_failure(
+        "output",
+        1,
+        max(0, engine.rows_emitted - args.resume_from),
+        engine.total_rows,
+        error,
+    )
+    print(f"ton: {error}", file=sys.stderr)
+    return 1
 
 
 def _log_terminal_failure(

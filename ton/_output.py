@@ -43,6 +43,26 @@ class OutputPublishedError(OSError):
         )
 
 
+class PartialOutputCommitError(OSError):
+    """Multiple requested outputs did not finish as one all-or-nothing unit."""
+
+    def __init__(
+        self,
+        published_paths: tuple[str, ...],
+        failed_path: str,
+        cause: Exception,
+    ) -> None:
+        self.published_paths = published_paths
+        self.failed_path = failed_path
+        self.cause = cause
+        published = ", ".join(repr(path) for path in published_paths)
+        super().__init__(
+            f"partial output commit; published/changed: {published}; failed target: "
+            f"{failed_path!r}; inspect these paths and keep or remove them consistently "
+            f"before retrying: {cause}"
+        )
+
+
 def validate_output_target(path: str, *, no_clobber: bool = False) -> bool:
     """Validate ``path`` and return whether it names an existing FIFO."""
     if os.path.islink(path):

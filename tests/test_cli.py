@@ -992,6 +992,119 @@ def test_atomic_output_reports_post_publish_fsync_failure(monkeypatch, tmp_path:
     assert list(tmp_path.glob(".published.txt.*.tmp")) == []
 
 
+def test_cli_surfaces_partial_commit_when_report_publication_fails(
+    monkeypatch, write_config, tmp_path: Path, capsys
+) -> None:
+    from ton import _output
+
+    output = tmp_path / "rows.txt"
+    report = tmp_path / "proof.jsonl"
+    real_replace = _output.os.replace
+    replacements = 0
+
+    def fail_second_replace(source: str, destination: str) -> None:
+        nonlocal replacements
+        replacements += 1
+        if replacements == 2:
+            raise OSError("report replace failed")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(_output.os, "replace", fail_second_replace)
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+    error = capsys.readouterr().err
+    assert "partial output commit" in error
+    assert str(output) in error and str(report) in error
+    assert "before retrying" in error
+    assert output.exists()
+    assert not report.exists()
+
+
+def test_cli_surfaces_partial_commit_when_data_finalization_fails(
+    monkeypatch, write_config, tmp_path: Path, capsys
+) -> None:
+    from ton import _output
+
+    output = tmp_path / "rows.txt"
+    report = tmp_path / "proof.jsonl"
+    monkeypatch.setattr(
+        _output,
+        "_fsync_directory",
+        lambda directory: (_ for _ in ()).throw(OSError("data fsync failed")),
+    )
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+    error = capsys.readouterr().err
+    assert "partial output commit" in error
+    assert str(output) in error and str(report) in error
+    assert output.exists()
+    assert not report.exists()
+
+
+def test_cli_reports_both_outputs_when_report_finalization_fails(
+    monkeypatch, write_config, tmp_path: Path, capsys
+) -> None:
+    from ton import _output
+
+    output = tmp_path / "rows.txt"
+    report = tmp_path / "proof.jsonl"
+    finalizations = 0
+
+    def fail_second_finalization(directory: str) -> None:
+        nonlocal finalizations
+        finalizations += 1
+        if finalizations == 2:
+            raise OSError("report fsync failed")
+
+    monkeypatch.setattr(_output, "_fsync_directory", fail_second_finalization)
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 1
+    )
+    error = capsys.readouterr().err
+    assert "partial output commit" in error
+    assert str(output) in error and str(report) in error
+    assert output.exists()
+    assert report.exists()
+
+
 def test_cli_atomic_output_preserves_existing_file_mode(write_config, tmp_path: Path) -> None:
     config = write_config()
     out_file = tmp_path / "out.txt"

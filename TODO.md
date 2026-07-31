@@ -57,7 +57,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| ROB-013 | open | M | With both `--output` and `--proof-report`, the inner data context publishes first and the outer report context finalizes second (`cli.py:337-349,505-533`). A report chmod/replace/fsync failure after generation therefore returns exit 1 with the data file committed and the report missing/old. Implement recoverable two-target publication or explicitly surface the partial-commit state and recovery steps. |
 
 ## architecture/modularity/SOLID
 

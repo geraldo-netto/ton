@@ -10,7 +10,8 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import PreparedField, PreparedTransform
 from ._registry import (
-    build_extension_catalog,
+    default_transforms,
+    default_validators,
     make_registry,
     normalize_reference,
     runtime_type_name,
@@ -62,9 +63,24 @@ class EngineCompiler:
         self.rows = int(config["rows"])
         self.tokens = tuple(parse(self.template))
         self.registry = self._resolve_registry(registry)
-        catalog = build_extension_catalog()
-        self.transforms = dict(transforms if transforms is not None else catalog.transforms())
-        self.validators = dict(validators if validators is not None else catalog.validators())
+        built_in_transforms = default_transforms()
+        built_in_validators = default_validators()
+        self.transforms = dict(
+            transforms
+            if transforms is not None
+            else {
+                **built_in_transforms,
+                **{f"core.{name}": value for name, value in built_in_transforms.items()},
+            }
+        )
+        self.validators = dict(
+            validators
+            if validators is not None
+            else {
+                **built_in_validators,
+                **{f"core.{name}": value for name, value in built_in_validators.items()},
+            }
+        )
 
     def compile(self) -> CompiledPlan:
         self._validate()

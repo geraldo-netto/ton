@@ -602,6 +602,18 @@ def test_engine_provenance_omits_plugin_package_for_builtins() -> None:
     assert engine.provenance[0].plugin_version is None
 
 
+def test_default_engine_does_not_build_unused_generators(monkeypatch) -> None:
+    import ton._registry as registry_module
+
+    monkeypatch.setattr(
+        registry_module,
+        "default_registry",
+        lambda: pytest.fail("full generator catalog constructed"),
+    )
+
+    assert list(Engine({"rows": 1, "format": "$v$", "types": {"v": {"type": "name"}}}))
+
+
 def test_engine_provenance_reports_repeated_type_once() -> None:
     engine = Engine(
         {

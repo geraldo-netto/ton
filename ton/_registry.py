@@ -203,15 +203,19 @@ def runtime_type_name(reference: object) -> str:
     return str(reference)
 
 
+def default_transforms() -> dict[str, Transform]:
+    """Return fresh built-in transform prototypes without building generators."""
+    return {"distribution": DistributionTransform(), "identity": IdentityTransform()}
+
+
+def default_validators() -> dict[str, Validator]:
+    """Return fresh built-in validators without building generators."""
+    return {"non_empty": NonEmptyValidator()}
+
+
 def build_extension_catalog() -> ExtensionCatalog:
-    """Return a catalog containing the built-in data types."""
-    return ExtensionCatalog(
-        transforms={
-            "distribution": DistributionTransform(),
-            "identity": IdentityTransform(),
-        },
-        validators={"non_empty": NonEmptyValidator()},
-    )
+    """Return a catalog containing all built-in extension kinds."""
+    return ExtensionCatalog(transforms=default_transforms(), validators=default_validators())
 
 
 def catalog_with_entry_points(

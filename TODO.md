@@ -46,7 +46,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-035 | open | S | Default Engine construction still instantiates every built-in generator: after `_resolve_registry()` builds the referenced-only registry, `EngineCompiler.__init__` calls `build_extension_catalog()` solely for transforms/validators, whose catalog constructor calls `default_registry()` (`_compiler.py:64-67`, `_registry.py:58-69,203-211`). Build the default transform/validator maps without constructing an unused full generator catalog. |
 | PERF-036 | open | M | Non-bcrypt hashes eagerly digest the entire `values` pool during prepare (`generators/hash.py:83-86`). Thus `--validate`, `rows: 0`, and small jobs pay CPU/memory for every SHA/NTLM value even when none or few are selected. Use the lazy per-plaintext cache already implemented for bcrypt without capping the pool. |
 | PERF-037 | open | M | Every clear proof-audit failure copies the full field spec and serializes it into every JSONL record (`_proofcheck.py:111-115`, `_proofaudit.py:38-53`). A large value pool multiplied by many failures creates avoidable multiplicative copying/output. Emit specs once (or by stable reference/fingerprint) while preserving a streaming, self-describing report. |
 

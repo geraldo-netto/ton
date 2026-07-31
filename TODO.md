@@ -111,7 +111,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DEP-011 | open | M | `bcrypt>=4` admits behavior-changing releases while TON does not normalize bcrypt's 72-byte plaintext boundary (`pyproject.toml:29-36`, `generators/hash.py:69-82,88-104`). With installed bcrypt 5.0.0, a >72-byte value passes `--validate` and fails only on its first selected row; other admitted versions can behave differently. Define stable TON semantics (prefer early byte-length validation) and constrain/test the supported dependency range. |
 
 ## platform
 

@@ -87,6 +87,9 @@ class HashGenerator(PairedGenerator):
                 raise ValueError(
                     f"hash 'rounds' must be between 4 and MAX_BCRYPT_ROUNDS ({MAX_BCRYPT_ROUNDS})"
                 )
+            oversized = next((word for word in words if len(word.encode("utf-8")) > 72), None)
+            if oversized is not None:
+                raise ValueError("hash bcrypt 'values' entries must be at most 72 UTF-8 bytes")
             _load_bcrypt()
             return BcryptPairSpec(words=words, rounds=rounds)
         return DigestPairSpec(words=words, algorithm=algorithm)

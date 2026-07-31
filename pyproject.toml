@@ -28,10 +28,10 @@ dependencies = []
 
 [project.optional-dependencies]
 bcrypt = [
-    "bcrypt>=4",
+    "bcrypt>=4,<6",
 ]
 dev = [
-    "bcrypt>=4",
+    "bcrypt>=4,<6",
     "pytest>=7",
     "pytest-cov>=4",
     "ruff>=0.4",

@@ -308,6 +308,12 @@ def test_hash_generator_rejects_bad_bcrypt_rounds() -> None:
         HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 3, "values": ["secret"]})
 
 
+@pytest.mark.parametrize("value", ["x" * 73, "é" * 37])
+def test_hash_generator_rejects_bcrypt_plaintext_over_72_bytes(value: str) -> None:
+    with pytest.raises(ValueError, match="at most 72 UTF-8 bytes"):
+        HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 4, "values": [value]})
+
+
 def test_hash_generator_rejects_bcrypt_rounds_above_cap() -> None:
     with pytest.raises(ValueError, match="MAX_BCRYPT_ROUNDS"):
         HashGenerator().prepare(

@@ -243,11 +243,26 @@ def _validate_proof_report_args(args: argparse.Namespace) -> int | None:
     if (
         args.proof_report is not None
         and args.output is not None
-        and os.path.abspath(args.proof_report) == os.path.abspath(args.output)
+        and _same_output_target(args.proof_report, args.output)
     ):
         print("ton: --proof-report and --output must use different paths", file=sys.stderr)
         return 2
     return None
+
+
+def _same_output_target(first: str, second: str) -> bool:
+    """Return whether two path spellings identify the same output target."""
+    canonical_first = os.path.normcase(os.path.realpath(first))
+    canonical_second = os.path.normcase(os.path.realpath(second))
+    if canonical_first == canonical_second:
+        return True
+    samefile = getattr(os.path, "samefile", None)
+    if not callable(samefile):
+        return False
+    try:
+        return bool(samefile(first, second))
+    except OSError:
+        return False
 
 
 def _validate_config(args: argparse.Namespace) -> int:

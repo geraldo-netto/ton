@@ -720,6 +720,75 @@ def test_cli_rejects_shared_data_and_proof_report_path(
     assert not output.exists()
 
 
+def test_cli_rejects_shared_path_through_symlinked_directory(
+    write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    output_dir = tmp_path / "output"
+    alias_dir = tmp_path / "alias"
+    output_dir.mkdir()
+    try:
+        alias_dir.symlink_to(output_dir, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlinks unavailable: {exc}")
+    output = output_dir / "shared.jsonl"
+    report = alias_dir / "shared.jsonl"
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 2
+    )
+    assert "must use different paths" in capsys.readouterr().err
+    assert not output.exists()
+
+
+def test_cli_rejects_shared_path_through_hard_link(
+    write_config, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    output = tmp_path / "output.jsonl"
+    report = tmp_path / "report.jsonl"
+    output.write_text("existing\n", encoding="utf-8")
+    try:
+        os.link(output, report)
+    except OSError as exc:
+        pytest.skip(f"hard links unavailable: {exc}")
+
+    assert (
+        main(
+            [
+                str(write_config()),
+                "--proof-check",
+                "audit",
+                "--proof-report",
+                str(report),
+                "--output",
+                str(output),
+            ]
+        )
+        == 2
+    )
+    assert "must use different paths" in capsys.readouterr().err
+    assert output.read_text(encoding="utf-8") == "existing\n"
+    assert report.read_text(encoding="utf-8") == "existing\n"
+
+
+def test_output_target_comparison_degrades_without_samefile(monkeypatch, tmp_path: Path) -> None:
+    from ton import cli
+
+    monkeypatch.setattr(cli.os.path, "samefile", None)
+
+    assert not cli._same_output_target(str(tmp_path / "first"), str(tmp_path / "second"))
+
+
 def test_cli_proof_choices_share_proof_checker_modes() -> None:
     from ton import cli
     from ton._proofcheck import PROOF_MODES

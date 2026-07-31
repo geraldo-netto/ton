@@ -35,7 +35,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-028 | open | S | `cli._validate_proof_report_args` compares only `abspath` strings. Two paths that resolve to the same file through a symlinked directory (or case alias on a case-insensitive platform) pass validation; the outer proof-report atomic replacement then overwrites the generated data and the CLI exits `0`. Compare canonical targets with `realpath`/`normcase` plus `samefile` where available, and add alias-path tests. |
 
 ## performance
 

@@ -1061,7 +1061,7 @@ Library code emits structured INFO events on a single logger named `ton`. Attach
 - `-o PATH` refuses to open a target that is not a regular file or FIFO. A stray `--output /dev/sda` aborts with exit code `1` and an `output_special_file_rejected` log event.
 - `--no-clobber` upgrades the silent overwrite to a hard refusal.
 - Regular `-o PATH` writes are staged through a same-directory temp file and atomically replace the final path only after generation succeeds. FIFO targets remain direct streams.
-- Third-party generators from the `ton.generators` entry-point group are opt-in and sandboxed per-entry: `ImportError`, construction failures, and non-`Generator` factories are logged and skipped instead of aborting the registry build. Entry point names and values are sanitized to printable ASCII before being logged (control codes / unicode lookalikes become `?`).
+- Third-party generators from the `ton.generators` entry-point group are opt-in and failure-isolated per entry: `ImportError`, construction failures, and non-`Generator` factories are logged and skipped instead of aborting the registry build. Plugin code is imported and constructed inside the TON process with the caller's full process privileges; enable only trusted packages. Entry point names and values are sanitized to printable ASCII before being logged (control codes / unicode lookalikes become `?`).
 - `hash` with `algorithm: "ntlm"` uses MD4 by design. Treat its output as fixture data, never as a credential.
 
 ## Bundled example configs

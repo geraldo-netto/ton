@@ -116,5 +116,4 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-032 | open | S | README calls entry-point loading “sandboxed per-entry” (`README.md:1033`), but the implementation merely catches exceptions after executing arbitrary package code in the TON process (`_registry.py:234-246`). Replace “sandboxed” with “failure-isolated” and state clearly that opt-in plugins have the caller's full process privileges. |
 | DOC-033 | open | S | `generators/sequence.py:7` documents `start` defaulting to 1 while implementation and README use 0 (`sequence.py:53-55`, `README.md:749-753`). Correct the module example so copied configs and shard reasoning use the actual default. |

@@ -32,7 +32,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-019 | open | S | The release version is duplicated in `pyproject.toml:7` and `ton/__init__.py:6`, while `ton --version` reads only the module constant. A release can therefore publish one metadata version and print another. Derive both surfaces from one source and add a package/CLI parity test. |
 
 ## reliability/correctness
 

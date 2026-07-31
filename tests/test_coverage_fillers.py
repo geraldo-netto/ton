@@ -21,6 +21,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def test_python_m_ton_runs_cli() -> None:
     """`python -m ton` should invoke ton.cli.main and respect --version."""
+    from ton import __version__
+
     result = subprocess.run(
         [sys.executable, "-m", "ton", "--version"],
         cwd=REPO_ROOT,
@@ -29,7 +31,7 @@ def test_python_m_ton_runs_cli() -> None:
         timeout=10,
     )
     assert result.returncode == 0
-    assert "ton" in result.stdout.lower()
+    assert result.stdout.strip() == f"ton {__version__}"
 
 
 @pytest.mark.parametrize("example", ["dna.json", "hwmetrics.json", "winhash.json"])

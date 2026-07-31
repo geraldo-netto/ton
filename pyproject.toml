@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ton"
-version = "2.0.0"
+dynamic = ["version"]
 description = "Mass data generator: synthesize structured test data from a JSON template."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -48,6 +48,9 @@ Issues = "https://github.com/geraldo-netto/ton/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["ton"]
+
+[tool.hatch.version]
+path = "ton/__init__.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

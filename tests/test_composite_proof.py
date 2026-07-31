@@ -28,11 +28,20 @@ class _RejectGenerator(Generator):
         return ProofResult(ok=False, reason="always rejects")
 
 
+class _PermissiveGenerator(Generator):
+    type_name = "permissive"
+
+    def generate(self, prepared: Any, rng: Random) -> str:
+        del prepared, rng
+        return "anything"
+
+
 def _registry() -> dict[str, Generator]:
     from ton._registry import default_registry
 
     reg = default_registry()
     reg["reject"] = _RejectGenerator()
+    reg["permissive"] = _PermissiveGenerator()
     return reg
 
 
@@ -43,7 +52,7 @@ def _one_of(*choices: dict[str, Any]) -> tuple[OneOfGenerator, Any]:
 
 
 def test_one_of_prove_accepts_when_a_child_accepts() -> None:
-    gen, prepared = _one_of({"type": "string", "values": ["a"]}, {"type": "reject"})
+    gen, prepared = _one_of({"type": "permissive"}, {"type": "reject"})
     assert gen.prove(prepared, TransformResult("anything")).ok
 
 

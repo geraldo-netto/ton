@@ -20,7 +20,6 @@ from ton.generators import (
     IntegerGenerator,
     StringGenerator,
 )
-from ton.generators.base import coerce_float
 
 
 def _rng() -> Random:
@@ -171,10 +170,6 @@ def test_decimal_formats_large_fixed_bounds_without_float_artifacts() -> None:
     prepared = generator.prepare({"minValue": bound, "maxValue": bound, "decimals": 2})
 
     assert generator.generate(prepared, Random(0)) == f"{bound}.00"
-
-
-def test_coerce_float_uses_default_when_optional_key_is_missing() -> None:
-    assert coerce_float({}, "value", type_name="test", default=1.5) == 1.5
 
 
 def test_decimal_rejects_negative_decimals() -> None:

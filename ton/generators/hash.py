@@ -17,8 +17,10 @@ from dataclasses import dataclass, field
 from random import Random
 from typing import Any
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from ._md4 import md4 as _pure_md4
-from .base import PairedGenerator, coerce_int, require_string_tuple
+from .base import PairedGenerator, coerce_int, proof_result, require_string_tuple
 
 
 def _select_md4_backend() -> Callable[[bytes], bytes]:
@@ -108,6 +110,24 @@ class HashGenerator(PairedGenerator):
             digest = _digest(prepared.algorithm, plaintext)
             prepared.cache[plaintext] = digest
         return plaintext, digest
+
+    def prove(
+        self, prepared: DigestPairSpec | BcryptPairSpec, result: TransformResult
+    ) -> ProofResult:
+        plaintext = result.id_value
+        if plaintext is None or plaintext not in prepared.words:
+            return proof_result(False, "hash plaintext is not in 'values'")
+        if isinstance(prepared, BcryptPairSpec):
+            expected = prepared.cache.get(plaintext)
+            if expected is None:
+                expected = _bcrypt_digest(plaintext, prepared.rounds)
+                prepared.cache[plaintext] = expected
+        else:
+            expected = prepared.cache.get(plaintext)
+            if expected is None:
+                expected = _digest(prepared.algorithm, plaintext)
+                prepared.cache[plaintext] = expected
+        return proof_result(result.value == expected, "digest does not match plaintext")
 
 
 def _digest(algorithm: str, plaintext: str) -> str:

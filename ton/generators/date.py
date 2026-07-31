@@ -23,8 +23,10 @@ from datetime import datetime, timedelta
 from random import Random
 from typing import Any
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from ._datetime import duration_seconds, parse_iso_bounds, uniform_offset_seconds
-from .base import Generator
+from .base import Generator, proof_result
 
 _DEFAULT_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -59,6 +61,13 @@ class DateGenerator(Generator):
         offset = uniform_offset_seconds(rng, prepared.span_seconds)
         moment = prepared.lo + timedelta(seconds=offset)
         return moment.strftime(prepared.fmt)
+
+    def prove(self, prepared: DateSpec, result: TransformResult) -> ProofResult:
+        try:
+            datetime.strptime(result.value, prepared.fmt)
+        except ValueError:
+            return proof_result(False, "value does not match the date format")
+        return proof_result(True, "")
 
 
 def _validate_format(fmt: Any) -> None:

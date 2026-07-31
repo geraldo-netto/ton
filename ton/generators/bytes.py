@@ -19,7 +19,9 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_int
+from .._proof import ProofResult
+from .._transforms import TransformResult
+from .base import Generator, coerce_int, proof_result
 
 
 def _encode_hex(raw: bytes) -> str:
@@ -34,10 +36,27 @@ def _encode_base32(raw: bytes) -> str:
     return base64.b32encode(raw).decode("ascii")
 
 
+def _decode_hex(value: str) -> bytes:
+    return bytes.fromhex(value)
+
+
+def _decode_base64(value: str) -> bytes:
+    return base64.b64decode(value, validate=True)
+
+
+def _decode_base32(value: str) -> bytes:
+    return base64.b32decode(value)
+
+
 _ENCODERS: dict[str, Callable[[bytes], str]] = {
     "hex": _encode_hex,
     "base64": _encode_base64,
     "base32": _encode_base32,
+}
+_DECODERS: dict[str, Callable[[str], bytes]] = {
+    "hex": _decode_hex,
+    "base64": _decode_base64,
+    "base32": _decode_base32,
 }
 
 # Divisible by both base64's 3-byte and base32's 5-byte input blocks, so
@@ -49,6 +68,7 @@ _ENCODING_CHUNK_BYTES = 65_520
 class BytesSpec:
     length: int
     encode: Callable[[bytes], str]
+    decode: Callable[[str], bytes]
 
 
 class BytesGenerator(Generator):
@@ -65,7 +85,7 @@ class BytesGenerator(Generator):
             raise ValueError(
                 f"bytes 'encoding' must be one of {sorted(_ENCODERS)} (got {encoding!r})"
             )
-        return BytesSpec(length=length, encode=_ENCODERS[encoding])
+        return BytesSpec(length=length, encode=_ENCODERS[encoding], decode=_DECODERS[encoding])
 
     def generate(self, prepared: BytesSpec, rng: Random) -> str:
         remaining = prepared.length
@@ -75,3 +95,10 @@ class BytesGenerator(Generator):
             chunks.append(prepared.encode(rng.randbytes(size)))
             remaining -= size
         return "".join(chunks)
+
+    def prove(self, prepared: BytesSpec, result: TransformResult) -> ProofResult:
+        try:
+            raw = prepared.decode(result.value)
+        except (ValueError, TypeError):
+            return proof_result(False, "value is not valid encoded bytes")
+        return proof_result(len(raw) == prepared.length, "decoded byte length does not match")

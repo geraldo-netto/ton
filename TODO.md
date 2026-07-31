@@ -37,7 +37,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-032 | open | L | Proof checking is permissive for every non-composite built-in: only `weighted`, `oneOf`, and `sequence_of` override `Generator.prove`; all other sources inherit `ProofResult(ok=True)` (`generators/base.py:154-162`). Consequently `--proof-check all/audit` cannot detect a faulty core integer, regex, hash, date, etc. implementation. Add real proof hooks by generator family and mutation tests proving each core type can fail. |
 
 ## performance
 

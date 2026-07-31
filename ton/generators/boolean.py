@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_string
+from .._proof import ProofResult
+from .._transforms import TransformResult
+from .base import Generator, coerce_string, proof_result
 
 
 @dataclass(frozen=True)
@@ -29,3 +31,9 @@ class BooleanGenerator(Generator):
 
     def generate(self, prepared: BooleanSpec, rng: Random) -> str:
         return rng.choice((prepared.when_true, prepared.when_false))
+
+    def prove(self, prepared: BooleanSpec, result: TransformResult) -> ProofResult:
+        return proof_result(
+            result.value in (prepared.when_true, prepared.when_false),
+            "value is not a configured boolean literal",
+        )

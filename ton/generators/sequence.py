@@ -33,7 +33,9 @@ from itertools import count
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_int, pad_with_zero
+from .._proof import ProofResult
+from .._transforms import TransformResult
+from .base import Generator, coerce_int, pad_with_zero, proof_result
 
 
 @dataclass(frozen=True)
@@ -66,3 +68,11 @@ class SequenceGenerator(Generator):
         if prepared.pad_width:
             return pad_with_zero(value, prepared.pad_width)
         return value
+
+    def prove(self, prepared: SequenceSpec, result: TransformResult) -> ProofResult:
+        try:
+            int(result.value)
+        except ValueError:
+            return proof_result(False, "sequence value is not an integer")
+        valid = not prepared.pad_width or len(result.value) >= prepared.pad_width
+        return proof_result(valid, "sequence value violates its padding contract")

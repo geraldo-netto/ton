@@ -29,7 +29,7 @@ from ton._transforms import (
     TransformProof,
     TransformResult,
 )
-from ton.generators import Generator
+from ton.generators import Generator, PairedGenerator
 
 
 def test_engine_yields_requested_row_count(basic_config: dict) -> None:
@@ -109,6 +109,23 @@ def test_paired_fields_and_generator_errors_bypass_direct_path() -> None:
     with pytest.raises(GeneratorExecutionError, match="BrokenGenerator.*RuntimeError: boom"):
         list(broken)
 
+    class BrokenPairGenerator(PairedGenerator):
+        type_name = "broken_pair"
+
+        def generate_pair(self, prepared: Any, rng: Random) -> tuple[str, str]:
+            raise RuntimeError("pair boom")
+
+    broken_pair = Engine(
+        {
+            "rows": 1,
+            "format": "$v[id]$",
+            "types": {"v": {"type": "broken_pair"}},
+        },
+        registry={"broken_pair": BrokenPairGenerator()},
+    )
+    with pytest.raises(GeneratorExecutionError, match="BrokenPairGenerator.*pair boom"):
+        list(broken_pair)
+
 
 def test_pipeline_failures_identify_transform_validator_and_proof_stages() -> None:
     class BrokenTransform(BaseTransform):
@@ -167,6 +184,35 @@ def test_pipeline_failures_identify_transform_validator_and_proof_stages() -> No
     }
     with pytest.raises(ProofEvaluationError, match="Source proof broken_proof.*proof boom"):
         list(Engine(proof_config, registry={"broken_proof": BrokenProof()}, proof_mode="all"))
+
+    class BrokenTransformProof(BaseTransform):
+        type_name = "broken_transform_proof"
+
+        def prove(self, prepared, before, after):
+            raise RuntimeError("transform proof boom")
+
+    transform_proof_config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "broken_transform_proof"}],
+            }
+        },
+    }
+    with pytest.raises(
+        ProofEvaluationError,
+        match="Transform proof broken_transform_proof.*transform proof boom",
+    ):
+        list(
+            Engine(
+                transform_proof_config,
+                transforms={"broken_transform_proof": BrokenTransformProof()},
+                proof_mode="all",
+            )
+        )
 
 
 def test_engine_runtime_state_uses_compiled_plan(basic_config: dict) -> None:

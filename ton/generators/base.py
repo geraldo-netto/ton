@@ -174,6 +174,11 @@ class Generator(ABC):
         return ProofResult(ok=True)
 
 
+def proof_result(ok: bool, reason: str) -> ProofResult:
+    """Build a compact proof result with a reason only on failure."""
+    return ProofResult(ok=ok, reason="" if ok else reason)
+
+
 class PairedGenerator(Generator):
     """Generator that emits a pair of related values for a single row.
 
@@ -215,32 +220,6 @@ class PairedGenerator(Generator):
         """
         id_value, primary = self.generate_pair(prepared, rng)
         return id_value if self.generate_returns_id else primary
-
-
-@dataclass(frozen=True)
-class WordPairSpec:
-    """Precomputed ``(plaintext, digest)`` pairs for word-pool generators.
-
-    Eager hashing happens once at prepare time; the row hot path is a single
-    ``rng.choice`` against this tuple. Shared by digest algorithms and the
-    inexpensive ``hash`` algorithms; bcrypt uses its own lazy cached spec.
-    """
-
-    pairs: tuple[tuple[str, str], ...]
-
-
-class PairedWordPoolGenerator(PairedGenerator):
-    """Paired generator backed by a precomputed ``(plaintext, digest)`` pool.
-
-    Subclasses build a :class:`WordPairSpec` in ``prepare`` (hashing each
-    word once) and inherit the shared draw. Extracted so ``hash`` and
-    paired generators no longer duplicate the identical ``generate_pair`` /
-    ``pairs`` spec (DUP-002).
-    """
-
-    def generate_pair(self, prepared: WordPairSpec, rng: Random) -> tuple[str, str]:
-        """Return ``(plaintext, digest)`` drawn from the precomputed pool."""
-        return rng.choice(prepared.pairs)
 
 
 def pad_with_zero(value: str, width: int) -> str:
@@ -322,21 +301,6 @@ def coerce_int(
         raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})") from exc
 
 
-def coerce_float(
-    spec: Mapping[str, Any],
-    key: str,
-    *,
-    type_name: str,
-    default: Any = _MISSING,
-) -> float:
-    """Read ``spec[key]`` and coerce to ``float`` with a uniform error message."""
-    raw = _value_or_default(spec, key, type_name, default)
-    try:
-        return float(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"{type_name} {key!r} must be a number (got {raw!r})") from exc
-
-
 def coerce_string(
     spec: Mapping[str, Any],
     key: str,
@@ -368,14 +332,6 @@ def require_min_le_max(type_name: str, lo: Any, hi: Any) -> None:
     """
     if hi < lo:
         raise ValueError(f"{type_name} 'maxValue' ({hi}) must be >= 'minValue' ({lo})")
-
-
-def assert_below_cap(type_name: str, field: str, value: int, cap: int, cap_name: str) -> None:
-    """Raise when ``value > cap``. Used by the char / bytes / text generators
-    to keep their "X exceeds MAX_X" rejections in one place (TODO DUP-005).
-    """
-    if value > cap:
-        raise ValueError(f"{type_name} {field!r} exceeds {cap_name} ({cap})")
 
 
 def prepare_child_spec(

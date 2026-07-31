@@ -33,8 +33,10 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from ._identity_data import EMAIL_DOMAINS, FAMILY_NAMES, GIVEN_NAMES
-from .base import Generator, require_string_tuple
+from .base import Generator, proof_result, require_string_tuple
 
 # ---------------------------------------------------------------------------
 # name
@@ -66,6 +68,16 @@ class NameGenerator(Generator):
             return rng.choice(FAMILY_NAMES)
         return f"{rng.choice(GIVEN_NAMES)} {rng.choice(FAMILY_NAMES)}"
 
+    def prove(self, prepared: NameSpec, result: TransformResult) -> ProofResult:
+        if prepared.style == "given":
+            valid = result.value in GIVEN_NAMES
+        elif prepared.style == "family":
+            valid = result.value in FAMILY_NAMES
+        else:
+            given, separator, family = result.value.partition(" ")
+            valid = bool(separator and given in GIVEN_NAMES and family in FAMILY_NAMES)
+        return proof_result(valid, "value is not a configured name")
+
 
 # ---------------------------------------------------------------------------
 # email
@@ -90,6 +102,18 @@ class EmailGenerator(Generator):
     def generate(self, prepared: EmailSpec, rng: Random) -> str:
         local = f"{rng.choice(GIVEN_NAMES).lower()}.{rng.choice(FAMILY_NAMES).lower()}"
         return f"{local}@{rng.choice(prepared.domains)}"
+
+    def prove(self, prepared: EmailSpec, result: TransformResult) -> ProofResult:
+        local, separator, domain = result.value.rpartition("@")
+        given, dot, family = local.partition(".")
+        valid = bool(
+            separator
+            and dot
+            and given in {name.lower() for name in GIVEN_NAMES}
+            and family in {name.lower() for name in FAMILY_NAMES}
+            and domain in prepared.domains
+        )
+        return proof_result(valid, "value is not a configured email")
 
 
 # ---------------------------------------------------------------------------
@@ -125,3 +149,15 @@ class PhoneGenerator(Generator):
             )
             + prepared.segments[-1]
         )
+
+    def prove(self, prepared: PhoneSpec, result: TransformResult) -> ProofResult:
+        position = 0
+        for segment in prepared.segments[:-1]:
+            if not result.value.startswith(segment, position):
+                return proof_result(False, "phone literal segment does not match")
+            position += len(segment)
+            if position >= len(result.value) or not result.value[position].isdigit():
+                return proof_result(False, "phone digit does not match")
+            position += 1
+        valid = result.value[position:] == prepared.segments[-1]
+        return proof_result(valid, "phone suffix does not match")

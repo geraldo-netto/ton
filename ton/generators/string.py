@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, require_string_tuple
+from .._proof import ProofResult
+from .._transforms import TransformResult
+from .base import Generator, proof_result, require_string_tuple
 
 
 @dataclass(frozen=True)
@@ -25,3 +27,6 @@ class StringGenerator(Generator):
 
     def generate(self, prepared: StringSpec, rng: Random) -> str:
         return rng.choice(prepared.values)
+
+    def prove(self, prepared: StringSpec, result: TransformResult) -> ProofResult:
+        return proof_result(result.value in prepared.values, "value is not in string 'values'")

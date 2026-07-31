@@ -249,6 +249,31 @@ def test_validate_config_lists_available_transforms() -> None:
         api.validate_config(payload)
 
 
+def test_validate_config_rejects_transform_owned_key_typo() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["transforms"] = [{"type": "identity", "extra": True}]
+
+    with pytest.raises(ConfigError, match=r"transforms\[0\].extra"):
+        api.validate_config(payload)
+
+
+def test_source_independent_transform_must_be_first() -> None:
+    payload = _valid_payload()
+    payload["types"]["a"]["transforms"] = [
+        {"type": "identity"},
+        {
+            "type": "distribution",
+            "choices": [
+                {"spec": {"type": "string", "values": ["a"]}},
+                {"spec": {"type": "string", "values": ["b"]}},
+            ],
+        },
+    ]
+
+    with pytest.raises(ConfigError, match="Source-independent transform.*must be the first"):
+        api.validate_config(payload)
+
+
 def test_validate_config_lists_available_validators() -> None:
     payload = _valid_payload()
     payload["types"]["a"]["validators"] = ["missing"]

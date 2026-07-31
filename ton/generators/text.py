@@ -22,7 +22,9 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_int
+from .._proof import ProofResult
+from .._transforms import TransformResult
+from .base import Generator, coerce_int, proof_result
 
 _WORDS: tuple[str, ...] = (
     "lorem",
@@ -119,6 +121,21 @@ class TextGenerator(Generator):
             return " ".join(_sentence(rng) for _ in range(prepared.count))
         return " ".join(_paragraph(rng) for _ in range(prepared.count))
 
+    def prove(self, prepared: TextSpec, result: TransformResult) -> ProofResult:
+        if prepared.unit == "words":
+            valid = _valid_words(result.value.split(), prepared.count)
+        else:
+            sentences = result.value.split(". ")
+            sentences[-1] = sentences[-1].removesuffix(".")
+            sentence_ok = all(_valid_sentence(sentence) for sentence in sentences)
+            expected = (
+                len(sentences) == prepared.count
+                if prepared.unit == "sentences"
+                else prepared.count * 3 <= len(sentences) <= prepared.count * 6
+            )
+            valid = result.value.endswith(".") and sentence_ok and expected
+        return proof_result(valid, "value is not valid generated text")
+
 
 def _words(count: int, rng: Random) -> str:
     return " ".join(rng.choice(_WORDS) for _ in range(count))
@@ -133,3 +150,12 @@ def _sentence(rng: Random) -> str:
 def _paragraph(rng: Random) -> str:
     sentences = rng.randint(3, 6)
     return " ".join(_sentence(rng) for _ in range(sentences))
+
+
+def _valid_words(words: list[str], count: int) -> bool:
+    return len(words) == count and all(word.lower() in _WORDS for word in words)
+
+
+def _valid_sentence(sentence: str) -> bool:
+    words = sentence.split()
+    return 6 <= len(words) <= 14 and _valid_words(words, len(words))

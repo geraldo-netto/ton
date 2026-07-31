@@ -260,6 +260,7 @@ def _load_catalog_entry_points(
         try:
             plugin = ep.load()()
             namespace, name = _entry_point_namespace_name(ep.name, kind, plugin)
+            _validate_entry_point_plugin(kind, plugin)
             _stamp_plugin_dist(plugin, ep)
             _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
         except Exception as exc:  # noqa: BLE001 - per-entry sandbox
@@ -289,19 +290,23 @@ def _register_entry_point_plugin(
     name: str,
     plugin: Any,
 ) -> None:
+    _validate_entry_point_plugin(kind, plugin)
     if kind == "data_type":
-        if not isinstance(plugin, Generator):
-            raise TypeError("data type entry point must return a Generator")
         catalog.register_data_type(namespace, name, plugin)
         return
     if kind == "transform":
-        if not _is_transform(plugin):
-            raise TypeError("transform entry point must return a Transform")
         catalog.register_transform(namespace, name, plugin)
         return
-    if not isinstance(plugin, Validator):
-        raise TypeError("validator entry point must return a Validator")
     catalog.register_validator(namespace, name, plugin)
+
+
+def _validate_entry_point_plugin(kind: str, plugin: Any) -> None:
+    if kind == "data_type" and not isinstance(plugin, Generator):
+        raise TypeError("data type entry point must return a Generator")
+    if kind == "transform" and not _is_transform(plugin):
+        raise TypeError("transform entry point must return a Transform")
+    if kind == "validator" and not isinstance(plugin, Validator):
+        raise TypeError("validator entry point must return a Validator")
 
 
 def _is_transform(plugin: Any) -> bool:

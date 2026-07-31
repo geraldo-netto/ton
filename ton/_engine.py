@@ -520,6 +520,7 @@ class Engine:
                 "event": LogEvent.GENERATE_FAILED.value,
                 "stage": stage,
                 "reference": reference,
+                "generator_type": reference if stage == "Generator" else None,
                 "type_key": type_key,
                 "row": self._rows_emitted + 1,
                 "error_type": type(cause).__name__,

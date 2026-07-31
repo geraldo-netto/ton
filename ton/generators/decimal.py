@@ -9,11 +9,14 @@ from functools import cached_property
 from random import Random
 from typing import Any
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from .base import (
     Generator,
     coerce_bool,
     coerce_int,
     pad_with_zero,
+    proof_result,
     require_min_le_max,
 )
 
@@ -85,6 +88,21 @@ class DecimalGenerator(Generator):
         if steps.pad_width:
             return pad_with_zero(value, steps.pad_width)
         return value
+
+    def prove(self, prepared: DecimalSpec, result: TransformResult) -> ProofResult:
+        expected_fraction = result.value.lstrip("-0").partition(".")[2]
+        try:
+            value = Decimal(result.value)
+        except InvalidOperation:
+            return proof_result(False, "value is not decimal")
+        width_ok = not prepared.pad_width or len(result.value) == prepared.pad_width
+        return proof_result(
+            value.is_finite()
+            and prepared.min_value <= value <= prepared.max_value
+            and (prepared.decimals == 0 or len(expected_fraction) == prepared.decimals)
+            and width_ok,
+            "decimal value is outside its bounds, scale, or padding contract",
+        )
 
 
 def _coerce_decimal(spec: Mapping[str, Any], key: str) -> Decimal:

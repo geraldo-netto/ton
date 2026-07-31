@@ -7,7 +7,16 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_bool, coerce_int, pad_with_zero, require_min_le_max
+from .._proof import ProofResult
+from .._transforms import TransformResult
+from .base import (
+    Generator,
+    coerce_bool,
+    coerce_int,
+    pad_with_zero,
+    proof_result,
+    require_min_le_max,
+)
 
 
 @dataclass(frozen=True)
@@ -39,3 +48,14 @@ class IntegerGenerator(Generator):
         if prepared.pad_width:
             return pad_with_zero(value, prepared.pad_width)
         return value
+
+    def prove(self, prepared: IntegerSpec, result: TransformResult) -> ProofResult:
+        try:
+            value = int(result.value)
+        except ValueError:
+            return proof_result(False, "value is not an integer")
+        width_ok = not prepared.pad_width or len(result.value) == prepared.pad_width
+        return proof_result(
+            prepared.min_value <= value <= prepared.max_value and width_ok,
+            "integer value is outside its bounds or padding contract",
+        )

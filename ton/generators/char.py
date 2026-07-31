@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_int, require_string_tuple
+from .._proof import ProofResult
+from .._transforms import TransformResult
+from .base import Generator, coerce_int, proof_result, require_string_tuple
 
 
 @dataclass(frozen=True)
@@ -30,3 +32,16 @@ class CharGenerator(Generator):
 
     def generate(self, prepared: CharSpec, rng: Random) -> str:
         return "".join(rng.choices(prepared.values, k=prepared.max_char))
+
+    def prove(self, prepared: CharSpec, result: TransformResult) -> ProofResult:
+        positions = {0}
+        for _ in range(prepared.max_char):
+            positions = {
+                position + len(candidate)
+                for position in positions
+                for candidate in prepared.values
+                if result.value.startswith(candidate, position)
+            }
+            if not positions:
+                break
+        return proof_result(len(result.value) in positions, "value is not a valid char sequence")

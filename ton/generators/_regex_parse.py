@@ -145,7 +145,7 @@ class _Parser:
     def _parse_atom(self) -> Node:
         char = self.text[self.pos]
         if char == "(":
-            raise RegexParseError("internal group parser state")
+            raise RegexParseError("internal group parser state")  # pragma: no cover
         if char == "[":
             return self._parse_class()
         if char == "\\":

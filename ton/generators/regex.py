@@ -24,6 +24,7 @@ on 3.13 (DEP-001).
 
 from __future__ import annotations
 
+import re
 import string
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -31,9 +32,11 @@ from functools import lru_cache
 from random import Random
 from typing import Any
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from . import _regex_parse as rx
 from ._regex_parse import RegexParseError
-from .base import Generator
+from .base import Generator, proof_result
 
 #: Upper bound on the *extra* repetitions allowed for ``*`` and ``+``.
 MAX_UNBOUNDED_REPEAT = 8
@@ -48,6 +51,7 @@ _ANY_POOL = tuple(c for c in _PRINTABLE_ASCII if c != "\n")
 
 @dataclass(frozen=True)
 class RegexSpec:
+    pattern: str
     parsed: tuple[tuple[Any, Any], ...]
 
 
@@ -64,12 +68,18 @@ class RegexGenerator(Generator):
             parsed = rx.parse(pattern)
         except RegexParseError as exc:
             raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
-        return RegexSpec(parsed=_prepare_nodes(parsed))
+        return RegexSpec(pattern=pattern, parsed=_prepare_nodes(parsed))
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:
         parts: list[str] = []
         _emit_into(prepared.parsed, rng, parts)
         return "".join(parts)
+
+    def prove(self, prepared: RegexSpec, result: TransformResult) -> ProofResult:
+        return proof_result(
+            re.fullmatch(prepared.pattern, result.value) is not None,
+            "value does not match regex 'pattern'",
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -29,7 +29,9 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_bool
+from .._proof import ProofResult
+from .._transforms import TransformResult
+from .base import Generator, coerce_bool, proof_result
 
 # ---------------------------------------------------------------------------
 # IPv4 / IPv6
@@ -76,6 +78,9 @@ class IPv4Generator(Generator):
     def generate(self, prepared: IPNetworkSpec, rng: Random) -> str:
         return _draw_ip(prepared, rng)
 
+    def prove(self, prepared: IPNetworkSpec, result: TransformResult) -> ProofResult:
+        return _prove_ip(prepared, result)
+
 
 class IPv6Generator(Generator):
     """Random IPv6 inside a CIDR block (default ::/0)."""
@@ -87,6 +92,22 @@ class IPv6Generator(Generator):
 
     def generate(self, prepared: IPNetworkSpec, rng: Random) -> str:
         return _draw_ip(prepared, rng)
+
+    def prove(self, prepared: IPNetworkSpec, result: TransformResult) -> ProofResult:
+        return _prove_ip(prepared, result)
+
+
+def _prove_ip(prepared: IPNetworkSpec, result: TransformResult) -> ProofResult:
+    try:
+        address = ipaddress.ip_address(result.value)
+    except ValueError:
+        return proof_result(False, "value is not an IP address")
+    numeric = int(address)
+    return proof_result(
+        address.version == prepared.version
+        and prepared.network_int <= numeric < prepared.network_int + prepared.size,
+        "IP address is outside its configured network",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +147,24 @@ class MACGenerator(Generator):
         octets = (f"{byte:02x}" for byte in raw)
         text = prepared.separator.join(octets) if prepared.separator else "".join(octets)
         return text.upper() if prepared.uppercase else text
+
+    def prove(self, prepared: MACSpec, result: TransformResult) -> ProofResult:
+        compact = (
+            result.value.replace(prepared.separator, "") if prepared.separator else result.value
+        )
+        try:
+            raw = bytes.fromhex(compact)
+        except ValueError:
+            return proof_result(False, "value is not a MAC address")
+        case_ok = result.value == (
+            result.value.upper() if prepared.uppercase else result.value.lower()
+        )
+        prefix_ok = prepared.oui_bytes is None or raw.startswith(prepared.oui_bytes)
+        separator_ok = not prepared.separator or result.value.count(prepared.separator) == 5
+        return proof_result(
+            len(raw) == 6 and case_ok and prefix_ok and separator_ok,
+            "MAC address violates its format or OUI",
+        )
 
 
 def _parse_oui(value: Any) -> bytes:

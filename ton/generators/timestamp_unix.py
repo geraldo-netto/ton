@@ -23,8 +23,10 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
+from .._proof import ProofResult
+from .._transforms import TransformResult
 from ._datetime import duration_seconds, parse_iso_bounds, uniform_offset_seconds
-from .base import Generator
+from .base import Generator, proof_result
 
 _UNIT_MULTIPLIERS = {"seconds": 1, "millis": 1000}
 
@@ -58,3 +60,15 @@ class TimestampUnixGenerator(Generator):
         offset = uniform_offset_seconds(rng, prepared.span_seconds)
         epoch_seconds = prepared.lo_epoch_seconds + offset
         return str(epoch_seconds * prepared.multiplier)
+
+    def prove(self, prepared: TimestampUnixSpec, result: TransformResult) -> ProofResult:
+        try:
+            value = int(result.value)
+        except ValueError:
+            return proof_result(False, "value is not a Unix timestamp")
+        lo = prepared.lo_epoch_seconds * prepared.multiplier
+        hi = (prepared.lo_epoch_seconds + prepared.span_seconds) * prepared.multiplier
+        return proof_result(
+            lo <= value <= hi and value % prepared.multiplier == 0,
+            "timestamp is outside its bounds or unit",
+        )

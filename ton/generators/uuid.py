@@ -25,7 +25,9 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, coerce_bool, coerce_int
+from .._proof import ProofResult
+from .._transforms import TransformResult
+from .base import Generator, coerce_bool, coerce_int, proof_result
 
 _SUPPORTED_VERSIONS = (1, 4)
 
@@ -57,3 +59,16 @@ class UUIDGenerator(Generator):
         value = uuid.UUID(bytes=rng.randbytes(16), version=prepared.version)
         text = str(value)
         return text.upper() if prepared.uppercase else text
+
+    def prove(self, prepared: UUIDSpec, result: TransformResult) -> ProofResult:
+        try:
+            value = uuid.UUID(result.value)
+        except ValueError:
+            return proof_result(False, "value is not a UUID")
+        case_ok = result.value == (
+            result.value.upper() if prepared.uppercase else result.value.lower()
+        )
+        return proof_result(
+            value.version == prepared.version and case_ok,
+            "UUID version or case does not match",
+        )

@@ -45,6 +45,11 @@ PRIVATE_OR_SECRET_RE = re.compile(
 )
 
 
+def _contains_private_or_secret(data: bytes) -> bool:
+    """Scan raw bytes; NULs do not make a tracked file exempt."""
+    return PRIVATE_OR_SECRET_RE.search(data) is not None
+
+
 @pytest.mark.parametrize(
     "candidate",
     [
@@ -56,7 +61,11 @@ PRIVATE_OR_SECRET_RE = re.compile(
     ],
 )
 def test_governance_pattern_detects_representative_credentials(candidate: bytes) -> None:
-    assert PRIVATE_OR_SECRET_RE.search(candidate)
+    assert _contains_private_or_secret(candidate)
+
+
+def test_governance_scan_cannot_be_bypassed_with_nul_byte() -> None:
+    assert _contains_private_or_secret(b"binary\x00/ho" + b"me/person/file")
 
 
 def test_tracked_text_files_do_not_contain_private_paths_or_secrets() -> None:
@@ -71,9 +80,7 @@ def test_tracked_text_files_do_not_contain_private_paths_or_secrets() -> None:
     for relative in result.stdout.splitlines():
         path = REPO_ROOT / relative
         data = path.read_bytes()
-        if b"\x00" in data:
-            continue
-        if PRIVATE_OR_SECRET_RE.search(data):
+        if _contains_private_or_secret(data):
             offenders.append(relative)
     assert offenders == []
 

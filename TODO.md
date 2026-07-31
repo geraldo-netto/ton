@@ -92,7 +92,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id     | status | effort | description |
 |--------|--------|--------|-------------|
-| DG-012 | open | S | The governance scan skips any tracked file containing one NUL byte (`tests/test_data_governance.py:62-78`). Adding a NUL to a text fixture therefore bypasses all private-path and credential patterns, and binary fixtures are never scanned. Search raw bytes regardless of NULs (or use a binary-aware scanner) and add an evasion regression test. |
 
 ## dependency
 

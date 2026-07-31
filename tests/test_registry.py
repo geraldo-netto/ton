@@ -27,7 +27,7 @@ from ton._registry import (
 )
 from ton._transforms import BaseTransform
 from ton._validation import NonEmptyValidator
-from ton.generators import Generator
+from ton.generators import Generator, StringGenerator
 
 
 @pytest.mark.parametrize(
@@ -113,29 +113,16 @@ def test_default_registry_instances_are_independent() -> None:
     assert first["sequence"] is not second["sequence"]
 
 
-def test_default_registry_class_list_is_cached(monkeypatch) -> None:
-    """default_registry() should call discover_generator_classes at most
-    once across repeated calls (PERF-008)."""
-    import ton._registry as registry_mod
+def test_default_registry_ignores_colliding_subclass() -> None:
+    class CollidingString(StringGenerator):
+        type_name = "string"
 
+    assert CollidingString not in discover_generator_classes()
     clear_default_registry_cache()
-    calls = {"n": 0}
-    real = registry_mod.discover_generator_classes
-
-    def _counting() -> list:
-        calls["n"] += 1
-        return real()
-
-    monkeypatch.setattr(registry_mod, "discover_generator_classes", _counting)
-    default_registry()
-    default_registry()
-    default_registry()
-    assert calls["n"] == 1
-    clear_default_registry_cache()  # leave the module in its original state
+    assert type(default_registry()["string"]) is StringGenerator
 
 
-def test_clear_cache_forces_rediscovery() -> None:
-    """Explicit invalidation should re-walk the subclass tree."""
+def test_clear_cache_rebuilds_defaults() -> None:
     clear_default_registry_cache()
     first_keys = set(default_registry().keys())
     clear_default_registry_cache()

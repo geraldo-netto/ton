@@ -42,10 +42,9 @@ VALIDATOR_ENTRY_POINT_GROUP = "ton.validators"
 CORE_NAMESPACE = "core"
 _T = TypeVar("_T")
 
-#: Allowlist of built-in ``type_name`` strings. Used by
-#: :func:`discover_generator_classes` to ignore in-process subclasses
-#: that aren't part of TON itself (TODO ARCH-005).
-_BUILTIN_TYPE_NAMES: frozenset[str] = frozenset(cls.type_name for cls in BUILTIN_GENERATOR_CLASSES)
+#: Identity-based allowlist of built-in classes. A third-party subclass may
+#: reuse a core ``type_name`` but can never become a default implementation.
+_BUILTIN_GENERATOR_CLASSES: frozenset[type[Generator]] = frozenset(BUILTIN_GENERATOR_CLASSES)
 
 
 class RegistryError(ValueError):
@@ -341,7 +340,7 @@ def _validate_identifier(label: str, value: str) -> None:
 
 def discover_generator_classes() -> list[type[Generator]]:
     """Return every concrete :class:`Generator` subclass with a ``type_name``
-    that matches a known built-in.
+    that is explicitly registered as a built-in.
 
     Walks the full subclass tree but filters by the built-in allowlist so
     test fixtures and third-party plugins do not leak in (TODO ARCH-005).
@@ -349,7 +348,7 @@ def discover_generator_classes() -> list[type[Generator]]:
     return [
         cls
         for cls in _walk_subclasses(Generator)  # type: ignore[type-abstract]
-        if not inspect.isabstract(cls) and cls.type_name and cls.type_name in _BUILTIN_TYPE_NAMES
+        if not inspect.isabstract(cls) and cls in _BUILTIN_GENERATOR_CLASSES
     ]
 
 
@@ -372,13 +371,10 @@ _DEFAULT_CLASSES_LOCK = threading.Lock()
 
 
 def clear_default_registry_cache() -> None:
-    """Force the next :func:`default_registry` call to re-discover classes.
+    """Force the next :func:`default_registry` call to rebuild its class map.
 
-    Useful after a test or third-party plugin has registered a new
-    ``Generator`` subclass and wants it picked up by the default
-    registry. Rebinds to a fresh empty dict (rather than clearing in
-    place) so a concurrent reader keeps its own consistent snapshot
-    (CONC-001).
+    Rebinds to a fresh empty dict (rather than clearing in place) so a
+    concurrent reader keeps its own consistent snapshot (CONC-001).
     """
     global _DEFAULT_CLASSES
     with _DEFAULT_CLASSES_LOCK:
@@ -401,7 +397,7 @@ def _ensure_default_classes() -> dict[str, type[Generator]]:
     with _DEFAULT_CLASSES_LOCK:
         if _DEFAULT_CLASSES:
             return _DEFAULT_CLASSES
-        built = {cls.type_name: cls for cls in discover_generator_classes()}
+        built = {cls.type_name: cls for cls in BUILTIN_GENERATOR_CLASSES}
         _logger.info(
             "registry_discovered generators=%d",
             len(built),

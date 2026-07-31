@@ -352,7 +352,7 @@ class Engine:
         try:
             if resolved.direct and not self._proof.enabled:
                 return cast(str, generator.generate(field.source_prepared, self._rng))
-            if paired_cache is not None and field.is_paired:
+            if paired_cache is not None and field.source_is_paired:
                 pair = paired_cache.get(token.type_key)
                 if pair is None:
                     pair = self._generate_pair(token.type_key, field)
@@ -393,7 +393,9 @@ class Engine:
         return (transformed.id_value or "", transformed.value)
 
     def _generate_single(self, type_key: str, field: PreparedField) -> str:
-        source = TransformResult(field.generator.generate(field.source_prepared, self._rng))
+        source = TransformResult(
+            field.generator.generate(field.source_prepared, self._rng) if field.uses_source else ""
+        )
         transformed, steps = self._apply_transforms_with_trace(field, source)
         self._handle_proof_failures(type_key, field, source, steps)
         self._run_validators(type_key, field, transformed.value)

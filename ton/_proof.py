@@ -28,6 +28,8 @@ class PreparedField:
     source_prepared: Any
     transforms: tuple[PreparedTransform, ...]
     is_paired: bool = False
+    source_is_paired: bool = False
+    uses_source: bool = True
     validators: tuple[Any, ...] = ()
 
     @cached_property

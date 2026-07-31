@@ -13,6 +13,7 @@ from ton._compiler import CompiledPlan
 from ton._config import ConfigError
 from ton._engine import Engine, ProofError, TemplateError
 from ton._proof import ProofResult
+from ton._registry import default_registry
 from ton._transforms import (
     BaseTransform,
     IdentityTransform,
@@ -740,3 +741,36 @@ def test_engine_applies_distribution_transform() -> None:
     }
 
     assert list(Engine(config, rng=Random(0))) == ["yes"]
+
+
+def test_distribution_short_circuits_unrelated_source_generation() -> None:
+    class UnusedSource(Generator):
+        type_name = "unused_source"
+
+        def generate(self, prepared, rng):
+            pytest.fail("distribution executed its unrelated source")
+
+        def prove(self, prepared, result):
+            pytest.fail("distribution proved its unrelated source")
+
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "unused_source",
+                "transforms": [
+                    {
+                        "type": "distribution",
+                        "choices": [
+                            {"weight": 0, "spec": {"type": "string", "values": ["no"]}},
+                            {"weight": 1, "spec": {"type": "string", "values": ["yes"]}},
+                        ],
+                    }
+                ],
+            }
+        },
+    }
+    registry = {**default_registry(), "unused_source": UnusedSource()}
+
+    assert list(Engine(config, registry=registry, rng=Random(0), proof_mode="all")) == ["yes"]

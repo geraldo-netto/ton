@@ -17,6 +17,7 @@ class DistributionTransform(BaseTransform):
     type_name: ClassVar[str] = "distribution"
     capabilities: ClassVar[TransformCapabilities] = TransformCapabilities()
     config_keys: ClassVar[frozenset[str] | None] = frozenset(("choices",))
+    requires_source: ClassVar[bool] = False
 
     def prepare_composite(
         self,

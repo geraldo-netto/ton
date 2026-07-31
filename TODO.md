@@ -79,7 +79,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| PAT-021 | open | M | `distribution` is modeled as a post-source transform but discards its input (`transforms/distribution.py:33-40`), so every row first executes an unrelated source generator (including expensive/stateful sources) and then throws that value away. Model distribution as a source-selection strategy or add an explicit pre-source/short-circuit stage so the domain pipeline does not perform meaningless work. |
 
 ## plugin extensibility
 

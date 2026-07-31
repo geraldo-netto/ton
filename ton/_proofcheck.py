@@ -188,6 +188,8 @@ class ProofChecker:
         row: int,
         spec: Mapping[str, Any] | None,
     ) -> tuple[ProofFailure, ...]:
+        if not field.uses_source:
+            return ()
         proof = field.generator.prove(field.source_prepared, source_result)
         if proof.ok:
             return ()

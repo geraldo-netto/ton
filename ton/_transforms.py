@@ -68,6 +68,7 @@ class Transform(Protocol):
     type_name: ClassVar[str]
     capabilities: ClassVar[TransformCapabilities]
     config_keys: ClassVar[frozenset[str] | None]
+    requires_source: ClassVar[bool]
 
     def prepare(self, spec: Mapping[str, Any]) -> Any:
         """Validate and normalize a raw transform spec."""
@@ -104,6 +105,7 @@ class BaseTransform:
     type_name: ClassVar[str] = ""
     capabilities: ClassVar[TransformCapabilities] = TransformCapabilities()
     config_keys: ClassVar[frozenset[str] | None] = None
+    requires_source: ClassVar[bool] = True
 
     def prepare(self, spec: Mapping[str, Any]) -> Any:
         return spec

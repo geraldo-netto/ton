@@ -568,12 +568,13 @@ validators such as `plugin.check`:
 ```
 
 The built-in `distribution` transform chooses among two or more prepared
-candidate type specs:
+candidate type specs. It is a source-independent first stage: TON does not
+draw the field's nominal source before selecting a candidate.
 
 ```json
 {
   "type": "string",
-  "values": ["ignored"],
+  "values": ["not drawn"],
   "transforms": [
     {
       "type": "distribution",

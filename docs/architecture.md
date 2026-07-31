@@ -49,13 +49,15 @@ For each template field, `Engine` prepares an explicit pipeline:
 
 1. Source data type: `Generator.prepare(spec, preparation_context)`.
 2. Ordered transform chain: `Transform.prepare_composite()`.
-3. Per-row source generation.
+3. Per-row source generation, unless the first transform explicitly declares
+   that it replaces the source.
 4. Per-row transform application.
 5. Optional proof checking.
 6. Per-row validator checks.
 
 Prepared specs are cached during engine construction. Row generation only
-performs draws, transform application, rendering, and optional proof checks.
+performs required draws, transform application, rendering, and optional proof
+checks.
 
 ## Transform Contract
 

@@ -104,7 +104,7 @@ class EngineCompiler:
             rows=self.rows,
             tokens=self.tokens,
             prepared=prepared,
-            has_paired=any(prepared[token.type_key].is_paired for token in self.tokens),
+            has_paired=any(prepared[token.type_key].source_is_paired for token in self.tokens),
             literals=tuple(literals),
             resolved_tokens=resolved_tokens,
         )
@@ -153,12 +153,16 @@ class EngineCompiler:
             generator = self.registry[runtime_type_name(spec["type"])]
             try:
                 self._validate_generator_keys(f"types.{type_key}", spec, generator)
-                transforms, is_paired = self._prepare_transforms(type_key, spec, generator)
+                transforms, is_paired, uses_source = self._prepare_transforms(
+                    type_key, spec, generator
+                )
                 prepared[type_key] = PreparedField(
                     generator=generator,
                     source_prepared=context.prepare_generator(generator, spec),
                     transforms=transforms,
                     is_paired=is_paired,
+                    source_is_paired=bool(generator.is_paired and uses_source),
+                    uses_source=uses_source,
                     validators=self._resolve_validators(type_key, spec),
                 )
             except Exception as exc:  # noqa: BLE001
@@ -206,14 +210,25 @@ class EngineCompiler:
 
     def _prepare_transforms(
         self, type_key: str, spec: Mapping[str, Any], generator: Generator
-    ) -> tuple[tuple[PreparedTransform, ...], bool]:
+    ) -> tuple[tuple[PreparedTransform, ...], bool, bool]:
         transform_specs = spec.get("transforms", [])
         resolved = [
             (transform_spec, self._resolve_transform(type_key, transform_spec["type"]))
             for transform_spec in transform_specs
         ]
+        source_independent = [
+            index
+            for index, (_spec, transform) in enumerate(resolved)
+            if not transform.requires_source
+        ]
+        if source_independent and source_independent != [0]:
+            raise TemplateError(
+                f"Source-independent transform {resolved[source_independent[0]][0]['type']!r} "
+                f"for variable {type_key!r} must be the first transform"
+            )
+        uses_source = not source_independent
         capability = fold_paired_capabilities(
-            bool(generator.is_paired),
+            bool(generator.is_paired and uses_source),
             tuple(transform.capabilities for _transform_spec, transform in resolved),
         )
         if capability.incompatible_index is not None:
@@ -221,7 +236,7 @@ class EngineCompiler:
             raise TemplateError(
                 f"Transform {reference!r} for variable {type_key!r} does not accept paired input"
             )
-        is_paired = bool(generator.is_paired)
+        is_paired = bool(generator.is_paired and uses_source)
         prepared: list[PreparedTransform] = []
         for index, (transform_spec, transform) in enumerate(resolved):
             error = extension_key_error(
@@ -251,7 +266,7 @@ class EngineCompiler:
                 },
             )
             is_paired = is_paired and transform.capabilities.preserves_pairing
-        return tuple(prepared), capability.preserves_pairing
+        return tuple(prepared), capability.preserves_pairing, uses_source
 
     def _resolve_transform(self, type_key: str, reference: str) -> Transform:
         normalized = normalize_reference(reference)

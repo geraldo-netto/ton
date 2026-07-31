@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import builtins
 from datetime import datetime
+from decimal import Decimal
 from random import Random
 from typing import Any
 from unittest import mock
@@ -149,7 +150,27 @@ def test_decimal_step_bounds_are_lazy_and_cached(monkeypatch) -> None:
     assert prepared.scale == 100
     generator.generate(prepared, Random(0))
     generator.generate(prepared, Random(1))
-    step_bounds.assert_called_once_with(0.0, 1.0, 2)
+    step_bounds.assert_called_once_with(Decimal("0.0"), Decimal("1.0"), 2)
+
+
+def test_decimal_preserves_integer_bounds_above_binary_float_precision() -> None:
+    generator = DecimalGenerator()
+    prepared = generator.prepare(
+        {"minValue": 9_007_199_254_740_992, "maxValue": 9_007_199_254_740_993, "decimals": 0}
+    )
+    rng = mock.Mock()
+    rng.randint.side_effect = [prepared.min_step, prepared.max_step]
+
+    assert generator.generate(prepared, rng) == "9007199254740992"
+    assert generator.generate(prepared, rng) == "9007199254740993"
+
+
+def test_decimal_formats_large_fixed_bounds_without_float_artifacts() -> None:
+    generator = DecimalGenerator()
+    bound = 10**80 + 1
+    prepared = generator.prepare({"minValue": bound, "maxValue": bound, "decimals": 2})
+
+    assert generator.generate(prepared, Random(0)) == f"{bound}.00"
 
 
 def test_coerce_float_uses_default_when_optional_key_is_missing() -> None:

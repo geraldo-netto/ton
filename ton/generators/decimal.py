@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, InvalidOperation, localcontext
 from functools import cached_property
 from random import Random
 from typing import Any
@@ -12,7 +12,6 @@ from typing import Any
 from .base import (
     Generator,
     coerce_bool,
-    coerce_float,
     coerce_int,
     pad_with_zero,
     require_min_le_max,
@@ -21,8 +20,8 @@ from .base import (
 
 @dataclass(frozen=True)
 class DecimalSpec:
-    min_value: float
-    max_value: float
+    min_value: Decimal
+    max_value: Decimal
     decimals: int
     pad_with_zero: bool
 
@@ -57,13 +56,13 @@ class DecimalSteps:
 
 
 class DecimalGenerator(Generator):
-    """Uniform float in ``[minValue, maxValue]`` rounded to ``decimals``."""
+    """Uniform fixed-point value in ``[minValue, maxValue]``."""
 
     type_name = "decimal"
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> DecimalSpec:
-        min_value = coerce_float(spec, "minValue", type_name="decimal")
-        max_value = coerce_float(spec, "maxValue", type_name="decimal")
+        min_value = _coerce_decimal(spec, "minValue")
+        max_value = _coerce_decimal(spec, "maxValue")
         require_min_le_max("decimal", min_value, max_value)
         decimals = coerce_int(spec, "decimals", type_name="decimal")
         if decimals < 0:
@@ -82,22 +81,33 @@ class DecimalGenerator(Generator):
     def generate(self, prepared: DecimalSpec, rng: Random) -> str:
         steps = prepared.steps
         step = rng.randint(steps.min_step, steps.max_step)
-        # f-string formatting keeps trailing zeros so pad_width math stays
-        # consistent (str(round(1.5, 2)) drops the trailing zero).
-        value = f"{step / steps.scale:.{prepared.decimals}f}"
+        value = _format_step(step, steps.scale, prepared.decimals)
         if steps.pad_width:
             return pad_with_zero(value, steps.pad_width)
         return value
 
 
-def _has_representable_value(min_value: float, max_value: float, decimals: int) -> bool:
+def _coerce_decimal(spec: Mapping[str, Any], key: str) -> Decimal:
+    if key not in spec:
+        raise ValueError(f"decimal {key!r} is required")
+    raw = spec[key]
+    if isinstance(raw, bool):
+        raise ValueError(f"decimal {key!r} must be a number (got {raw!r})")
+    try:
+        value = Decimal(str(raw))
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(f"decimal {key!r} must be a number (got {raw!r})") from exc
+    if not value.is_finite():
+        raise ValueError(f"decimal {key!r} must be a finite number (got {raw!r})")
+    return value
+
+
+def _has_representable_value(min_value: Decimal, max_value: Decimal, decimals: int) -> bool:
     """Validate the range without scaling when its lower bound already fits."""
-    minimum = Decimal(str(min_value))
-    maximum = Decimal(str(max_value))
-    exponent = minimum.as_tuple().exponent
+    exponent = min_value.as_tuple().exponent
     if (
-        minimum.is_finite()
-        and maximum.is_finite()
+        min_value.is_finite()
+        and max_value.is_finite()
         and isinstance(exponent, int)
         and exponent >= -decimals
     ):
@@ -118,8 +128,8 @@ def _build_decimal_steps(prepared: DecimalSpec) -> DecimalSteps:
         # '-' sign on negative bounds and the decimal point + fraction
         # (TODO REL-014).
         pad_width = max(
-            len(f"{min_step / scale:.{prepared.decimals}f}"),
-            len(f"{max_step / scale:.{prepared.decimals}f}"),
+            len(_format_step(min_step, scale, prepared.decimals)),
+            len(_format_step(max_step, scale, prepared.decimals)),
         )
     return DecimalSteps(
         scale=scale,
@@ -129,8 +139,25 @@ def _build_decimal_steps(prepared: DecimalSpec) -> DecimalSteps:
     )
 
 
-def _step_bounds(min_value: float, max_value: float, decimals: int) -> tuple[int, int, int]:
+def _step_bounds(min_value: Decimal, max_value: Decimal, decimals: int) -> tuple[int, int, int]:
     scale = 10**decimals
-    min_step = int((Decimal(str(min_value)) * scale).to_integral_value(rounding=ROUND_CEILING))
-    max_step = int((Decimal(str(max_value)) * scale).to_integral_value(rounding=ROUND_FLOOR))
+    min_step = _scaled_integral(min_value, scale, decimals, ROUND_CEILING)
+    max_step = _scaled_integral(max_value, scale, decimals, ROUND_FLOOR)
     return scale, min_step, max_step
+
+
+def _scaled_integral(value: Decimal, scale: int, decimals: int, rounding: str) -> int:
+    digits = value.as_tuple().digits
+    exponent = value.as_tuple().exponent
+    precision = len(digits) + abs(exponent if isinstance(exponent, int) else 0) + decimals + 2
+    with localcontext() as context:
+        context.prec = precision
+        return int((value * scale).to_integral_value(rounding=rounding))
+
+
+def _format_step(step: int, scale: int, decimals: int) -> str:
+    if decimals == 0:
+        return str(step)
+    whole, fraction = divmod(abs(step), scale)
+    sign = "-" if step < 0 else ""
+    return f"{sign}{whole}.{fraction:0{decimals}d}"

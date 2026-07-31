@@ -76,7 +76,13 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
     transforms = catalog.transforms()
     validators = catalog.validators()
     try:
-        compile_plan(data, registry=generators, transforms=transforms, validators=validators)
+        compile_plan(
+            data,
+            registry=generators,
+            transforms=transforms,
+            validators=validators,
+            prepare_all_fields=True,
+        )
     except TemplateError as exc:
         raise ConfigError(str(exc)) from exc
     _logger.info(

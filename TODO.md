@@ -103,7 +103,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CLI-020 | open | S | Catalog validation compiles only fields referenced by the template (`_config.py:85-103`, `_compiler.py:107-150`). An unused field with `type: missing` or inverted integer bounds is therefore reported as valid by `ton --validate`, despite help promising per-field spec validation. Resolve and prepare every declared field during validation without changing generation's lazy runtime plan. |
 
 ## configuration discoverability
 

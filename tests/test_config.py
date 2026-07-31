@@ -159,6 +159,18 @@ def test_validate_config_lists_available_types_for_unknown_type() -> None:
         api.validate_config(payload)
 
 
+def test_validate_config_prepares_unused_fields() -> None:
+    payload = _valid_payload()
+    payload["types"]["unused"] = {"type": "integer", "minValue": 2, "maxValue": 1}
+
+    with pytest.raises(ConfigError, match="unused.*maxValue.*must be >=.*minValue"):
+        api.validate_config(payload)
+
+    payload["types"]["unused"] = {"type": "missing"}
+    with pytest.raises(ConfigError, match="Unknown type 'missing'.*unused"):
+        api.validate_config(payload)
+
+
 def test_encoding_accepts_known_codec() -> None:
     payload = _valid_payload()
     payload["encoding"] = "latin-1"

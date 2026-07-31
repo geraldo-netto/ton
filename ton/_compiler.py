@@ -59,11 +59,17 @@ class EngineCompiler:
         registry: Mapping[str, Generator] | None,
         transforms: Mapping[str, Transform] | None,
         validators: Mapping[str, Validator] | None,
+        prepare_all_fields: bool = False,
     ) -> None:
         self.template = str(config["format"])
         self.types: Mapping[str, Mapping[str, Any]] = config["types"]
         self.rows = int(config["rows"])
         self.tokens = tuple(parse(self.template))
+        self.field_keys = (
+            tuple(self.types)
+            if prepare_all_fields
+            else tuple(dict.fromkeys(token.type_key for token in self.tokens))
+        )
         self.registry = self._resolve_registry(registry)
         built_in_transforms = default_transforms()
         built_in_validators = default_validators()
@@ -109,8 +115,8 @@ class EngineCompiler:
             return dict(registry)
         root_specs: list[Mapping[str, Any]] = []
         root_types: set[str] = set()
-        for token in self.tokens:
-            spec = self.types.get(token.type_key)
+        for type_key in self.field_keys:
+            spec = self.types.get(type_key)
             if isinstance(spec, Mapping) and "type" in spec:
                 root_specs.append(spec)
                 root_types.add(runtime_type_name(spec["type"]))
@@ -123,16 +129,16 @@ class EngineCompiler:
         return make_registry(needed)
 
     def _validate(self) -> None:
-        for token in self.tokens:
+        for type_key in self.field_keys:
             try:
-                normalize_reference(self.types[token.type_key]["type"])
+                normalize_reference(self.types[type_key]["type"])
             except RegistryError as exc:
                 raise TemplateError(str(exc)) from exc
-            type_name = runtime_type_name(self.types[token.type_key]["type"])
+            type_name = runtime_type_name(self.types[type_key]["type"])
             if type_name not in self.registry:
                 available = ", ".join(sorted(self.registry)) or "(none)"
                 raise TemplateError(
-                    f"Unknown type {type_name!r} for variable {token.type_key!r}. "
+                    f"Unknown type {type_name!r} for variable {type_key!r}. "
                     f"Available types: {available}."
                 )
 
@@ -141,34 +147,32 @@ class EngineCompiler:
 
         prepared: dict[str, PreparedField] = {}
         context = PreparationContext(self.registry)
-        for token in self.tokens:
-            if token.type_key in prepared:
-                continue
-            spec = self.types[token.type_key]
+        for type_key in self.field_keys:
+            spec = self.types[type_key]
             generator = self.registry[runtime_type_name(spec["type"])]
             try:
-                self._validate_generator_keys(f"types.{token.type_key}", spec, generator)
-                prepared[token.type_key] = PreparedField(
+                self._validate_generator_keys(f"types.{type_key}", spec, generator)
+                prepared[type_key] = PreparedField(
                     generator=generator,
                     source_prepared=context.prepare_generator(generator, spec),
-                    transforms=self._prepare_transforms(token.type_key, spec, generator),
-                    validators=self._resolve_validators(token.type_key, spec),
+                    transforms=self._prepare_transforms(type_key, spec, generator),
+                    validators=self._resolve_validators(type_key, spec),
                 )
             except Exception as exc:  # noqa: BLE001
                 _logger.warning(
                     "prepare_failed type_key=%s generator_type=%s error_type=%s",
-                    token.type_key,
+                    type_key,
                     type(generator).__name__,
                     type(exc).__name__,
                     extra={
                         "event": LogEvent.PREPARE_FAILED.value,
-                        "type_key": token.type_key,
+                        "type_key": type_key,
                         "generator_type": type(generator).__name__,
                         "error_type": type(exc).__name__,
                     },
                 )
                 raise TemplateError(
-                    f"Invalid spec for variable {token.type_key!r}: {type(exc).__name__}: {exc}"
+                    f"Invalid spec for variable {type_key!r}: {type(exc).__name__}: {exc}"
                 ) from exc
         return prepared
 
@@ -255,6 +259,13 @@ def compile_plan(
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
     validators: Mapping[str, Validator] | None = None,
+    prepare_all_fields: bool = False,
 ) -> CompiledPlan:
     """Compile one config through the canonical compiler boundary."""
-    return EngineCompiler(config, registry, transforms, validators).compile()
+    return EngineCompiler(
+        config,
+        registry,
+        transforms,
+        validators,
+        prepare_all_fields=prepare_all_fields,
+    ).compile()

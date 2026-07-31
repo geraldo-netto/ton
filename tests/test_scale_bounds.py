@@ -98,6 +98,13 @@ def test_row_width_counts_literals_and_all_placeholders() -> None:
         list(Engine(config))
 
 
+def test_row_width_is_unbounded_when_limit_is_omitted() -> None:
+    wide = "x" * 2_000_001
+    config = {"rows": 1, "format": wide, "types": {"v": {"type": "string", "values": [""]}}}
+
+    assert list(Engine(config)) == [wide]
+
+
 def test_row_width_guards_composite_and_unknown_width_values() -> None:
     composite = {
         "rows": 1,

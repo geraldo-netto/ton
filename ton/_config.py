@@ -32,9 +32,6 @@ ROOT_KEYS = frozenset((*_REQUIRED_TOP_LEVEL, "encoding", "maxRowWidth"))
 _unknown_key_message = unknown_key_message
 
 
-DEFAULT_MAX_ROW_WIDTH = 2_000_000
-
-
 def load(path: str | Path) -> dict[str, Any]:
     """Read a JSON config from disk and validate its top-level shape.
 
@@ -107,13 +104,16 @@ def validate_structure(data: Any) -> None:
 
 
 def _validate_row_width(data: dict[str, Any]) -> None:
-    value = data.get("maxRowWidth", DEFAULT_MAX_ROW_WIDTH)
+    if "maxRowWidth" not in data:
+        return
+    value = data["maxRowWidth"]
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise ConfigError("'maxRowWidth' must be a positive integer.")
 
 
-def row_width_limit(data: Mapping[str, Any]) -> int:
-    return int(data.get("maxRowWidth", DEFAULT_MAX_ROW_WIDTH))
+def row_width_limit(data: Mapping[str, Any]) -> int | None:
+    value = data.get("maxRowWidth")
+    return int(value) if value is not None else None
 
 
 def _validate_encoding(data: dict[str, Any]) -> None:

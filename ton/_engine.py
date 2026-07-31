@@ -337,7 +337,7 @@ class Engine:
         return self._bounded_row("".join(parts))
 
     def _bounded_row(self, row: str) -> str:
-        if len(row) > self._max_row_width:
+        if self._max_row_width is not None and len(row) > self._max_row_width:
             raise TemplateError(
                 f"rendered row width {len(row)} exceeds maxRowWidth ({self._max_row_width})"
             )

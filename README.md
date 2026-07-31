@@ -172,10 +172,10 @@ flowchart TB
 
 Row-generation request flow:
 
-Rows are limited to 2,000,000 Unicode characters by default. Set the
-top-level `maxRowWidth` positive integer to choose a smaller or larger limit.
-The limit covers the complete rendered row—literals and all placeholders—and
-raises `TemplateError` before the row is yielded or written.
+Rows have no implicit width ceiling. Set the optional top-level `maxRowWidth`
+positive integer when an operator-controlled guard is required. The limit
+covers the complete rendered row—literals and all placeholders—and raises
+`TemplateError` before the row is yielded or written.
 
 ```mermaid
 sequenceDiagram

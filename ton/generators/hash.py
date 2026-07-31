@@ -18,7 +18,7 @@ from random import Random
 from typing import Any
 
 from ._md4 import md4 as _pure_md4
-from .base import PairedWordPoolGenerator, WordPairSpec, coerce_int, require_string_tuple
+from .base import PairedGenerator, coerce_int, require_string_tuple
 
 
 def _select_md4_backend() -> Callable[[bytes], bytes]:
@@ -58,14 +58,23 @@ class BcryptPairSpec:
     cache: dict[str, str] = field(default_factory=dict, compare=False, repr=False)
 
 
-class HashGenerator(PairedWordPoolGenerator):
+@dataclass(frozen=True)
+class DigestPairSpec:
+    """Validated digest pool with results cached only after selection."""
+
+    words: tuple[str, ...]
+    algorithm: str
+    cache: dict[str, str] = field(default_factory=dict, compare=False, repr=False)
+
+
+class HashGenerator(PairedGenerator):
     """Generate ``(plaintext, digest)`` pairs from a fixed word list."""
 
     type_name = "hash"
 
     def prepare(
         self, spec: Mapping[str, Any], context: Any = None
-    ) -> WordPairSpec | BcryptPairSpec:
+    ) -> DigestPairSpec | BcryptPairSpec:
         words = require_string_tuple(spec)
         algorithm = str(spec.get("algorithm", "sha256")).lower()
         if algorithm not in _ALGORITHMS:
@@ -80,13 +89,10 @@ class HashGenerator(PairedWordPoolGenerator):
                 )
             _load_bcrypt()
             return BcryptPairSpec(words=words, rounds=rounds)
-        if algorithm == "ntlm":
-            return WordPairSpec(pairs=tuple((word, _ntlm_digest(word)) for word in words))
-        hash_one = _HASHERS[algorithm]
-        return WordPairSpec(pairs=tuple((word, hash_one(word.encode("utf-8"))) for word in words))
+        return DigestPairSpec(words=words, algorithm=algorithm)
 
     def generate_pair(
-        self, prepared: WordPairSpec | BcryptPairSpec, rng: Random
+        self, prepared: DigestPairSpec | BcryptPairSpec, rng: Random
     ) -> tuple[str, str]:
         if isinstance(prepared, BcryptPairSpec):
             plaintext = rng.choice(prepared.words)
@@ -95,7 +101,18 @@ class HashGenerator(PairedWordPoolGenerator):
                 digest = _bcrypt_digest(plaintext, prepared.rounds)
                 prepared.cache[plaintext] = digest
             return plaintext, digest
-        return super().generate_pair(prepared, rng)
+        plaintext = rng.choice(prepared.words)
+        digest = prepared.cache.get(plaintext)
+        if digest is None:
+            digest = _digest(prepared.algorithm, plaintext)
+            prepared.cache[plaintext] = digest
+        return plaintext, digest
+
+
+def _digest(algorithm: str, plaintext: str) -> str:
+    if algorithm == "ntlm":
+        return _ntlm_digest(plaintext)
+    return _HASHERS[algorithm](plaintext.encode("utf-8"))
 
 
 def _bcrypt_digest(plaintext: str, rounds: int) -> str:

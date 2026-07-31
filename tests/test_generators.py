@@ -283,6 +283,26 @@ def test_hash_generator_bcrypt_hashes_selected_values_once(monkeypatch) -> None:
     assert len(prepared.cache) == 2
 
 
+def test_hash_generator_digests_selected_values_once(monkeypatch) -> None:
+    from ton.generators import hash as hash_module
+
+    words = [f"secret-{index}" for index in range(10_000)]
+    digest = mock.Mock(side_effect=lambda data: data.decode().upper())
+    monkeypatch.setitem(hash_module._HASHERS, "sha256", digest)
+    rng = mock.Mock()
+    rng.choice.side_effect = [words[-1], words[-1], words[0]]
+    generator = HashGenerator()
+
+    prepared = generator.prepare({"algorithm": "sha256", "values": words})
+
+    digest.assert_not_called()
+    assert generator.generate_pair(prepared, rng) == (words[-1], words[-1].upper())
+    assert generator.generate_pair(prepared, rng) == (words[-1], words[-1].upper())
+    assert generator.generate_pair(prepared, rng) == (words[0], words[0].upper())
+    assert digest.call_args_list == [mock.call(words[-1].encode()), mock.call(words[0].encode())]
+    assert len(prepared.cache) == 2
+
+
 def test_hash_generator_rejects_bad_bcrypt_rounds() -> None:
     with pytest.raises(ValueError, match="rounds"):
         HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 3, "values": ["secret"]})

@@ -46,7 +46,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-036 | open | M | Non-bcrypt hashes eagerly digest the entire `values` pool during prepare (`generators/hash.py:83-86`). Thus `--validate`, `rows: 0`, and small jobs pay CPU/memory for every SHA/NTLM value even when none or few are selected. Use the lazy per-plaintext cache already implemented for bcrypt without capping the pool. |
 | PERF-037 | open | M | Every clear proof-audit failure copies the full field spec and serializes it into every JSONL record (`_proofcheck.py:111-115`, `_proofaudit.py:38-53`). A large value pool multiplied by many failures creates avoidable multiplicative copying/output. Emit specs once (or by stable reference/fingerprint) while preserving a streaming, self-describing report. |
 
 ## scalability

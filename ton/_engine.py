@@ -8,7 +8,7 @@ files, or anywhere else without buffering the full dataset in memory.
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from random import Random
 from typing import Any, cast
@@ -24,8 +24,7 @@ from ._proof import (
     ProvenanceRecord,
     TransformStep,
 )
-from ._proofaudit import ProofAuditWriteError
-from ._proofcheck import ProofChecker
+from ._proofcheck import ProofChecker, ProofFailureSink, ProofFailureSinkError
 from ._transforms import Transform, TransformResult
 from ._validation import ValidationError, Validator
 from .generators import Generator
@@ -240,7 +239,7 @@ class Engine:
 
     def _set_proof_failure_sink(
         self,
-        failure_sink: Callable[[ProofFailure], None] | None,
+        failure_sink: ProofFailureSink | None,
     ) -> None:
         """Attach the CLI-owned streaming report destination before iteration."""
         self._proof.failure_sink = failure_sink
@@ -360,7 +359,7 @@ class Engine:
                     paired_cache[token.type_key] = pair
                 return pair[0] if token.wants_id else pair[1]
             return self._generate_single(token.type_key, field)
-        except (ProofError, ValidationError, ProofAuditWriteError):
+        except (ProofError, ValidationError, ProofFailureSinkError):
             raise
         except Exception as exc:  # noqa: BLE001 - boundary; re-raised below
             # A generator that raises mid-iteration would otherwise hit

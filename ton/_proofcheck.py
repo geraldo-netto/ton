@@ -30,6 +30,11 @@ from ._transforms import TransformResult
 #: exhaust memory (SCAL-001).
 MAX_AUDIT_SAMPLE = 1000
 PROOF_MODES = ("off", "sample", "all", "audit")
+ProofFailureSink = Callable[[ProofFailure], None]
+
+
+class ProofFailureSinkError(Exception):
+    """A configured proof-failure sink could not accept a record."""
 
 
 class ProofChecker:
@@ -42,7 +47,7 @@ class ProofChecker:
         sample_rate: int,
         seed: int | None,
         redact: bool = False,
-        failure_sink: Callable[[ProofFailure], None] | None = None,
+        failure_sink: ProofFailureSink | None = None,
     ) -> None:
         self.mode = validate_proof_mode(mode)
         self.sample_rate = validate_proof_sample_rate(sample_rate)
@@ -121,7 +126,12 @@ class ProofChecker:
         if len(self.failures) < MAX_AUDIT_SAMPLE:
             self.failures.append(visible)
         if self.failure_sink is not None:
-            self.failure_sink(visible)
+            try:
+                self.failure_sink(visible)
+            except ProofFailureSinkError:
+                raise
+            except Exception as exc:
+                raise ProofFailureSinkError(str(exc)) from exc
 
     def build_failures(
         self,

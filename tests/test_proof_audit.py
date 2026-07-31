@@ -10,9 +10,10 @@ from typing import Any
 import pytest
 
 from ton import _proofcheck as proofcheck
+from ton._engine import Engine
 from ton._proof import REDACTED, PreparedField, ProofFailure, ProofResult
 from ton._proofaudit import PROOF_AUDIT_SCHEMA, ProofAuditWriteError, ProofAuditWriter
-from ton._proofcheck import ProofChecker
+from ton._proofcheck import ProofChecker, ProofFailureSinkError
 from ton._transforms import TransformResult
 from ton.generators import Generator
 
@@ -139,3 +140,52 @@ def test_proof_checker_streams_details_beyond_retention_sample(monkeypatch) -> N
     assert len(checker.failures) == 2
     assert [record["row"] for record in records] == [1, 2, 3, 4, 5]
     assert all(record["spec"] == {"type": "failing"} for record in records)
+
+
+def test_engine_preserves_proof_sink_failure_boundary() -> None:
+    class FailingGenerator(Generator):
+        type_name = "failing"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            del prepared, rng
+            return "bad"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            del prepared, result
+            return ProofResult(ok=False, reason="bad value")
+
+    def reject_failure(failure: ProofFailure) -> None:
+        del failure
+        raise RuntimeError("sink unavailable")
+
+    engine = Engine.from_config(
+        {"rows": 1, "format": "$v$", "types": {"v": {"type": "failing"}}},
+        registry={"failing": FailingGenerator()},
+        proof_mode="audit",
+    )
+    engine._set_proof_failure_sink(reject_failure)
+
+    with pytest.raises(ProofFailureSinkError, match="sink unavailable") as exc:
+        list(engine)
+
+    assert isinstance(exc.value.__cause__, RuntimeError)
+
+
+def test_proof_checker_preserves_existing_sink_error() -> None:
+    sink_error = ProofFailureSinkError("sink unavailable")
+
+    def reject_failure(failure: ProofFailure) -> None:
+        del failure
+        raise sink_error
+
+    checker = ProofChecker(
+        mode="audit",
+        sample_rate=1,
+        seed=None,
+        failure_sink=reject_failure,
+    )
+
+    with pytest.raises(ProofFailureSinkError) as exc:
+        checker._record_audit(_failure())
+
+    assert exc.value is sink_error

@@ -570,6 +570,22 @@ def test_cli_proof_report_open_failure_returns_output_error(
     assert not report.exists()
 
 
+def test_open_proof_report_preserves_body_proof_error(tmp_path: Path) -> None:
+    from ton import cli
+
+    report = tmp_path / "proof.jsonl"
+    proof_error = ProofAuditWriteError("disk full")
+
+    with (
+        pytest.raises(ProofAuditWriteError) as exc,
+        cli._open_proof_report(str(report), no_clobber=False),
+    ):
+        raise proof_error
+
+    assert exc.value is proof_error
+    assert not report.exists()
+
+
 def test_cli_help_does_not_expose_internal_todo_ids(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

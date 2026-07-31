@@ -66,7 +66,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DEC-019 | open | S | Core `Engine` imports the infrastructure-specific `_proofaudit.ProofAuditWriteError` solely to let report failures escape its generator exception wrapper, while `_set_proof_failure_sink` is explicitly CLI-owned. Any other sink exception is misreported as `TemplateError: Generator ... raised ...`. Define a proof-layer sink/error boundary and keep report serialization/output exceptions out of `_engine.py`. |
 
 ## business/design patterns/DDD
 

@@ -16,7 +16,7 @@ from . import __version__, api
 from ._logging import terminal_failure_fields
 from ._output import OutputEncodingError, open_output_path
 from ._proofaudit import ProofAuditWriteError, ProofAuditWriter
-from ._proofcheck import PROOF_MODES
+from ._proofcheck import PROOF_MODES, ProofFailureSinkError
 from .api import (
     ConfigError,
     Engine,
@@ -332,7 +332,7 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
                     batch_rows=args.batch_rows,
                     resume_from=args.resume_from,
                 )
-    except ProofAuditWriteError as exc:
+    except (ProofAuditWriteError, ProofFailureSinkError) as exc:
         _log_terminal_failure(
             "output", 1, max(0, engine.rows_emitted - args.resume_from), engine.total_rows, exc
         )

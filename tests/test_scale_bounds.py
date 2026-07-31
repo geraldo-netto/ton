@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 from random import Random
 
 import pytest
 
 from ton._engine import Engine, TemplateError
 from ton.generators import Generator
-from ton.generators.bytes import MAX_BYTES_LENGTH, BytesGenerator
+from ton.generators.bytes import BytesGenerator
 from ton.generators.char import CharGenerator
 from ton.generators.regex import (
     MAX_LITERAL_REPEAT,
@@ -25,9 +26,11 @@ def test_char_honors_large_operator_requested_length() -> None:
     assert CharGenerator().generate(prepared, Random(0)) == "A" * 100_001
 
 
-def test_bytes_rejects_length_above_cap() -> None:
-    with pytest.raises(ValueError, match="MAX_BYTES_LENGTH"):
-        BytesGenerator().prepare({"length": MAX_BYTES_LENGTH + 1})
+def test_bytes_honors_large_operator_requested_length() -> None:
+    generator = BytesGenerator()
+    prepared = generator.prepare({"length": 1_000_001, "encoding": "base64"})
+
+    assert len(base64.b64decode(generator.generate(prepared, Random(0)))) == 1_000_001
 
 
 def test_text_rejects_count_above_cap() -> None:

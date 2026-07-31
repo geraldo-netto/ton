@@ -334,7 +334,6 @@ def test_cli_output_lines_are_utf8_decodable(write_config, tmp_path: Path) -> No
 
 def _capped_specs(rng: Random) -> list[Callable[[], int]]:
     """Return spec factories whose maximum output width is known."""
-    from ton.generators.bytes import MAX_BYTES_LENGTH
     from ton.generators.text import MAX_TEXT_COUNT
 
     pool = string_pool = ["a", "b", "c"]
@@ -373,7 +372,7 @@ def _capped_specs(rng: Random) -> list[Callable[[], int]]:
         return n
 
     # Static references silence unused-warning lint on imports.
-    assert MAX_BYTES_LENGTH and MAX_TEXT_COUNT
+    assert MAX_TEXT_COUNT
     assert string_pool == pool
     return [char_factory, bytes_factory, text_factory]
 

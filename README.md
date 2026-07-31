@@ -771,7 +771,7 @@ Random bytes encoded for transport.
 
 | field      | type   | description                                 |
 |------------|--------|---------------------------------------------|
-| `length`   | int    | raw byte count (default `16`; 1 ≤ N ≤ `MAX_BYTES_LENGTH`) |
+| `length`   | int    | raw byte count (default `16`; N ≥ 1)                      |
 | `encoding` | string | `hex` (default), `base64`, or `base32`      |
 
 ```json

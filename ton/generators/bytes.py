@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, assert_below_cap, coerce_int
+from .base import Generator, coerce_int
 
 
 def _encode_hex(raw: bytes) -> str:
@@ -40,8 +40,9 @@ _ENCODERS: dict[str, Callable[[bytes], str]] = {
     "base32": _encode_base32,
 }
 
-#: Upper bound on raw bytes drawn per row (TODO SCALE-002).
-MAX_BYTES_LENGTH = 1_000_000
+# Divisible by both base64's 3-byte and base32's 5-byte input blocks, so
+# independently encoded chunks concatenate without interior padding.
+_ENCODING_CHUNK_BYTES = 65_520
 
 
 @dataclass(frozen=True)
@@ -59,7 +60,6 @@ class BytesGenerator(Generator):
         length = coerce_int(spec, "length", type_name="bytes", default=16)
         if length < 1:
             raise ValueError("bytes 'length' must be >= 1")
-        assert_below_cap("bytes", "length", length, MAX_BYTES_LENGTH, "MAX_BYTES_LENGTH")
         encoding = str(spec.get("encoding", "hex"))
         if encoding not in _ENCODERS:
             raise ValueError(
@@ -68,4 +68,10 @@ class BytesGenerator(Generator):
         return BytesSpec(length=length, encode=_ENCODERS[encoding])
 
     def generate(self, prepared: BytesSpec, rng: Random) -> str:
-        return prepared.encode(rng.randbytes(prepared.length))
+        remaining = prepared.length
+        chunks: list[str] = []
+        while remaining:
+            size = min(remaining, _ENCODING_CHUNK_BYTES)
+            chunks.append(prepared.encode(rng.randbytes(size)))
+            remaining -= size
+        return "".join(chunks)

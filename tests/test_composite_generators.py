@@ -17,10 +17,7 @@ from ton._engine import Engine, TemplateError
 from ton._logging import LogEvent
 from ton.generators.base import Generator, PreparationContext, prepare_child_spec
 from ton.generators.one_of import OneOfGenerator
-from ton.generators.sequence_of import (
-    MAX_SEQUENCE_OF_COUNT,
-    SequenceOfGenerator,
-)
+from ton.generators.sequence_of import SequenceOfGenerator
 
 # ---------------------------------------------------------------------------
 # oneOf
@@ -184,20 +181,19 @@ def test_sequence_of_rejects_count_zero() -> None:
         list(api.generate(config))
 
 
-def test_sequence_of_rejects_count_above_cap() -> None:
+def test_sequence_of_honors_large_operator_requested_count() -> None:
     config = {
         "rows": 1,
         "format": "$v$",
         "types": {
             "v": {
                 "type": "sequence_of",
-                "count": MAX_SEQUENCE_OF_COUNT + 1,
+                "count": 10_001,
                 "spec": _string_spec("X"),
             }
         },
     }
-    with pytest.raises(TemplateError, match="MAX_SEQUENCE_OF_COUNT"):
-        list(api.generate(config))
+    assert list(api.generate(config)) == ["X" * 10_001]
 
 
 def test_sequence_of_rejects_non_string_separator() -> None:

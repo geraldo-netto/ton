@@ -660,7 +660,7 @@ Concatenate `count` independent draws from a single child spec, joined by an opt
 
 | field       | type   | description                                              |
 |-------------|--------|----------------------------------------------------------|
-| `count`     | int    | draws per row (1 ≤ N ≤ `MAX_SEQUENCE_OF_COUNT`)          |
+| `count`     | int    | draws per row (N ≥ 1)                                    |
 | `separator` | string | inserted between draws (default empty)                   |
 | `spec`      | object | child type spec                                          |
 

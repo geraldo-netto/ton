@@ -15,8 +15,7 @@ Spec::
                     "padWithZero": false}
     }
 
-``count`` is capped at :data:`MAX_SEQUENCE_OF_COUNT` so a misconfigured
-``1_000_000`` does not produce gigabyte rows.
+``count`` is operator-controlled and has no implicit workload ceiling.
 """
 
 from __future__ import annotations
@@ -31,14 +30,9 @@ from .._transforms import TransformResult
 from .base import (
     Generator,
     PreparationContext,
-    assert_below_cap,
     coerce_int,
     prepare_child_spec,
 )
-
-#: Upper bound on ``count`` so the generator stays bounded under
-#: misconfiguration.
-MAX_SEQUENCE_OF_COUNT = 10_000
 
 
 @dataclass(frozen=True)
@@ -75,13 +69,6 @@ class SequenceOfGenerator(Generator):
         count = coerce_int(spec, "count", type_name="sequence_of")
         if count < 1:
             raise ValueError("sequence_of 'count' must be >= 1")
-        assert_below_cap(
-            "sequence_of",
-            "count",
-            count,
-            MAX_SEQUENCE_OF_COUNT,
-            "MAX_SEQUENCE_OF_COUNT",
-        )
         separator = spec.get("separator", "")
         if not isinstance(separator, str):
             raise ValueError("sequence_of 'separator' must be a string")
@@ -90,10 +77,9 @@ class SequenceOfGenerator(Generator):
 
     def generate(self, prepared: SequenceOfSpec, rng: Random) -> str:
         child_gen, child_prepared = prepared.child
-        parts = [child_gen.generate(child_prepared, rng) for _ in range(prepared.count)]
-        if prepared.separator:
-            return prepared.separator.join(parts)
-        return "".join(parts)
+        return prepared.separator.join(
+            child_gen.generate(child_prepared, rng) for _ in range(prepared.count)
+        )
 
     def prove(self, prepared: SequenceOfSpec, result: TransformResult) -> ProofResult:
         # Recurse into the child for each element (REL-001). Only attempt

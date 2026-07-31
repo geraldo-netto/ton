@@ -980,6 +980,10 @@ Digest drawn from a fixed plaintext list. **Paired**: a single row may reference
 Plaintext entries are limited by bcrypt's format to 72 UTF-8 bytes and are
 rejected during config preparation when they exceed that boundary.
 
+> **Fixture-data warning:** Treat every `hash` output as synthetic fixture data,
+> never as stored credentials. Deterministic bcrypt salts are unsuitable for
+> password storage, and MD5, SHA-1, and NTLM are weak or legacy algorithms.
+
 ```json
 {
   "rows": 4,

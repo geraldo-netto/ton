@@ -54,7 +54,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| CONC-017 | open | L | Sequence partitioning assumes one counter draw per output row (`concurrency.py:122-127,190-205`). Repeated placeholders (`$id$,$id$`) and `sequence` nested under `sequence_of` draw multiple times, so later workers start inside earlier workers' ranges and duplicate ids. Compute offsets from the compiled draw plan (including composite multiplicity) or assign each worker a provably disjoint counter stream. |
 
 ## robustness/recovery
 

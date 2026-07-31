@@ -50,6 +50,7 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._output import open_output_path
 from ._registry import runtime_type_name
+from ._template import parse
 from ._transforms import Transform
 from ._validation import Validator
 from .generators import Generator
@@ -190,17 +191,26 @@ def _chunk_offset(total_rows: int, workers: int, worker_id: int) -> int:
 
 def _offset_sequences(config: Mapping[str, Any], offset: int) -> dict[str, Any]:
     copied = deepcopy(dict(config))
-    for spec in copied.get("types", {}).values():
-        _offset_sequence_spec(spec, offset)
+    occurrences: dict[str, int] = {}
+    for token in parse(str(copied.get("format", ""))):
+        occurrences[token.type_key] = occurrences.get(token.type_key, 0) + 1
+    for type_key, spec in copied.get("types", {}).items():
+        _offset_sequence_spec(spec, offset * occurrences.get(type_key, 0))
     return copied
 
 
 def _offset_sequence_spec(value: Any, offset: int) -> None:
     if isinstance(value, dict):
-        if runtime_type_name(value.get("type")) == "sequence":
+        type_name = runtime_type_name(value.get("type"))
+        if type_name == "sequence":
             start = int(value.get("start", 0))
             step = int(value.get("step", 1))
             value["start"] = start + offset * step
+            return
+        if type_name == "sequence_of":
+            count = int(value.get("count", 0))
+            _offset_sequence_spec(value.get("spec"), offset * count)
+            return
         for nested in value.values():
             _offset_sequence_spec(nested, offset)
     elif isinstance(value, list):

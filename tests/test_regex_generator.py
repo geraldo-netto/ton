@@ -93,6 +93,12 @@ def test_control_and_literal_escapes() -> None:
     assert _draw("a\\@") == "a@"
 
 
+@pytest.mark.parametrize("pattern", [r"(a)\1", r"\x41", r"\u0041", r"\07"])
+def test_unsupported_escape_forms_are_rejected(pattern: str) -> None:
+    with pytest.raises(ValueError, match="unsupported .*escape"):
+        RegexGenerator().prepare({"pattern": pattern})
+
+
 @pytest.mark.parametrize(
     "pattern",
     [

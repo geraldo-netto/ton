@@ -271,5 +271,9 @@ class _Parser:
             # word-boundary anchor outside a class; backspace inside one.
             return (LITERAL, 0x08) if in_class else (AT, "b")
         if nxt in _CONTROL_ESCAPES:
+            if nxt == "0" and (self._peek() or "").isdigit():
+                raise RegexParseError("unsupported octal escape")
             return (LITERAL, ord(_CONTROL_ESCAPES[nxt]))
+        if nxt.isalnum():
+            raise RegexParseError(f"unsupported escape \\{nxt}")
         return (LITERAL, ord(nxt))

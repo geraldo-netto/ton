@@ -53,7 +53,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SCAL-020 | open | S | `CharGenerator.prepare` rejects `maxChar > 100_000` through `MAX_CHAR_LENGTH` (`generators/char.py:12-14,28-34`). Remove the hard row-size cap and make generation honor the requested count without introducing a replacement fixed limit. |
 | SCAL-021 | open | S | `BytesGenerator.prepare` rejects `length > 1_000_000` through `MAX_BYTES_LENGTH` (`generators/bytes.py:43-44,58-68`). Remove the hard size cap and use chunked generation/encoding where needed rather than rejecting a valid large byte field. |
 | SCAL-022 | open | S | `TextGenerator.prepare` rejects `count > 10_000` through `MAX_TEXT_COUNT` (`generators/text.py:94-96,110-118`). Remove the hard workload cap and generate/join incrementally without imposing a new restrictive default. |
 | SCAL-023 | open | M | `SequenceOfGenerator.prepare` rejects `count > 10_000`, and generation materializes a list containing every child result (`generators/sequence_of.py:39-41,69-95`). Remove the cap and rework accumulation so large requested sequences are not rejected solely by a fixed policy limit. |

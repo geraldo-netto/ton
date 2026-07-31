@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from random import Random
+
 import pytest
 
 from ton._engine import Engine, TemplateError
 from ton.generators import Generator
 from ton.generators.bytes import MAX_BYTES_LENGTH, BytesGenerator
-from ton.generators.char import MAX_CHAR_LENGTH, CharGenerator
+from ton.generators.char import CharGenerator
 from ton.generators.regex import (
     MAX_LITERAL_REPEAT,
     MAX_TOTAL_EXPANSION,
@@ -17,15 +19,10 @@ from ton.generators.sequence import MAX_SEQUENCE_PAD_WIDTH, SequenceGenerator
 from ton.generators.text import MAX_TEXT_COUNT, TextGenerator
 
 
-def test_char_rejects_max_char_above_cap() -> None:
-    with pytest.raises(ValueError, match="MAX_CHAR_LENGTH"):
-        CharGenerator().prepare({"values": ["A"], "maxChar": MAX_CHAR_LENGTH + 1})
-
-
-def test_char_accepts_max_char_at_cap() -> None:
-    spec = {"values": ["A"], "maxChar": MAX_CHAR_LENGTH}
+def test_char_honors_large_operator_requested_length() -> None:
+    spec = {"values": ["A"], "maxChar": 100_001}
     prepared = CharGenerator().prepare(spec)
-    assert prepared.max_char == MAX_CHAR_LENGTH
+    assert CharGenerator().generate(prepared, Random(0)) == "A" * 100_001
 
 
 def test_bytes_rejects_length_above_cap() -> None:

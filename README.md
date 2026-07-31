@@ -470,7 +470,7 @@ Concatenate `maxChar` random picks from `values` (with replacement).
 | field      | type      | description                              |
 |------------|-----------|------------------------------------------|
 | `values`   | string[]  | non-empty alphabet                       |
-| `maxChar`  | int       | output length (1 ≤ N ≤ `MAX_CHAR_LENGTH`) |
+| `maxChar`  | int       | output length (N ≥ 1)                     |
 
 ```json
 {"type": "char", "values": ["A", "C", "G", "T"], "maxChar": 6}

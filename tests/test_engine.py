@@ -15,6 +15,7 @@ from ton._engine import Engine, ProofError, TemplateError
 from ton._proof import ProofResult
 from ton._transforms import (
     BaseTransform,
+    IdentityTransform,
     TransformCapabilities,
     TransformProof,
     TransformResult,
@@ -350,6 +351,35 @@ def test_engine_rejects_transform_that_cannot_accept_paired_input() -> None:
 
     with pytest.raises(TemplateError, match="does not accept paired"):
         Engine(config, transforms={"plugin.unpaired": UnpairedTransform()})
+
+
+@pytest.mark.parametrize("chain", [["plugin.drop"], ["plugin.drop", "identity"]])
+def test_engine_rejects_id_reference_after_transform_drops_pairing(chain: list[str]) -> None:
+    class DropPairTransform(BaseTransform):
+        type_name: ClassVar[str] = "drop"
+        capabilities: ClassVar[TransformCapabilities] = TransformCapabilities(True, False)
+
+        def apply(self, prepared, value, rng):
+            del prepared, rng
+            return TransformResult(value.value)
+
+    config = {
+        "rows": 1,
+        "format": "$word[id]$",
+        "types": {
+            "word": {
+                "type": "hash",
+                "algorithm": "ntlm",
+                "values": ["alpha"],
+                "transforms": [{"type": reference} for reference in chain],
+            }
+        },
+    }
+
+    with pytest.raises(TemplateError, match=r"cannot use \[id\].*does not preserve pairing"):
+        Engine(
+            config, transforms={"plugin.drop": DropPairTransform(), "identity": IdentityTransform()}
+        )
 
 
 def test_engine_collects_source_proof_failure() -> None:

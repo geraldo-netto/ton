@@ -37,7 +37,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-029 | open | M | Pairing capability is not preserved as compiled state. A transform that accepts but drops pairing lets a requested `$field[id]$` silently render the transformed primary value; adding a later pairing-preserving transform makes `PreparedField.is_paired` look only at the last transform and render `""` (`_proof.py:32-37`, `_engine.py:355-360,387-393`). Fold the complete chain once, reject `[id]` references after pairing is lost, and cover both drop-only and drop-then-identity chains. |
 | REL-032 | open | L | Proof checking is permissive for every non-composite built-in: only `weighted`, `oneOf`, and `sequence_of` override `Generator.prove`; all other sources inherit `ProofResult(ok=True)` (`generators/base.py:154-162`). Consequently `--proof-check all/audit` cannot detect a faulty core integer, regex, hash, date, etc. implementation. Add real proof hooks by generator family and mutation tests proving each core type can fail. |
 
 ## performance

@@ -93,6 +93,7 @@ class EngineCompiler:
     def compile(self) -> CompiledPlan:
         self._validate()
         prepared = self._build_prepared()
+        self._validate_id_references(prepared)
         literals, plan_tokens = split_segments(self.template)
         resolved_tokens = tuple(
             ResolvedToken(token, prepared[token.type_key], prepared[token.type_key].is_direct)
@@ -152,10 +153,12 @@ class EngineCompiler:
             generator = self.registry[runtime_type_name(spec["type"])]
             try:
                 self._validate_generator_keys(f"types.{type_key}", spec, generator)
+                transforms, is_paired = self._prepare_transforms(type_key, spec, generator)
                 prepared[type_key] = PreparedField(
                     generator=generator,
                     source_prepared=context.prepare_generator(generator, spec),
-                    transforms=self._prepare_transforms(type_key, spec, generator),
+                    transforms=transforms,
+                    is_paired=is_paired,
                     validators=self._resolve_validators(type_key, spec),
                 )
             except Exception as exc:  # noqa: BLE001
@@ -176,6 +179,14 @@ class EngineCompiler:
                 ) from exc
         return prepared
 
+    def _validate_id_references(self, prepared: Mapping[str, PreparedField]) -> None:
+        for token in self.tokens:
+            if token.wants_id and not prepared[token.type_key].is_paired:
+                raise TemplateError(
+                    f"Variable {token.type_key!r} cannot use [id] because its "
+                    "generator/transform chain does not preserve pairing"
+                )
+
     def _validate_generator_keys(
         self,
         path: str,
@@ -195,11 +206,24 @@ class EngineCompiler:
 
     def _prepare_transforms(
         self, type_key: str, spec: Mapping[str, Any], generator: Generator
-    ) -> tuple[PreparedTransform, ...]:
+    ) -> tuple[tuple[PreparedTransform, ...], bool]:
+        transform_specs = spec.get("transforms", [])
+        resolved = [
+            (transform_spec, self._resolve_transform(type_key, transform_spec["type"]))
+            for transform_spec in transform_specs
+        ]
+        capability = fold_paired_capabilities(
+            bool(generator.is_paired),
+            tuple(transform.capabilities for _transform_spec, transform in resolved),
+        )
+        if capability.incompatible_index is not None:
+            reference = transform_specs[capability.incompatible_index]["type"]
+            raise TemplateError(
+                f"Transform {reference!r} for variable {type_key!r} does not accept paired input"
+            )
         is_paired = bool(generator.is_paired)
         prepared: list[PreparedTransform] = []
-        for index, transform_spec in enumerate(spec.get("transforms", [])):
-            transform = self._resolve_transform(type_key, transform_spec["type"])
+        for index, (transform_spec, transform) in enumerate(resolved):
             error = extension_key_error(
                 f"types.{type_key}.transforms[{index}]",
                 transform_spec,
@@ -208,12 +232,6 @@ class EngineCompiler:
             )
             if error is not None:
                 raise TemplateError(error)
-            capability = fold_paired_capabilities(is_paired, (transform.capabilities,))
-            if capability.incompatible_index is not None:
-                raise TemplateError(
-                    f"Transform {transform_spec['type']!r} for variable "
-                    f"{type_key!r} does not accept paired input"
-                )
             prepared.append(
                 PreparedTransform(
                     transform,
@@ -232,8 +250,8 @@ class EngineCompiler:
                     "paired_input": is_paired,
                 },
             )
-            is_paired = capability.preserves_pairing
-        return tuple(prepared)
+            is_paired = is_paired and transform.capabilities.preserves_pairing
+        return tuple(prepared), capability.preserves_pairing
 
     def _resolve_transform(self, type_key: str, reference: str) -> Transform:
         normalized = normalize_reference(reference)

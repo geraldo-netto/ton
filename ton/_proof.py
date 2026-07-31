@@ -27,14 +27,8 @@ class PreparedField:
     generator: Any
     source_prepared: Any
     transforms: tuple[PreparedTransform, ...]
+    is_paired: bool = False
     validators: tuple[Any, ...] = ()
-
-    @cached_property
-    def is_paired(self) -> bool:
-        if not self.transforms:
-            return bool(self.generator.is_paired)
-        last = self.transforms[-1].transform
-        return bool(self.generator.is_paired and last.capabilities.preserves_pairing)
 
     @cached_property
     def is_direct(self) -> bool:

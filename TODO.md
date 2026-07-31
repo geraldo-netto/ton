@@ -116,4 +116,3 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-033 | open | S | `generators/sequence.py:7` documents `start` defaulting to 1 while implementation and README use 0 (`sequence.py:53-55`, `README.md:749-753`). Correct the module example so copied configs and shard reasoning use the actual default. |

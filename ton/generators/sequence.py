@@ -4,7 +4,7 @@ Spec fields::
 
     {
       "type":     "sequence",
-      "start":    1,        // optional, default 0
+      "start":    0,        // optional, default 0
       "step":     1,        // optional, default 1
       "padWidth": 6         // optional, zero-pad output to this width
     }

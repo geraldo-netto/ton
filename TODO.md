@@ -50,7 +50,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SCAL-025 | open | M | Regex preparation rejects otherwise supported patterns through fixed literal-repeat, total-expansion, and group-nesting caps (`generators/regex.py:38-51,71-85,116-166`; `generators/_regex_parse.py:97,203-219`). Replace recursive/eager expansion paths with overflow-safe lazy/iterative handling and operator-controlled settings rather than fixed rejection thresholds. |
 
 ## concurrency
 

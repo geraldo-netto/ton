@@ -7,7 +7,6 @@ from random import Random
 
 import pytest
 
-from ton.generators._regex_parse import MAX_GROUP_NESTING
 from ton.generators.regex import RegexGenerator
 
 
@@ -124,11 +123,10 @@ def test_rejects_invalid_character_classes_at_prepare(pattern: str) -> None:
         RegexGenerator().prepare({"pattern": pattern})
 
 
-def test_rejects_excessive_group_nesting_at_prepare() -> None:
-    pattern = "(" * (MAX_GROUP_NESTING + 1) + "a" + ")" * (MAX_GROUP_NESTING + 1)
+def test_deep_group_nesting_uses_iterative_pipeline() -> None:
+    pattern = "(" * 2_000 + "a" + ")" * 2_000
 
-    with pytest.raises(ValueError, match="MAX_GROUP_NESTING"):
-        RegexGenerator().prepare({"pattern": pattern})
+    assert _draw(pattern) == "a"
 
 
 def test_character_classes_are_resolved_during_prepare(monkeypatch) -> None:

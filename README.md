@@ -926,7 +926,11 @@ ipsum mollit culpa nostrud laboris reprehenderit
 
 #### `regex`
 
-Produce strings matching a user-supplied regex. Supports literals, character classes, escapes (`\d \w \s` and their negations), quantifiers, alternation, and groups. Unbounded `*` / `+` add at most 8 repeats, literal `{N}` quantifiers are capped at 10,000, total nested expansion is capped at 1,000,000 characters per row, and group nesting is capped at 100.
+Produce strings matching a user-supplied regex. Supports literals, character
+classes, escapes (`\d \w \s` and their negations), quantifiers, alternation,
+and groups. Unbounded `*` / `+` choose up to 8 additional repetitions so each
+draw terminates. Explicit quantifiers and group nesting have no fixed expansion
+ceiling; nested patterns are prepared and emitted iteratively.
 
 | field     | type   | description                       |
 |-----------|--------|-----------------------------------|

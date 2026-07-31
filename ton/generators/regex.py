@@ -29,7 +29,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from random import Random
-from typing import Any, cast
+from typing import Any
 
 from . import _regex_parse as rx
 from ._regex_parse import RegexParseError
@@ -37,18 +37,6 @@ from .base import Generator
 
 #: Upper bound on the *extra* repetitions allowed for ``*`` and ``+``.
 MAX_UNBOUNDED_REPEAT = 8
-
-#: Upper bound on the literal repeat count in ``{N}`` / ``{N,M}``. Without
-#: this cap, ``a{1_000_000}`` quietly produces a million-character row
-#: (TODO SCALE-002).
-MAX_LITERAL_REPEAT = 10_000
-
-#: Upper bound on the *total* characters one row can expand to. The
-#: per-node MAX_LITERAL_REPEAT check is blind to multiplicative nesting:
-#: ``(a{5000}){5000}`` passes it node-by-node yet materializes ~25M
-#: chars/row. This cap bounds the product of nested repeats so a config
-#: cannot drive unbounded memory use (SEC-001).
-MAX_TOTAL_EXPANSION = 1_000_000
 
 _PRINTABLE_ASCII = tuple(chr(c) for c in range(0x20, 0x7F))
 _DIGITS = tuple(string.digits)
@@ -76,13 +64,7 @@ class RegexGenerator(Generator):
             parsed = rx.parse(pattern)
         except RegexParseError as exc:
             raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
-        _reject_oversized_repeats(cast(Iterable[tuple[Any, Any]], parsed))
-        if _max_expansion(cast(Iterable[tuple[Any, Any]], parsed)) > MAX_TOTAL_EXPANSION:
-            raise ValueError(
-                "regex 'pattern' can expand beyond MAX_TOTAL_EXPANSION "
-                f"({MAX_TOTAL_EXPANSION}) characters per row"
-            )
-        return RegexSpec(parsed=_prepare_nodes(cast(Iterable[tuple[Any, Any]], parsed)))
+        return RegexSpec(parsed=_prepare_nodes(parsed))
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:
         parts: list[str] = []
@@ -96,88 +78,67 @@ class RegexGenerator(Generator):
 
 
 def _prepare_nodes(seq: Iterable[tuple[Any, Any]]) -> tuple[tuple[Any, Any], ...]:
-    """Freeze the parsed AST and resolve character classes before generation."""
+    """Resolve pools and prepare nested AST nodes without Python recursion."""
     prepared: list[tuple[Any, Any]] = []
-    for op, arg in seq:
+    work: list[tuple[tuple[Any, Any], list[tuple[Any, Any]]]] = [
+        (node, prepared) for node in reversed(tuple(seq))
+    ]
+    while work:
+        (op, arg), target = work.pop()
         if op is rx.IN:
-            arg = _in_pool(tuple(arg))
+            target.append((op, _prepare_in_pool(arg)))
         elif op is rx.NOT_LITERAL:
-            arg = _excluding_pool(frozenset((chr(arg),)))
+            target.append((op, _excluding_pool(frozenset((chr(arg),)))))
         elif op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
-            arg = (arg[0], arg[1], _prepare_nodes(arg[2]))
+            child: list[tuple[Any, Any]] = []
+            target.append((op, (arg[0], arg[1], child)))
+            work.extend((node, child) for node in reversed(tuple(arg[2])))
         elif op is rx.BRANCH:
-            arg = (arg[0], tuple(_prepare_nodes(alt) for alt in arg[1]))
+            alternatives: list[list[tuple[Any, Any]]] = [[] for _ in arg[1]]
+            target.append((op, (arg[0], alternatives)))
+            for source, destination in reversed(tuple(zip(arg[1], alternatives, strict=True))):
+                work.extend((node, destination) for node in reversed(tuple(source)))
         elif op is rx.SUBPATTERN:
-            arg = (arg[0], arg[1], arg[2], _prepare_nodes(arg[3]))
-        prepared.append((op, arg))
+            child = []
+            target.append((op, (arg[0], arg[1], arg[2], child)))
+            work.extend((node, child) for node in reversed(tuple(arg[3])))
+        else:
+            target.append((op, arg))
     return tuple(prepared)
 
 
-def _reject_oversized_repeats(seq: Iterable[tuple[Any, Any]]) -> None:
-    """Walk the AST and reject any literal ``{lo,hi}`` whose ``lo`` (or
-    finite ``hi``) exceeds :data:`MAX_LITERAL_REPEAT` (TODO SCALE-002)."""
-    for op, arg in seq:
-        if op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
-            lo, hi, sub = arg
-            bounded_hi = hi if hi != rx.MAXREPEAT else lo
-            if max(lo, bounded_hi) > MAX_LITERAL_REPEAT:
-                raise ValueError(
-                    "regex 'pattern' literal repeat exceeds "
-                    f"MAX_LITERAL_REPEAT ({MAX_LITERAL_REPEAT})"
-                )
-            _reject_oversized_repeats(sub)
-        elif op is rx.BRANCH:
-            for alt in arg[1]:
-                _reject_oversized_repeats(alt)
-        elif op is rx.SUBPATTERN:
-            _reject_oversized_repeats(arg[3])
-        elif op is rx.IN:
-            _reject_invalid_character_class(arg)
-
-
-def _reject_invalid_character_class(items: Iterable[tuple[Any, Any]]) -> None:
+def _prepare_in_pool(items: Iterable[tuple[Any, Any]]) -> tuple[str, ...]:
     try:
-        _in_pool(tuple(items))
+        return _in_pool(tuple(items))
     except ValueError as exc:
         raise ValueError(f"regex 'pattern' has invalid character class: {exc}") from exc
 
 
-def _max_expansion(seq: Iterable[tuple[Any, Any]]) -> int:
-    """Return the maximum characters ``seq`` can emit for one row (SEC-001).
-
-    Repeats multiply their sub-expansion, so nested quantifiers compound
-    -- this is what the per-node :func:`_reject_oversized_repeats` check
-    cannot see.
-    """
-    return sum(_node_expansion(op, arg) for op, arg in seq)
-
-
-def _node_expansion(op: Any, arg: Any) -> int:
-    if op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
-        lo, hi, sub = arg
-        reps = lo + MAX_UNBOUNDED_REPEAT if hi == rx.MAXREPEAT else hi
-        return int(reps) * _max_expansion(sub)
-    if op is rx.BRANCH:
-        return max((_max_expansion(alt) for alt in arg[1]), default=0)
-    if op is rx.SUBPATTERN:
-        return _max_expansion(arg[3])
-    if op is rx.AT:
-        return 0
-    return 1  # literals, classes, categories, any, range -> one char each
-
-
 def _emit_into(seq: Iterable[tuple[Any, Any]], rng: Random, out: list[str]) -> None:
-    """Append each node's rendering directly to ``out``.
-
-    Caller-supplied accumulator so nested calls (notably
-    :func:`_emit_repeat` and :func:`_emit_branch`) reuse the same list
-    instead of allocating a fresh list per AST node (TODO PERF-010).
-    """
-    for op, arg in seq:
-        handler = _EMIT_HANDLERS.get(op)
-        if handler is None:
-            raise ValueError(f"regex generator: unsupported construct {op!r}")
-        handler(arg, rng, out)
+    """Append nodes iteratively so nesting does not consume the Python stack."""
+    work: list[tuple[str, Any]] = [("node", node) for node in reversed(tuple(seq))]
+    while work:
+        kind, payload = work.pop()
+        if kind == "repeat":
+            remaining, sub = payload
+            if remaining:
+                work.append(("repeat", (remaining - 1, sub)))
+                work.extend(("node", node) for node in reversed(tuple(sub)))
+            continue
+        op, arg = payload
+        if op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
+            lo, hi, sub = arg
+            bounded_hi = lo + MAX_UNBOUNDED_REPEAT if hi == rx.MAXREPEAT else hi
+            work.append(("repeat", (rng.randint(lo, bounded_hi), sub)))
+        elif op is rx.BRANCH:
+            work.extend(("node", node) for node in reversed(tuple(rng.choice(arg[1]))))
+        elif op is rx.SUBPATTERN:
+            work.extend(("node", node) for node in reversed(tuple(arg[3])))
+        else:
+            handler = _EMIT_HANDLERS.get(op)
+            if handler is None:
+                raise ValueError(f"regex generator: unsupported construct {op!r}")
+            handler(arg, rng, out)
 
 
 def _emit_literal(arg: Any, rng: Random, out: list[str]) -> None:
@@ -192,16 +153,6 @@ def _emit_any(arg: Any, rng: Random, out: list[str]) -> None:
     out.append(rng.choice(_ANY_POOL))
 
 
-def _emit_branch(arg: Any, rng: Random, out: list[str]) -> None:
-    _, alternatives = arg
-    _emit_into(rng.choice(alternatives), rng, out)
-
-
-def _emit_subpattern(arg: Any, rng: Random, out: list[str]) -> None:
-    # (group, add_flags, del_flags, sub)
-    _emit_into(arg[3], rng, out)
-
-
 def _emit_category(arg: Any, rng: Random, out: list[str]) -> None:
     out.append(rng.choice(_category_pool(arg)))
 
@@ -213,15 +164,6 @@ def _emit_at(arg: Any, rng: Random, out: list[str]) -> None:
 def _emit_range(arg: Any, rng: Random, out: list[str]) -> None:
     lo, hi = arg
     out.append(chr(rng.randint(lo, hi)))
-
-
-def _emit_repeat(arg: tuple[int, int, Any], rng: Random, out: list[str]) -> None:
-    lo, hi, sub = arg
-    if hi == rx.MAXREPEAT:
-        hi = lo + MAX_UNBOUNDED_REPEAT
-    count = rng.randint(lo, hi)
-    for _ in range(count):
-        _emit_into(sub, rng, out)
 
 
 def _pick_in(pool: tuple[str, ...], rng: Random, out: list[str]) -> None:
@@ -310,10 +252,6 @@ _EMIT_HANDLERS = {
     rx.NOT_LITERAL: _emit_not_literal,
     rx.ANY: _emit_any,
     rx.IN: _pick_in,
-    rx.MAX_REPEAT: _emit_repeat,
-    rx.MIN_REPEAT: _emit_repeat,
-    rx.BRANCH: _emit_branch,
-    rx.SUBPATTERN: _emit_subpattern,
     rx.CATEGORY: _emit_category,
     rx.AT: _emit_at,
     rx.RANGE: _emit_range,

@@ -94,46 +94,49 @@ _CONTROL_ESCAPES = {
     "0": "\0",
 }
 _BRACE_RE = re.compile(r"\{(\d+)(,(\d*))?\}")
-MAX_GROUP_NESTING = 100
-
 Node = tuple[Any, Any]
 
 
 def parse(pattern: str) -> list[Node]:
     """Parse ``pattern`` into a list of ``(op, arg)`` nodes."""
     parser = _Parser(pattern)
-    nodes = parser.parse_alternation()
-    if parser.pos != len(parser.text):
-        raise RegexParseError(f"unbalanced parenthesis at position {parser.pos}")
-    return nodes
+    alternatives: list[list[Node]] = [[]]
+    parents: list[list[list[Node]]] = []
+    while (char := parser._peek()) is not None:
+        if char == "(":
+            parser._open_group()
+            parents.append(alternatives)
+            alternatives = [[]]
+        elif char == ")":
+            if not parents:
+                raise RegexParseError(f"unbalanced parenthesis at position {parser.pos}")
+            parser.pos += 1
+            group = (SUBPATTERN, (None, 0, 0, _finish_alternatives(alternatives)))
+            alternatives = parents.pop()
+            alternatives[-1].append(parser._apply_quantifier(group))
+        elif char == "|":
+            parser.pos += 1
+            alternatives.append([])
+        else:
+            alternatives[-1].append(parser._parse_quantified())
+    if parents:
+        raise RegexParseError("missing ), unterminated subpattern")
+    return _finish_alternatives(alternatives)
+
+
+def _finish_alternatives(alternatives: list[list[Node]]) -> list[Node]:
+    if len(alternatives) == 1:
+        return alternatives[0]
+    return [(BRANCH, (None, alternatives))]
 
 
 class _Parser:
     def __init__(self, text: str) -> None:
         self.text = text
         self.pos = 0
-        self.group_depth = 0
 
     def _peek(self) -> str | None:
         return self.text[self.pos] if self.pos < len(self.text) else None
-
-    def parse_alternation(self) -> list[Node]:
-        alternatives = [self.parse_concat()]
-        while self._peek() == "|":
-            self.pos += 1
-            alternatives.append(self.parse_concat())
-        if len(alternatives) == 1:
-            return alternatives[0]
-        return [(BRANCH, (None, alternatives))]
-
-    def parse_concat(self) -> list[Node]:
-        nodes: list[Node] = []
-        while True:
-            char = self._peek()
-            if char is None or char in "|)":
-                break
-            nodes.append(self._parse_quantified())
-        return nodes
 
     def _parse_quantified(self) -> Node:
         atom = self._parse_atom()
@@ -142,7 +145,7 @@ class _Parser:
     def _parse_atom(self) -> Node:
         char = self.text[self.pos]
         if char == "(":
-            return self._parse_group()
+            raise RegexParseError("internal group parser state")
         if char == "[":
             return self._parse_class()
         if char == "\\":
@@ -200,23 +203,12 @@ class _Parser:
         self.pos = match.end()
         return (lo, hi)
 
-    def _parse_group(self) -> Node:
+    def _open_group(self) -> None:
         self.pos += 1  # consume '('
-        if self.group_depth >= MAX_GROUP_NESTING:
-            raise RegexParseError(f"group nesting exceeds MAX_GROUP_NESTING ({MAX_GROUP_NESTING})")
-        self.group_depth += 1
-        try:
-            if self.text[self.pos : self.pos + 2] == "?:":
-                self.pos += 2
-            elif self._peek() == "?":
-                raise RegexParseError("unsupported group extension")
-            sub = self.parse_alternation()
-            if self._peek() != ")":
-                raise RegexParseError("missing ), unterminated subpattern")
-            self.pos += 1
-            return (SUBPATTERN, (None, 0, 0, sub))
-        finally:
-            self.group_depth -= 1
+        if self.text[self.pos : self.pos + 2] == "?:":
+            self.pos += 2
+        elif self._peek() == "?":
+            raise RegexParseError("unsupported group extension")
 
     def _parse_class(self) -> Node:
         self.pos += 1  # consume '['

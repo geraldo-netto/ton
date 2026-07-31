@@ -1,4 +1,4 @@
-"""Tests for the per-generator output-size caps (SCALE-002)."""
+"""Tests for operator-controlled generator scale."""
 
 from __future__ import annotations
 
@@ -11,11 +11,7 @@ from ton._engine import Engine, TemplateError
 from ton.generators import Generator
 from ton.generators.bytes import BytesGenerator
 from ton.generators.char import CharGenerator
-from ton.generators.regex import (
-    MAX_LITERAL_REPEAT,
-    MAX_TOTAL_EXPANSION,
-    RegexGenerator,
-)
+from ton.generators.regex import RegexGenerator
 from ton.generators.sequence import SequenceGenerator
 from ton.generators.text import TextGenerator
 
@@ -47,43 +43,25 @@ def test_sequence_honors_large_operator_requested_padding() -> None:
     assert generator.generate(prepared, Random(0)) == "0" * 100_000 + "1"
 
 
-def test_regex_rejects_oversized_literal_repeat() -> None:
-    big = MAX_LITERAL_REPEAT + 1
-    with pytest.raises(ValueError, match="MAX_LITERAL_REPEAT"):
-        RegexGenerator().prepare({"pattern": f"a{{{big}}}"})
+def test_regex_honors_large_literal_repeat() -> None:
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": "a{10001}"})
 
-
-def test_regex_rejects_oversized_literal_inside_group() -> None:
-    big = MAX_LITERAL_REPEAT + 1
-    with pytest.raises(ValueError, match="MAX_LITERAL_REPEAT"):
-        RegexGenerator().prepare({"pattern": f"(ab){{{big}}}"})
-
-
-def test_regex_rejects_oversized_literal_inside_alternation() -> None:
-    big = MAX_LITERAL_REPEAT + 1
-    with pytest.raises(ValueError, match="MAX_LITERAL_REPEAT"):
-        RegexGenerator().prepare({"pattern": f"x|a{{{big}}}"})
+    assert generator.generate(prepared, Random(0)) == "a" * 10_001
 
 
 def test_regex_accepts_unbounded_quantifiers_at_any_lo() -> None:
-    # 'a+' (unbounded) is still allowed; only literal lo/hi exceeding
-    # MAX_LITERAL_REPEAT trip the cap.
     RegexGenerator().prepare({"pattern": "a+"})
     RegexGenerator().prepare({"pattern": "a*"})
 
 
-def test_regex_rejects_nested_repeats_exceeding_total_expansion() -> None:
-    # Each node is within MAX_LITERAL_REPEAT, but nesting multiplies:
-    # 5000 * 5000 = 25M chars/row (SEC-001).
-    with pytest.raises(ValueError, match="MAX_TOTAL_EXPANSION"):
-        RegexGenerator().prepare({"pattern": "(?:a{5000}){5000}"})
+def test_regex_prepares_nested_repeats_without_eager_expansion() -> None:
+    assert RegexGenerator().prepare({"pattern": "(?:a{5000}){5000}"}) is not None
 
 
 def test_regex_accepts_pattern_within_total_expansion() -> None:
-    # A single large-but-bounded repeat stays under the total cap.
     prepared = RegexGenerator().prepare({"pattern": "a{10000}"})
     assert prepared is not None
-    assert MAX_TOTAL_EXPANSION == 1_000_000
 
 
 def test_row_width_counts_literals_and_all_placeholders() -> None:

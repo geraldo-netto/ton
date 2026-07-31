@@ -10,7 +10,6 @@ validation surfaces cannot drift (TODO REL-011).
 from __future__ import annotations
 
 import codecs
-import difflib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -19,7 +18,8 @@ from typing import Any, cast
 from ._compiler import TemplateError, compile_plan
 from ._logging import LogEvent
 from ._logging import logger as _logger
-from ._registry import ExtensionCatalog, RegistryError, normalize_reference
+from ._registry import ExtensionCatalog
+from ._speckeys import COMMON_FIELD_KEYS, unknown_key_message
 from ._template import UndeclaredVariableError, validate_against
 
 
@@ -29,14 +29,7 @@ class ConfigError(ValueError):
 
 _REQUIRED_TOP_LEVEL = ("rows", "format", "types")
 ROOT_KEYS = frozenset((*_REQUIRED_TOP_LEVEL, "encoding", "maxRowWidth"))
-COMMON_FIELD_KEYS = frozenset(("type", "transforms", "validators"))
-
-
-def _unknown_key_message(path: str, key: str, allowed: frozenset[str]) -> str:
-    """Return a stable unknown-key diagnostic with a typo suggestion."""
-    matches = difflib.get_close_matches(key, allowed, n=1, cutoff=0.6)
-    suggestion = f" Did you mean {matches[0]!r}?" if matches else ""
-    return f"Unknown key {path}.{key}.{suggestion} Allowed keys: {', '.join(sorted(allowed))}."
+_unknown_key_message = unknown_key_message
 
 
 #: Defensive upper bound on row count. Type-specific upper bounds
@@ -82,22 +75,6 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
     generators = catalog.generators()
     transforms = catalog.transforms()
     validators = catalog.validators()
-    for field_name, spec in data["types"].items():
-        generator = generators.get(_normalize_config_reference(spec["type"]))
-        if generator is not None:
-            _validate_extension_keys(
-                f"types.{field_name}", spec, generator.config_keys, COMMON_FIELD_KEYS
-            )
-            _validate_nested_generator_keys(f"types.{field_name}", spec, generator, generators)
-        for transform_spec in spec.get("transforms", []):
-            transform = transforms.get(_normalize_config_reference(transform_spec["type"]))
-            if transform is not None:
-                _validate_extension_keys(
-                    f"types.{field_name}.transforms",
-                    transform_spec,
-                    transform.config_keys,
-                    frozenset(("type",)),
-                )
     try:
         compile_plan(data, registry=generators, transforms=transforms, validators=validators)
     except TemplateError as exc:
@@ -195,6 +172,8 @@ def _validate_type_spec(name: str, spec: Any) -> None:
     for key in spec:
         if key in COMMON_FIELD_KEYS:
             continue
+        import difflib
+
         matches = difflib.get_close_matches(key, COMMON_FIELD_KEYS, n=1, cutoff=0.8)
         if matches:
             raise ConfigError(_unknown_key_message(f"types.{name}", key, COMMON_FIELD_KEYS))
@@ -225,44 +204,4 @@ def _validate_template_references(template: str, types: dict[str, Any]) -> None:
     try:
         validate_against(template, types.keys())
     except UndeclaredVariableError as exc:
-        raise ConfigError(str(exc)) from exc
-
-
-def _validate_extension_keys(
-    path: str,
-    spec: Mapping[str, Any],
-    extension_keys: frozenset[str] | None,
-    common_keys: frozenset[str],
-) -> None:
-    if extension_keys is None:
-        return
-    allowed = common_keys | extension_keys
-    unknown = set(spec) - allowed
-    if unknown:
-        key = sorted(unknown)[0]
-        raise ConfigError(_unknown_key_message(path, key, allowed))
-
-
-def _validate_nested_generator_keys(
-    path: str,
-    spec: Mapping[str, Any],
-    generator: Any,
-    generators: Mapping[str, Any],
-) -> None:
-    for location, nested_spec in generator.nested_specs(spec):
-        nested_path = f"{path}.{location}"
-        reference = nested_spec.get("type")
-        if not isinstance(reference, str):
-            continue
-        child = generators.get(_normalize_config_reference(reference))
-        if child is None:
-            continue
-        _validate_extension_keys(nested_path, nested_spec, child.config_keys, COMMON_FIELD_KEYS)
-        _validate_nested_generator_keys(nested_path, nested_spec, child, generators)
-
-
-def _normalize_config_reference(reference: str) -> str:
-    try:
-        return normalize_reference(reference)
-    except RegistryError as exc:
         raise ConfigError(str(exc)) from exc

@@ -201,6 +201,13 @@ def test_cli_invalid_config_returns_2(tmp_path: Path, capsys: pytest.CaptureFixt
     assert "ton:" in captured.err
 
 
+def test_cli_generation_rejects_extension_owned_key_typo(write_config, capsys) -> None:
+    config = write_config({"types": {"n": {"type": "integer", "padWithZeros": True}}})
+
+    assert main([str(config)]) == 2
+    assert "Did you mean 'padWithZero'?" in capsys.readouterr().err
+
+
 def test_cli_verbose_prints_summary_to_stderr(
     write_config, capsys: pytest.CaptureFixture[str]
 ) -> None:

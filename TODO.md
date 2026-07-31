@@ -103,7 +103,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CLI-019 | open | S | Normal CLI/library generation runs structural validation plus `compile_plan`, but extension-owned key validation runs only through `api.validate_config` (`_config.py:73-104`, `cli.py:268-300`). A typo such as integer `padWithZeros` is rejected by `ton --validate` yet silently ignored by the real run. Use one canonical validation path for validate-only and generation. |
 | CLI-020 | open | S | Catalog validation compiles only fields referenced by the template (`_config.py:85-103`, `_compiler.py:107-150`). An unused field with `type: missing` or inverted integer bounds is therefore reported as valid by `ton --validate`, despite help promising per-field spec validation. Resolve and prepare every declared field during validation without changing generation's lazy runtime plan. |
 
 ## configuration discoverability

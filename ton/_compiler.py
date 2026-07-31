@@ -10,12 +10,14 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import PreparedField, PreparedTransform
 from ._registry import (
+    RegistryError,
     default_transforms,
     default_validators,
     make_registry,
     normalize_reference,
     runtime_type_name,
 )
+from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
 from ._template import Token, parse, split_segments
 from ._transforms import Transform, fold_paired_capabilities
 from ._validation import Validator
@@ -122,6 +124,10 @@ class EngineCompiler:
 
     def _validate(self) -> None:
         for token in self.tokens:
+            try:
+                normalize_reference(self.types[token.type_key]["type"])
+            except RegistryError as exc:
+                raise TemplateError(str(exc)) from exc
             type_name = runtime_type_name(self.types[token.type_key]["type"])
             if type_name not in self.registry:
                 available = ", ".join(sorted(self.registry)) or "(none)"
@@ -141,6 +147,7 @@ class EngineCompiler:
             spec = self.types[token.type_key]
             generator = self.registry[runtime_type_name(spec["type"])]
             try:
+                self._validate_generator_keys(f"types.{token.type_key}", spec, generator)
                 prepared[token.type_key] = PreparedField(
                     generator=generator,
                     source_prepared=context.prepare_generator(generator, spec),
@@ -165,13 +172,38 @@ class EngineCompiler:
                 ) from exc
         return prepared
 
+    def _validate_generator_keys(
+        self,
+        path: str,
+        spec: Mapping[str, Any],
+        generator: Generator,
+    ) -> None:
+        error = extension_key_error(path, spec, generator.config_keys, COMMON_FIELD_KEYS)
+        if error is not None:
+            raise TemplateError(error)
+        for location, nested_spec in generator.nested_specs(spec):
+            reference = nested_spec.get("type")
+            if not isinstance(reference, str):
+                continue
+            child = self.registry.get(runtime_type_name(reference))
+            if child is not None:
+                self._validate_generator_keys(f"{path}.{location}", nested_spec, child)
+
     def _prepare_transforms(
         self, type_key: str, spec: Mapping[str, Any], generator: Generator
     ) -> tuple[PreparedTransform, ...]:
         is_paired = bool(generator.is_paired)
         prepared: list[PreparedTransform] = []
-        for transform_spec in spec.get("transforms", []):
+        for index, transform_spec in enumerate(spec.get("transforms", [])):
             transform = self._resolve_transform(type_key, transform_spec["type"])
+            error = extension_key_error(
+                f"types.{type_key}.transforms[{index}]",
+                transform_spec,
+                transform.config_keys,
+                frozenset(("type",)),
+            )
+            if error is not None:
+                raise TemplateError(error)
             capability = fold_paired_capabilities(is_paired, (transform.capabilities,))
             if capability.incompatible_index is not None:
                 raise TemplateError(

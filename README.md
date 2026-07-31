@@ -911,7 +911,7 @@ Lorem-style words, sentences, or paragraphs (single-line output, safe inside CSV
 | field   | type   | description                                          |
 |---------|--------|------------------------------------------------------|
 | `unit`  | string | `words` (default), `sentences`, or `paragraphs`      |
-| `count` | int    | how many units (default `5`; 1 ≤ N ≤ `MAX_TEXT_COUNT`) |
+| `count` | int    | how many units (default `5`; N ≥ 1)                    |
 
 ```json
 {"type": "text", "unit": "words", "count": 6}

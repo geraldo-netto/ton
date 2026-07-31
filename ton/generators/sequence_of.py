@@ -37,7 +37,7 @@ from .base import (
 )
 
 #: Upper bound on ``count`` so the generator stays bounded under
-#: misconfiguration (mirrors MAX_TEXT_COUNT / MAX_CHAR_LENGTH).
+#: misconfiguration.
 MAX_SEQUENCE_OF_COUNT = 10_000
 
 

@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .base import Generator, assert_below_cap, coerce_int
+from .base import Generator, coerce_int
 
 _WORDS: tuple[str, ...] = (
     "lorem",
@@ -91,10 +91,6 @@ _WORDS: tuple[str, ...] = (
 
 _UNITS = ("words", "sentences", "paragraphs")
 
-#: Upper bound on ``count``. A misconfigured value of 1e7 paragraphs would
-#: blow up memory and stall the pipeline (TODO SCALE-002).
-MAX_TEXT_COUNT = 10_000
-
 
 @dataclass(frozen=True)
 class TextSpec:
@@ -114,7 +110,6 @@ class TextGenerator(Generator):
         count = coerce_int(spec, "count", type_name="text", default=5)
         if count < 1:
             raise ValueError("text 'count' must be >= 1")
-        assert_below_cap("text", "count", count, MAX_TEXT_COUNT, "MAX_TEXT_COUNT")
         return TextSpec(unit=unit, count=count)
 
     def generate(self, prepared: TextSpec, rng: Random) -> str:
@@ -126,7 +121,7 @@ class TextGenerator(Generator):
 
 
 def _words(count: int, rng: Random) -> str:
-    return " ".join(rng.choices(_WORDS, k=count))
+    return " ".join(rng.choice(_WORDS) for _ in range(count))
 
 
 def _sentence(rng: Random) -> str:

@@ -17,7 +17,7 @@ from ton.generators.regex import (
     RegexGenerator,
 )
 from ton.generators.sequence import MAX_SEQUENCE_PAD_WIDTH, SequenceGenerator
-from ton.generators.text import MAX_TEXT_COUNT, TextGenerator
+from ton.generators.text import TextGenerator
 
 
 def test_char_honors_large_operator_requested_length() -> None:
@@ -33,9 +33,11 @@ def test_bytes_honors_large_operator_requested_length() -> None:
     assert len(base64.b64decode(generator.generate(prepared, Random(0)))) == 1_000_001
 
 
-def test_text_rejects_count_above_cap() -> None:
-    with pytest.raises(ValueError, match="MAX_TEXT_COUNT"):
-        TextGenerator().prepare({"count": MAX_TEXT_COUNT + 1})
+def test_text_honors_large_operator_requested_count() -> None:
+    generator = TextGenerator()
+    prepared = generator.prepare({"unit": "words", "count": 10_001})
+
+    assert len(generator.generate(prepared, Random(0)).split()) == 10_001
 
 
 def test_sequence_rejects_pad_width_above_cap() -> None:

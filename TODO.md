@@ -53,7 +53,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SCAL-022 | open | S | `TextGenerator.prepare` rejects `count > 10_000` through `MAX_TEXT_COUNT` (`generators/text.py:94-96,110-118`). Remove the hard workload cap and generate/join incrementally without imposing a new restrictive default. |
 | SCAL-023 | open | M | `SequenceOfGenerator.prepare` rejects `count > 10_000`, and generation materializes a list containing every child result (`generators/sequence_of.py:39-41,69-95`). Remove the cap and rework accumulation so large requested sequences are not rejected solely by a fixed policy limit. |
 | SCAL-024 | open | S | `SequenceGenerator.prepare` rejects `padWidth > 100_000` through `MAX_SEQUENCE_PAD_WIDTH` (`generators/sequence.py:38-39,53-67`). Remove the fixed row-width cap and honor operator-requested padding. |
 | SCAL-025 | open | M | Regex preparation rejects otherwise supported patterns through fixed literal-repeat, total-expansion, and group-nesting caps (`generators/regex.py:38-51,71-85,116-166`; `generators/_regex_parse.py:97,203-219`). Replace recursive/eager expansion paths with overflow-safe lazy/iterative handling and operator-controlled settings rather than fixed rejection thresholds. |

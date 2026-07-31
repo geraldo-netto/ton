@@ -23,6 +23,7 @@ EXPECTED_PUBLIC_API = {
     "GeneratorExecutionError",
     "LogEvent",
     "OutputEncodingError",
+    "OutputPublishedError",
     "PairedGenerator",
     "PipelineStageError",
     "ProofError",

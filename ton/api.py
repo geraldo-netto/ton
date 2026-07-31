@@ -59,7 +59,7 @@ from ._engine import (
     ValidatorExecutionError,
 )
 from ._logging import LogEvent, configure_stderr, logger
-from ._output import OutputEncodingError, open_output_path
+from ._output import OutputEncodingError, OutputPublishedError, open_output_path
 from ._proof import ProvenanceRecord
 from ._registry import (
     ExtensionCatalog,
@@ -86,6 +86,7 @@ __all__ = [
     "GeneratorExecutionError",
     "LogEvent",
     "OutputEncodingError",
+    "OutputPublishedError",
     "PairedGenerator",
     "PipelineStageError",
     "ProofError",

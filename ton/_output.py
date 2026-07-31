@@ -30,6 +30,19 @@ class OutputEncodingError(OSError):
         super().__init__(f"cannot encode {context} as {encoding!r}: {reason}")
 
 
+class OutputPublishedError(OSError):
+    """Publication changed the destination but durability confirmation failed."""
+
+    def __init__(self, path: str, cause: OSError) -> None:
+        self.path = path
+        self.destination_changed = True
+        self.cause = cause
+        super().__init__(
+            f"output was published to {path!r}, but finalization failed: {cause}; "
+            "inspect the destination before retrying"
+        )
+
+
 def validate_output_target(path: str, *, no_clobber: bool = False) -> bool:
     """Validate ``path`` and return whether it names an existing FIFO."""
     if os.path.islink(path):
@@ -71,6 +84,7 @@ def atomic_output(
     directory = os.path.dirname(os.path.abspath(path)) or "."
     basename = os.path.basename(path)
     tmp_name = ""
+    published = False
     try:
         with tempfile.NamedTemporaryFile(
             "w",
@@ -86,13 +100,20 @@ def atomic_output(
             stream.flush()
             os.fsync(stream.fileno())
         os.chmod(tmp_name, mode)
-        if no_clobber:
-            os.link(tmp_name, path)
-            os.unlink(tmp_name)
-        else:
-            os.replace(tmp_name, path)
-        tmp_name = ""
-        _fsync_directory(directory)
+        try:
+            if no_clobber:
+                os.link(tmp_name, path)
+                published = True
+                os.unlink(tmp_name)
+            else:
+                os.replace(tmp_name, path)
+                published = True
+            tmp_name = ""
+            _fsync_directory(directory)
+        except OSError as exc:
+            if published:
+                raise OutputPublishedError(path, exc) from exc
+            raise
     finally:
         if tmp_name:
             with suppress(FileNotFoundError):

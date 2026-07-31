@@ -633,6 +633,11 @@ Proof-report files use atomic replacement and honor `--no-clobber`. An
 open/write failure exits `1`, removes temporary report/data files, and never
 publishes a partial regular-file report.
 
+If atomic replacement succeeds but the final directory sync fails, TON reports
+that the destination changed and tells the operator to inspect it before
+retrying. The published file is complete; its crash-durability could not be
+confirmed.
+
 #### `oneOf`
 
 Pick uniformly between several nested type specs. Same as `weighted` with equal weights, just less typing.

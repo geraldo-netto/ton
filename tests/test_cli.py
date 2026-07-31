@@ -16,6 +16,7 @@ from unittest import mock
 import pytest
 
 from ton._engine import Engine
+from ton._output import OutputPublishedError, atomic_output
 from ton._proof import REDACTED, ProofResult
 from ton._proofaudit import ProofAuditWriteError
 from ton._proofcheck import MAX_AUDIT_SAMPLE
@@ -967,6 +968,28 @@ def test_cli_atomic_output_keeps_existing_file_on_failure(
     assert main([str(config), "-o", str(out_file)]) == 3
     assert out_file.read_text(encoding="utf-8") == "old\n"
     assert list(tmp_path.glob(".out.txt.*.tmp")) == []
+
+
+def test_atomic_output_reports_post_publish_fsync_failure(monkeypatch, tmp_path: Path) -> None:
+    from ton import _output
+
+    output = tmp_path / "published.txt"
+    monkeypatch.setattr(
+        _output,
+        "_fsync_directory",
+        lambda directory: (_ for _ in ()).throw(OSError("fsync failed")),
+    )
+
+    with (
+        pytest.raises(OutputPublishedError, match="inspect the destination") as raised,
+        atomic_output(str(output)) as stream,
+    ):
+        stream.write("new\n")
+
+    assert raised.value.destination_changed is True
+    assert raised.value.path == str(output)
+    assert output.read_text() == "new\n"
+    assert list(tmp_path.glob(".published.txt.*.tmp")) == []
 
 
 def test_cli_atomic_output_preserves_existing_file_mode(write_config, tmp_path: Path) -> None:

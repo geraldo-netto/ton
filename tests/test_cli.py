@@ -509,7 +509,9 @@ def test_cli_proof_report_streams_beyond_engine_retention_sample(
     assert engine.proof_failure_count == rows
     assert len(records) == rows
     assert records[-1]["row"] == rows
-    assert records[-1]["spec"] == {"type": "failing"}
+    assert records[0]["spec"] == {"type": "failing"}
+    assert records[-1]["spec"] is None
+    assert records[0]["spec_ref"] == records[-1]["spec_ref"]
 
 
 def test_cli_proof_report_write_failure_aborts_atomic_outputs(

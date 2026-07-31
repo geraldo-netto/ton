@@ -121,7 +121,7 @@ class ProofChecker:
         if self.mode == "audit":
             for failure in failures:
                 if self.failure_sink is not None or len(self.failures) < MAX_AUDIT_SAMPLE:
-                    failure = replace(failure, spec=dict(spec))
+                    failure = replace(failure, spec=spec)
                 self._record_audit(failure)
                 self._log_failure(failure)
             return None

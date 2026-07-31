@@ -49,8 +49,10 @@ def test_proof_audit_writer_emits_clear_json_line() -> None:
         "value": "secret",
         "id_value": "secret-id",
         "seed": 42,
+        "spec_ref": record["spec_ref"],
         "spec": {"type": "paired", "values": ["secret"]},
     }
+    assert record["spec_ref"].startswith("sha256:")
     assert stream.getvalue().endswith("\n")
 
 
@@ -64,6 +66,7 @@ def test_proof_audit_writer_uses_failure_redaction_state() -> None:
     assert record["value"] == REDACTED
     assert record["id_value"] == REDACTED
     assert record["spec"] is None
+    assert record["spec_ref"] is None
     assert record["reason"] == "mismatch"
 
 
@@ -96,6 +99,19 @@ def test_proof_audit_writer_maps_stream_errors() -> None:
         ProofAuditWriter(BrokenStream())(_failure())
 
 
+def test_proof_audit_writer_emits_repeated_spec_once_by_stable_reference() -> None:
+    stream = io.StringIO()
+    writer = ProofAuditWriter(stream)
+
+    writer(_failure())
+    writer(_failure())
+
+    first, second = [json.loads(line) for line in stream.getvalue().splitlines()]
+    assert first["spec"] == _failure().spec
+    assert second["spec"] is None
+    assert first["spec_ref"] == second["spec_ref"]
+
+
 def test_proof_checker_streams_details_beyond_retention_sample(monkeypatch) -> None:
     class FailingGenerator(Generator):
         type_name = "failing"
@@ -122,6 +138,7 @@ def test_proof_checker_streams_details_beyond_retention_sample(monkeypatch) -> N
         transforms=(),
     )
 
+    spec = {"type": "failing"}
     for row in range(5):
         assert (
             checker.evaluate(
@@ -130,7 +147,7 @@ def test_proof_checker_streams_details_beyond_retention_sample(monkeypatch) -> N
                 TransformResult("bad"),
                 (),
                 rows_emitted=row,
-                spec={"type": "failing"},
+                spec=spec,
             )
             is None
         )
@@ -139,7 +156,10 @@ def test_proof_checker_streams_details_beyond_retention_sample(monkeypatch) -> N
     assert checker.failure_count == 5
     assert len(checker.failures) == 2
     assert [record["row"] for record in records] == [1, 2, 3, 4, 5]
-    assert all(record["spec"] == {"type": "failing"} for record in records)
+    assert records[0]["spec"] == spec
+    assert all(record["spec"] is None for record in records[1:])
+    assert len({record["spec_ref"] for record in records}) == 1
+    assert checker.failures[0].spec is checker.failures[1].spec
 
 
 def test_engine_preserves_proof_sink_failure_boundary() -> None:

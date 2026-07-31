@@ -42,7 +42,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-037 | open | M | Every clear proof-audit failure copies the full field spec and serializes it into every JSONL record (`_proofcheck.py:111-115`, `_proofaudit.py:38-53`). A large value pool multiplied by many failures creates avoidable multiplicative copying/output. Emit specs once (or by stable reference/fingerprint) while preserving a streaming, self-describing report. |
 
 ## scalability
 

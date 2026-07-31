@@ -1,7 +1,7 @@
 """Streaming proof-audit report serialization.
 
 Proof reports use UTF-8 JSON Lines: each line is one complete
-``ton.proof-audit/v1`` failure record, so consumers can process arbitrarily
+``ton.proof-audit/v2`` failure record, so consumers can process arbitrarily
 large reports without loading them in memory. The CLI exposes the destination
 as ``--proof-report PATH``.
 
@@ -13,12 +13,13 @@ becomes ``null``. Diagnostic and provenance fields remain visible.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import TextIO
 
 from ._proof import ProofFailure
 
-PROOF_AUDIT_SCHEMA = "ton.proof-audit/v1"
+PROOF_AUDIT_SCHEMA = "ton.proof-audit/v2"
 
 
 class ProofAuditWriteError(OSError):
@@ -34,8 +35,11 @@ class ProofAuditWriter:
 
     def __init__(self, stream: TextIO) -> None:
         self._stream = stream
+        self._emitted_specs: set[str] = set()
 
     def __call__(self, failure: ProofFailure) -> None:
+        spec_ref = _spec_reference(failure.spec) if failure.spec is not None else None
+        emit_spec = spec_ref is not None and spec_ref not in self._emitted_specs
         payload = {
             "schema": PROOF_AUDIT_SCHEMA,
             "redacted": failure.is_redacted,
@@ -47,9 +51,18 @@ class ProofAuditWriter:
             "value": failure.value,
             "id_value": failure.id_value,
             "seed": failure.seed,
-            "spec": failure.spec,
+            "spec_ref": spec_ref,
+            "spec": failure.spec if emit_spec else None,
         }
         try:
             self._stream.write(json.dumps(payload, ensure_ascii=True, separators=(",", ":")) + "\n")
         except OSError as exc:
             raise ProofAuditWriteError(str(exc)) from exc
+        if spec_ref is not None:
+            self._emitted_specs.add(spec_ref)
+
+
+def _spec_reference(spec: object) -> str:
+    canonical = json.dumps(spec, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"

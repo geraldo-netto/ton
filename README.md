@@ -619,13 +619,15 @@ Strict modes (`sample` and `all`) stop on the first proof failure with row,
 field, stage, and reason. Audit mode keeps generating rows and records proof
 failures for library callers via `Engine.proof_failures`.
 
-Proof reports are UTF-8 JSON Lines with one `ton.proof-audit/v1` object per
+Proof reports are UTF-8 JSON Lines with one `ton.proof-audit/v2` object per
 failure. Each object contains `row`, `type_key`, `stage`, `reference`, `reason`,
-`value`, paired `id_value`, `seed`, and `spec`, plus a `redacted` boolean. The
+`value`, paired `id_value`, `seed`, and `spec_ref`, plus a `redacted` boolean.
+The first clear record for each stable spec fingerprint also contains `spec`;
+later records carry only the same `spec_ref`, avoiding repeated large specs. The
 CLI streams every failure to the report even after the bounded in-memory
 `Engine.proof_failures` sample is full. Reports contain clear values by default;
 `--redact-proof-failures` replaces `value` and a present `id_value` with
-`"<redacted>"` and writes `spec` as `null`, while preserving diagnostic fields.
+`"<redacted>"` and writes `spec`/`spec_ref` as `null`, while preserving diagnostic fields.
 
 Proof-report files use atomic replacement and honor `--no-clobber`. An
 open/write failure exits `1`, removes temporary report/data files, and never

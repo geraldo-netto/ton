@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from functools import cached_property
 from typing import Any
@@ -67,7 +68,7 @@ class ProofFailure:
     value: str
     id_value: str | None = None
     seed: int | None = None
-    spec: dict[str, Any] | None = None
+    spec: Mapping[str, Any] | None = None
     is_redacted: bool = False
 
     def redacted(self) -> ProofFailure:

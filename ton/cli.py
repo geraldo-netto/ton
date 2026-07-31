@@ -322,7 +322,6 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
         with _open_proof_report(
             args.proof_report,
             no_clobber=args.no_clobber,
-            redact=args.redact_proof_failures,
         ) as failure_sink:
             engine._set_proof_failure_sink(failure_sink)
             with _open_output(args.output, no_clobber=args.no_clobber, encoding=encoding) as stream:
@@ -492,14 +491,13 @@ def _open_proof_report(
     path: str | None,
     *,
     no_clobber: bool,
-    redact: bool,
 ) -> Iterator[ProofAuditWriter | None]:
     if path is None:
         yield None
         return
     try:
         with open_output_path(path, no_clobber=no_clobber, encoding="utf-8") as stream:
-            yield ProofAuditWriter(stream, redact=redact)
+            yield ProofAuditWriter(stream)
     except ProofAuditWriteError:
         raise
     except OSError as exc:

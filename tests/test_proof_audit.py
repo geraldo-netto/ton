@@ -53,10 +53,10 @@ def test_proof_audit_writer_emits_clear_json_line() -> None:
     assert stream.getvalue().endswith("\n")
 
 
-def test_proof_audit_writer_applies_redaction_semantics() -> None:
+def test_proof_audit_writer_uses_failure_redaction_state() -> None:
     stream = io.StringIO()
 
-    ProofAuditWriter(stream, redact=True)(_failure())
+    ProofAuditWriter(stream)(_failure().redacted())
 
     record = json.loads(stream.getvalue())
     assert record["redacted"] is True
@@ -64,6 +64,25 @@ def test_proof_audit_writer_applies_redaction_semantics() -> None:
     assert record["id_value"] == REDACTED
     assert record["spec"] is None
     assert record["reason"] == "mismatch"
+
+
+@pytest.mark.parametrize("redact", [False, True])
+def test_proof_checker_owns_sink_redaction(redact: bool) -> None:
+    stream = io.StringIO()
+    checker = ProofChecker(
+        mode="audit",
+        sample_rate=1,
+        seed=42,
+        redact=redact,
+        failure_sink=ProofAuditWriter(stream),
+    )
+
+    checker._record_audit(_failure())
+
+    record = json.loads(stream.getvalue())
+    assert record["redacted"] is redact
+    assert record["value"] == checker.failures[0].value
+    assert record["spec"] == checker.failures[0].spec
 
 
 def test_proof_audit_writer_maps_stream_errors() -> None:

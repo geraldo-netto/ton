@@ -72,6 +72,7 @@ class ProofFailure:
     id_value: str | None = None
     seed: int | None = None
     spec: dict[str, Any] | None = None
+    is_redacted: bool = False
 
     def redacted(self) -> ProofFailure:
         """Return a copy with the sensitive fields masked (DG-002).
@@ -87,6 +88,7 @@ class ProofFailure:
             value=REDACTED,
             id_value=REDACTED if self.id_value is not None else None,
             spec=None,
+            is_redacted=True,
         )
 
 

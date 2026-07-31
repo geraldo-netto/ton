@@ -30,7 +30,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| DUP-018 | open | S | Proof-failure redaction is owned twice: `ProofChecker._record_audit` redacts the record, then `ProofAuditWriter.__call__` redacts it again from a separately threaded CLI flag. The writer can therefore emit `"redacted": false` for an already-redacted payload if these paths drift. Make one layer own redaction and the schema marker, then test mismatched/internal sink configurations. |
 
 ## reliability/correctness
 

@@ -26,26 +26,28 @@ class ProofAuditWriteError(OSError):
 
 
 class ProofAuditWriter:
-    """Serialize proof failures to a JSON Lines text stream."""
+    """Serialize proof failures to a JSON Lines text stream.
 
-    def __init__(self, stream: TextIO, *, redact: bool = False) -> None:
+    Redaction belongs to the proof layer. The writer records the state carried
+    by each failure so its schema marker cannot disagree with its payload.
+    """
+
+    def __init__(self, stream: TextIO) -> None:
         self._stream = stream
-        self._redact = redact
 
     def __call__(self, failure: ProofFailure) -> None:
-        visible = failure.redacted() if self._redact else failure
         payload = {
             "schema": PROOF_AUDIT_SCHEMA,
-            "redacted": self._redact,
-            "row": visible.row,
-            "type_key": visible.type_key,
-            "stage": visible.stage,
-            "reference": visible.reference,
-            "reason": visible.reason,
-            "value": visible.value,
-            "id_value": visible.id_value,
-            "seed": visible.seed,
-            "spec": visible.spec,
+            "redacted": failure.is_redacted,
+            "row": failure.row,
+            "type_key": failure.type_key,
+            "stage": failure.stage,
+            "reference": failure.reference,
+            "reason": failure.reason,
+            "value": failure.value,
+            "id_value": failure.id_value,
+            "seed": failure.seed,
+            "spec": failure.spec,
         }
         try:
             self._stream.write(json.dumps(payload, ensure_ascii=True, separators=(",", ":")) + "\n")

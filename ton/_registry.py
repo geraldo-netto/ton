@@ -78,6 +78,8 @@ class ExtensionCatalog:
         name: str,
         generator: Generator,
     ) -> None:
+        if not isinstance(generator, Generator):
+            raise TypeError("generator must be a Generator")
         with self._lock:
             self._register(self._generators, namespace, name, generator)
         _log_plugin_registered("data_type", namespace, name)
@@ -88,6 +90,8 @@ class ExtensionCatalog:
         name: str,
         transform: Transform,
     ) -> None:
+        if not isinstance(transform, Transform):
+            raise TypeError("transform must implement the Transform protocol")
         with self._lock:
             self._register(self._transforms, namespace, name, transform)
         _log_plugin_registered("transform", namespace, name)

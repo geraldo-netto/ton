@@ -301,6 +301,15 @@ def test_extension_catalog_rejects_invalid_validator() -> None:
         build_extension_catalog().register_validator("plugin", "bad", object())
 
 
+def test_extension_catalog_rejects_invalid_generator_and_transform() -> None:
+    catalog = build_extension_catalog()
+
+    with pytest.raises(TypeError, match="Generator"):
+        catalog.register_data_type("plugin", "bad", object())
+    with pytest.raises(TypeError, match="Transform protocol"):
+        catalog.register_transform("plugin", "bad", object())
+
+
 def test_extension_catalog_rejects_ambiguous_registration() -> None:
     class CustomTransform(BaseTransform):
         type_name: ClassVar[str] = "trim"

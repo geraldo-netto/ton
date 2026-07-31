@@ -52,6 +52,7 @@ For each template field, `Engine` prepares an explicit pipeline:
 3. Per-row source generation.
 4. Per-row transform application.
 5. Optional proof checking.
+6. Per-row validator checks.
 
 Prepared specs are cached during engine construction. Row generation only
 performs draws, transform application, rendering, and optional proof checks.

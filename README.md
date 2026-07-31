@@ -318,7 +318,8 @@ my_ns.my_transform = "my_pkg.transforms:MyTransform"
 catalog = api.build_extension_catalog(include_entry_points=True)
 for row in api.generate(config_dict,
                         registry=catalog.generators(),
-                        transforms=catalog.transforms()):
+                        transforms=catalog.transforms(),
+                        validators=catalog.validators()):
     ...
 ```
 

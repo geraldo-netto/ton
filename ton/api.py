@@ -33,7 +33,8 @@ Typical use::
     # Opt into third-party entry points when you trust the installed packages:
     catalog = api.build_extension_catalog(include_entry_points=True)
     for row in api.generate(config_dict, registry=catalog.generators(),
-                            transforms=catalog.transforms()):
+                            transforms=catalog.transforms(),
+                            validators=catalog.validators()):
         ...
 """
 

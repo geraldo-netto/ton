@@ -37,6 +37,16 @@ class ProofFailureSinkError(Exception):
     """A configured proof-failure sink could not accept a record."""
 
 
+class ProofHookError(RuntimeError):
+    """A generator or transform proof hook raised unexpectedly."""
+
+    def __init__(self, stage: str, reference: str, cause: Exception) -> None:
+        self.stage = stage
+        self.reference = reference
+        self.cause = cause
+        super().__init__(str(cause))
+
+
 class ProofChecker:
     """Own the proof-check state and failure-building for one engine."""
 
@@ -146,11 +156,14 @@ class ProofChecker:
         """Return every proof failure for a field's source + transform trace."""
         failures = list(self._source_failures(type_key, field, source_result, row, spec))
         for step in steps:
-            proof = step.prepared.transform.prove(
-                step.prepared.prepared,
-                step.before,
-                step.after,
-            )
+            try:
+                proof = step.prepared.transform.prove(
+                    step.prepared.prepared,
+                    step.before,
+                    step.after,
+                )
+            except Exception as exc:
+                raise ProofHookError("transform", step.prepared.transform.type_name, exc) from exc
             if not proof.ok:
                 failures.append(
                     self._make_failure(
@@ -190,7 +203,10 @@ class ProofChecker:
     ) -> tuple[ProofFailure, ...]:
         if not field.uses_source:
             return ()
-        proof = field.generator.prove(field.source_prepared, source_result)
+        try:
+            proof = field.generator.prove(field.source_prepared, source_result)
+        except Exception as exc:
+            raise ProofHookError("source", field.generator.type_name, exc) from exc
         if proof.ok:
             return ()
         return (

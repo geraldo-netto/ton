@@ -47,7 +47,17 @@ from typing import Any
 from . import _config
 from ._config import ConfigError
 from ._config import output_encoding as _output_encoding
-from ._engine import Engine, EngineOptions, ProofError, TemplateError
+from ._engine import (
+    Engine,
+    EngineOptions,
+    GeneratorExecutionError,
+    PipelineStageError,
+    ProofError,
+    ProofEvaluationError,
+    TemplateError,
+    TransformExecutionError,
+    ValidatorExecutionError,
+)
 from ._logging import LogEvent, configure_stderr, logger
 from ._output import OutputEncodingError, open_output_path
 from ._proof import ProvenanceRecord
@@ -73,17 +83,22 @@ __all__ = [
     "Engine",
     "EngineOptions",
     "Generator",
+    "GeneratorExecutionError",
     "LogEvent",
     "OutputEncodingError",
     "PairedGenerator",
+    "PipelineStageError",
     "ProofError",
+    "ProofEvaluationError",
     "ProvenanceRecord",
     "RegistryError",
     "TemplateError",
     "Transform",
+    "TransformExecutionError",
     "UndeclaredVariableError",
     "ValidationError",
     "Validator",
+    "ValidatorExecutionError",
     "ExtensionCatalog",
     "build_extension_catalog",
     "build_registry",

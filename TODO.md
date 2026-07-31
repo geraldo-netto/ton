@@ -68,7 +68,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| ARCH-021 | open | M | `_resolve` wraps source generation, transform application, proof evaluation, and validators in one broad exception boundary, then logs/rethrows every unexpected stage failure as `Generator ... raised ...` (`_engine.py:346-385`). Give each pipeline stage its own typed failure context so transform/validator/plugin defects identify the actual component instead of falsely blaming the source generator. |
 
 ## decoupling
 

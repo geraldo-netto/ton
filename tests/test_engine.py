@@ -11,7 +11,15 @@ import pytest
 
 from ton._compiler import CompiledPlan
 from ton._config import ConfigError
-from ton._engine import Engine, ProofError, TemplateError
+from ton._engine import (
+    Engine,
+    GeneratorExecutionError,
+    ProofError,
+    ProofEvaluationError,
+    TemplateError,
+    TransformExecutionError,
+    ValidatorExecutionError,
+)
 from ton._proof import ProofResult
 from ton._registry import default_registry
 from ton._transforms import (
@@ -98,8 +106,67 @@ def test_paired_fields_and_generator_errors_bypass_direct_path() -> None:
         {"rows": 1, "format": "$v$", "types": {"v": {"type": "broken"}}},
         registry={"broken": BrokenGenerator()},
     )
-    with pytest.raises(TemplateError, match="BrokenGenerator.*RuntimeError: boom"):
+    with pytest.raises(GeneratorExecutionError, match="BrokenGenerator.*RuntimeError: boom"):
         list(broken)
+
+
+def test_pipeline_failures_identify_transform_validator_and_proof_stages() -> None:
+    class BrokenTransform(BaseTransform):
+        type_name = "broken_transform"
+
+        def apply(self, prepared, value, rng):
+            raise RuntimeError("transform boom")
+
+    transform_config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "transforms": [{"type": "broken_transform"}],
+            }
+        },
+    }
+    with pytest.raises(TransformExecutionError, match="Transform broken_transform.*transform boom"):
+        list(Engine(transform_config, transforms={"broken_transform": BrokenTransform()}))
+
+    class BrokenValidator:
+        type_name = "broken_validator"
+
+        def validate(self, value: str) -> bool:
+            raise RuntimeError("validator boom")
+
+    validator_config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["x"],
+                "validators": ["broken_validator"],
+            }
+        },
+    }
+    with pytest.raises(ValidatorExecutionError, match="Validator broken_validator.*validator boom"):
+        list(Engine(validator_config, validators={"broken_validator": BrokenValidator()}))
+
+    class BrokenProof(Generator):
+        type_name = "broken_proof"
+
+        def generate(self, prepared, rng):
+            return "x"
+
+        def prove(self, prepared, result):
+            raise RuntimeError("proof boom")
+
+    proof_config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {"v": {"type": "broken_proof"}},
+    }
+    with pytest.raises(ProofEvaluationError, match="Source proof broken_proof.*proof boom"):
+        list(Engine(proof_config, registry={"broken_proof": BrokenProof()}, proof_mode="all"))
 
 
 def test_engine_runtime_state_uses_compiled_plan(basic_config: dict) -> None:
@@ -432,7 +499,7 @@ def test_engine_collects_transform_proof_failure() -> None:
     engine = Engine(config, transforms={"plugin.failproof": FailingProofTransform()})
     field = engine._plan.prepared["v"]
     source = TransformResult("x")
-    _, steps = engine._apply_transforms_with_trace(field, source)
+    _, steps = engine._apply_transforms_with_trace("v", field, source)
 
     failures = engine._proof.build_failures("v", field, source, steps)
 

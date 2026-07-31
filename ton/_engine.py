@@ -11,7 +11,7 @@ import threading
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 from . import _config
 from ._compiler import ResolvedToken, compile_plan
@@ -24,7 +24,7 @@ from ._proof import (
     ProvenanceRecord,
     TransformStep,
 )
-from ._proofcheck import ProofChecker, ProofFailureSink, ProofFailureSinkError
+from ._proofcheck import ProofChecker, ProofFailureSink, ProofHookError
 from ._transforms import Transform, TransformResult
 from ._validation import ValidationError, Validator
 from .generators import Generator
@@ -34,6 +34,41 @@ TemplateError = _TemplateError
 
 class ProofError(TemplateError):
     """Raised when strict proof checking finds an invalid generated value."""
+
+
+class PipelineStageError(TemplateError):
+    """Base for unexpected failures attributed to one pipeline component."""
+
+    def __init__(
+        self,
+        stage: str,
+        reference: str,
+        type_key: str,
+        cause: Exception,
+    ) -> None:
+        self.stage = stage
+        self.reference = reference
+        self.type_key = type_key
+        self.cause = cause
+        super().__init__(
+            f"{stage} {reference} for variable {type_key!r} raised {type(cause).__name__}: {cause}"
+        )
+
+
+class GeneratorExecutionError(PipelineStageError):
+    """A source generator raised during a row draw."""
+
+
+class TransformExecutionError(PipelineStageError):
+    """A transform raised while applying a prepared stage."""
+
+
+class ProofEvaluationError(PipelineStageError):
+    """A source or transform proof hook raised unexpectedly."""
+
+
+class ValidatorExecutionError(PipelineStageError):
+    """A validator raised instead of returning a result."""
 
 
 @dataclass(frozen=True)
@@ -348,62 +383,67 @@ class Engine:
     ) -> str:
         token = resolved.token
         field = resolved.field
-        generator = field.generator
+        if resolved.direct and not self._proof.enabled:
+            return self._generate_source(token.type_key, field)
+        if paired_cache is not None and field.source_is_paired:
+            pair = paired_cache.get(token.type_key)
+            if pair is None:
+                pair = self._generate_pair(token.type_key, field)
+                paired_cache[token.type_key] = pair
+            return pair[0] if token.wants_id else pair[1]
+        return self._generate_single(token.type_key, field)
+
+    def _generate_source(self, type_key: str, field: PreparedField) -> str:
         try:
-            if resolved.direct and not self._proof.enabled:
-                return cast(str, generator.generate(field.source_prepared, self._rng))
-            if paired_cache is not None and field.source_is_paired:
-                pair = paired_cache.get(token.type_key)
-                if pair is None:
-                    pair = self._generate_pair(token.type_key, field)
-                    paired_cache[token.type_key] = pair
-                return pair[0] if token.wants_id else pair[1]
-            return self._generate_single(token.type_key, field)
-        except (ProofError, ValidationError, ProofFailureSinkError):
-            raise
-        except Exception as exc:  # noqa: BLE001 - boundary; re-raised below
-            # A generator that raises mid-iteration would otherwise hit
-            # the CLI's catch-all (TODO REL-014). Log an identifying
-            # event before letting it propagate as TemplateError.
-            _logger.error(
-                "generate_failed type_key=%s generator_type=%s row=%d error_type=%s",
-                token.type_key,
-                type(generator).__name__,
-                self._rows_emitted + 1,
-                type(exc).__name__,
-                extra={
-                    "event": LogEvent.GENERATE_FAILED.value,
-                    "type_key": token.type_key,
-                    "generator_type": type(generator).__name__,
-                    "row": self._rows_emitted + 1,
-                    "error_type": type(exc).__name__,
-                },
+            return cast(str, field.generator.generate(field.source_prepared, self._rng))
+        except Exception as exc:
+            self._raise_pipeline_error(
+                GeneratorExecutionError,
+                "Generator",
+                type(field.generator).__name__,
+                type_key,
+                exc,
             )
-            raise TemplateError(
-                f"Generator {type(generator).__name__} for variable "
-                f"{token.type_key!r} raised {type(exc).__name__}: {exc}"
-            ) from exc
 
     def _generate_pair(self, type_key: str, field: PreparedField) -> tuple[str, str]:
-        pair = field.generator.generate_pair(field.source_prepared, self._rng)
+        try:
+            pair = field.generator.generate_pair(field.source_prepared, self._rng)
+        except Exception as exc:
+            self._raise_pipeline_error(
+                GeneratorExecutionError,
+                "Generator",
+                type(field.generator).__name__,
+                type_key,
+                exc,
+            )
         source = TransformResult(value=pair[1], id_value=pair[0])
-        transformed, steps = self._apply_transforms_with_trace(field, source)
+        transformed, steps = self._apply_transforms_with_trace(type_key, field, source)
         self._handle_proof_failures(type_key, field, source, steps)
         self._run_validators(type_key, field, transformed.value)
         return (transformed.id_value or "", transformed.value)
 
     def _generate_single(self, type_key: str, field: PreparedField) -> str:
         source = TransformResult(
-            field.generator.generate(field.source_prepared, self._rng) if field.uses_source else ""
+            self._generate_source(type_key, field) if field.uses_source else ""
         )
-        transformed, steps = self._apply_transforms_with_trace(field, source)
+        transformed, steps = self._apply_transforms_with_trace(type_key, field, source)
         self._handle_proof_failures(type_key, field, source, steps)
         self._run_validators(type_key, field, transformed.value)
         return transformed.value
 
     def _run_validators(self, type_key: str, field: PreparedField, value: str) -> None:
         for validator in field.validators:
-            if not validator.validate(value):
+            try:
+                valid = validator.validate(value)
+            except Exception as exc:
+                self._raise_pipeline_error(
+                    ValidatorExecutionError,
+                    "Validator",
+                    validator.type_name,
+                    type_key,
+                    exc,
+                )
+            if not valid:
                 raise ValidationError(
                     f"Value {value!r} for variable {type_key!r} failed "
                     f"validator {validator.type_name!r}"
@@ -416,14 +456,23 @@ class Engine:
         source_result: TransformResult,
         steps: tuple[TransformStep, ...],
     ) -> None:
-        failure = self._proof.evaluate(
-            type_key,
-            field,
-            source_result,
-            steps,
-            rows_emitted=self._rows_emitted,
-            spec=self._plan.types[type_key],
-        )
+        try:
+            failure = self._proof.evaluate(
+                type_key,
+                field,
+                source_result,
+                steps,
+                rows_emitted=self._rows_emitted,
+                spec=self._plan.types[type_key],
+            )
+        except ProofHookError as exc:
+            self._raise_pipeline_error(
+                ProofEvaluationError,
+                f"{exc.stage.capitalize()} proof",
+                exc.reference,
+                type_key,
+                exc.cause,
+            )
         if failure is not None:
             raise ProofError(
                 f"Proof failed at row {failure.row} for {failure.type_key!r} "
@@ -432,15 +481,51 @@ class Engine:
 
     def _apply_transforms_with_trace(
         self,
+        type_key: str,
         field: PreparedField,
         result: TransformResult,
     ) -> tuple[TransformResult, tuple[TransformStep, ...]]:
         steps: list[TransformStep] = []
         for prepared in field.transforms:
             before = result
-            result = prepared.transform.apply(prepared.prepared, before, self._rng)
+            try:
+                result = prepared.transform.apply(prepared.prepared, before, self._rng)
+            except Exception as exc:
+                self._raise_pipeline_error(
+                    TransformExecutionError,
+                    "Transform",
+                    prepared.transform.type_name,
+                    type_key,
+                    exc,
+                )
             steps.append(TransformStep(prepared=prepared, before=before, after=result))
         return result, tuple(steps)
+
+    def _raise_pipeline_error(
+        self,
+        error_type: type[PipelineStageError],
+        stage: str,
+        reference: str,
+        type_key: str,
+        cause: Exception,
+    ) -> NoReturn:
+        _logger.error(
+            "pipeline_stage_failed stage=%s reference=%s type_key=%s row=%d error_type=%s",
+            stage,
+            reference,
+            type_key,
+            self._rows_emitted + 1,
+            type(cause).__name__,
+            extra={
+                "event": LogEvent.GENERATE_FAILED.value,
+                "stage": stage,
+                "reference": reference,
+                "type_key": type_key,
+                "row": self._rows_emitted + 1,
+                "error_type": type(cause).__name__,
+            },
+        )
+        raise error_type(stage, reference, type_key, cause) from cause
 
 
 def _rng_for_seed(seed: int | None) -> Random:

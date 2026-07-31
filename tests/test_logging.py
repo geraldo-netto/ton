@@ -184,7 +184,7 @@ def test_proof_failure_logs_identifier_without_value(
     assert summaries[0].mode == "audit"  # type: ignore[attr-defined]
 
 
-def test_cli_audit_summary_event_carries_mode(
+def test_cli_audit_emits_one_canonical_summary(
     caplog: pytest.LogCaptureFixture, write_config
 ) -> None:
     from ton.cli import main
@@ -194,10 +194,8 @@ def test_cli_audit_summary_event_carries_mode(
         main([str(config), "--proof-check", "audit", "--seed", "0"])
 
     summaries = [r for r in caplog.records if getattr(r, "event", None) == "proof_check_summary"]
-    # Both the engine and the CLI audit summary emit the same event; every
-    # one carries a mode field so consumers see a consistent schema (OBS-002).
-    assert summaries
-    assert all(getattr(r, "mode", None) == "audit" for r in summaries)
+    assert len(summaries) == 1
+    assert summaries[0].mode == "audit"  # type: ignore[attr-defined]
 
 
 def test_readme_documents_every_log_event() -> None:

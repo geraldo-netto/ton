@@ -465,7 +465,7 @@ def _log_terminal_failure(
 
 
 def _report_proof_audit(engine: Engine, report_path: str | None = None) -> None:
-    """Print the audit proof-check summary to stderr (TODO OBS-002).
+    """Print the audit proof-check summary to stderr.
 
     Audit mode collects failures instead of aborting, so a normal run
     exits 0 and the user would otherwise never learn that any value
@@ -473,13 +473,6 @@ def _report_proof_audit(engine: Engine, report_path: str | None = None) -> None:
     ``proof_check_failed`` log events that carry the per-row detail.
     """
     count = engine.proof_failure_count
-    _logger.info(
-        "cli_proof_audit_summary failures=%d",
-        count,
-        # Mirror the engine's proof_check_summary payload shape so a
-        # consumer keying on the event sees a consistent schema (OBS-002).
-        extra={"event": LogEvent.PROOF_CHECK_SUMMARY.value, "mode": "audit", "failures": count},
-    )
     if count == 0:
         print("ton: proof-check audit: all generated values passed", file=sys.stderr)
         return

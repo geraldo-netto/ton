@@ -88,7 +88,7 @@ def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> No
             _validate_extension_keys(
                 f"types.{field_name}", spec, generator.config_keys, COMMON_FIELD_KEYS
             )
-            _validate_nested_generator_keys(f"types.{field_name}", spec, generators)
+            _validate_nested_generator_keys(f"types.{field_name}", spec, generator, generators)
         for transform_spec in spec.get("transforms", []):
             transform = transforms.get(_normalize_config_reference(transform_spec["type"]))
             if transform is not None:
@@ -243,19 +243,22 @@ def _validate_extension_keys(
         raise ConfigError(_unknown_key_message(path, key, allowed))
 
 
-def _validate_nested_generator_keys(path: str, value: Any, generators: Mapping[str, Any]) -> None:
-    if isinstance(value, Mapping):
-        reference = value.get("type")
-        if isinstance(reference, str):
-            generator = generators.get(_normalize_config_reference(reference))
-            if generator is not None:
-                _validate_extension_keys(path, value, generator.config_keys, COMMON_FIELD_KEYS)
-        for key, nested in value.items():
-            if isinstance(nested, (Mapping, list)):
-                _validate_nested_generator_keys(f"{path}.{key}", nested, generators)
-    elif isinstance(value, list):
-        for index, nested in enumerate(value):
-            _validate_nested_generator_keys(f"{path}[{index}]", nested, generators)
+def _validate_nested_generator_keys(
+    path: str,
+    spec: Mapping[str, Any],
+    generator: Any,
+    generators: Mapping[str, Any],
+) -> None:
+    for location, nested_spec in generator.nested_specs(spec):
+        nested_path = f"{path}.{location}"
+        reference = nested_spec.get("type")
+        if not isinstance(reference, str):
+            continue
+        child = generators.get(_normalize_config_reference(reference))
+        if child is None:
+            continue
+        _validate_extension_keys(nested_path, nested_spec, child.config_keys, COMMON_FIELD_KEYS)
+        _validate_nested_generator_keys(nested_path, nested_spec, child, generators)
 
 
 def _normalize_config_reference(reference: str) -> str:

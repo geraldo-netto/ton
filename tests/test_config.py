@@ -380,6 +380,35 @@ def test_plugin_generator_may_own_custom_keys() -> None:
     api.validate_config(payload, catalog=catalog)
 
 
+def test_plugin_metadata_type_key_is_not_a_nested_generator() -> None:
+    from random import Random
+    from typing import Any
+
+    from ton.generators import Generator
+
+    class PluginGenerator(Generator):
+        type_name = "metadata"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            del rng
+            return str(prepared["metadata"]["custom"])
+
+    payload = {
+        "rows": 1,
+        "format": "$a$",
+        "types": {
+            "a": {
+                "type": "plugin.metadata",
+                "metadata": {"type": "string", "custom": 1},
+            }
+        },
+    }
+    catalog = api.build_extension_catalog()
+    catalog.register_data_type("plugin", "metadata", PluginGenerator())
+
+    api.validate_config(payload, catalog=catalog)
+
+
 def test_nested_builtin_generator_rejects_key_typo() -> None:
     payload = {
         "rows": 1,

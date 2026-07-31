@@ -128,6 +128,18 @@ class Generator(ABC):
         construction does not need to infer generator references from
         arbitrary nested mappings.
         """
+        names: list[str] = []
+        for _location, nested_spec in self.nested_specs(spec):
+            names.extend(self._nested_type_names(nested_spec))
+        return tuple(names)
+
+    def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        """Return ``(location, spec)`` pairs owned as nested generators.
+
+        Composite extensions override this hook to declare only their real
+        generator-bearing config locations. Ordinary plugin metadata is not
+        interpreted as a generator merely because it contains ``type``.
+        """
         del spec
         return ()
 

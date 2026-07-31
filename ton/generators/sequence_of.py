@@ -54,8 +54,9 @@ class SequenceOfGenerator(Generator):
     type_name = "sequence_of"
     is_composite: ClassVar[bool] = True
 
-    def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
-        return self._nested_type_names(spec.get("spec"))
+    def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        child = spec.get("spec")
+        return (("spec", child),) if isinstance(child, Mapping) else ()
 
     def prepare(
         self,

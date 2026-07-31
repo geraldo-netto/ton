@@ -301,8 +301,9 @@ Custom plugins register via three entry-point groups in any installed package: `
 
 Generator extensions implement `prepare(spec, context=None)`. Composite generators
 resolve children with `context.prepare_child(parent_type, location, child_spec)` and
-declare nested references with `nested_types(spec)`. The legacy one-argument
-`prepare(spec)` contract remains supported for existing plugins.
+declare generator-bearing config locations with `nested_specs(spec)`; the default
+`nested_types(spec)` discovery derives references from those locations. The legacy
+one-argument `prepare(spec)` contract remains supported for existing plugins.
 
 ```toml
 [project.entry-points."ton.generators"]

@@ -98,7 +98,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| PLUG-020 | open | M | `_validate_nested_generator_keys` recursively interprets every plugin-owned mapping containing a `type` key as a nested generator spec (`_config.py:246-258`). A plugin's ordinary metadata such as `{"type":"string","custom":1}` is therefore validated against the core string schema and rejected. Let each composite extension declare its actual nested-spec locations instead of inferring from arbitrary mappings. |
 
 ## CLI / option integrity
 

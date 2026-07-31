@@ -78,8 +78,15 @@ class WeightedGenerator(Generator):
     type_name = "weighted"
     is_composite: ClassVar[bool] = True
 
-    def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
-        return self._nested_type_names(spec.get("choices"))
+    def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        choices = spec.get("choices")
+        if not isinstance(choices, list):
+            return ()
+        nested: list[tuple[str, Mapping[str, Any]]] = []
+        for index, choice in enumerate(choices):
+            if isinstance(choice, Mapping) and isinstance(choice.get("spec"), Mapping):
+                nested.append((f"choices[{index}].spec", choice["spec"]))
+        return tuple(nested)
 
     def prepare(
         self,

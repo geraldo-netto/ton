@@ -442,6 +442,33 @@ def test_catalog_entry_points_skip_wrong_generator_kind() -> None:
     assert "acme.bad" not in catalog.list_data_types()
 
 
+def test_catalog_entry_point_metadata_failure_is_transactional() -> None:
+    class ReadOnlyGenerator(Generator):
+        type_name = "readonly"
+
+        def __setattr__(self, name: str, value: Any) -> None:
+            if name.startswith("_ton_plugin_"):
+                raise AttributeError("read-only metadata")
+            super().__setattr__(name, value)
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            del prepared, rng
+            return "value"
+
+    ep = mock.Mock()
+    ep.name = "acme.readonly"
+    ep.value = "pkg:ReadOnlyGenerator"
+    ep.load.return_value = ReadOnlyGenerator
+
+    def _entry_points(group: str):
+        return [ep] if group == "ton.generators" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points()
+
+    assert "acme.readonly" not in catalog.list_data_types()
+
+
 def test_catalog_entry_point_without_namespace_uses_plugin_namespace() -> None:
     class CustomTransform(BaseTransform):
         type_name: ClassVar[str] = "trim"

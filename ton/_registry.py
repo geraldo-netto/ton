@@ -256,8 +256,8 @@ def _load_catalog_entry_points(
         try:
             plugin = ep.load()()
             namespace, name = _entry_point_namespace_name(ep.name, kind, plugin)
-            _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
             _stamp_plugin_dist(plugin, ep)
+            _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
         except Exception as exc:  # noqa: BLE001 - per-entry sandbox
             failed += 1
             _log_entry_point_failed(ep, exc)

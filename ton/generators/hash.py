@@ -46,7 +46,7 @@ _HASHERS: dict[str, Callable[[bytes], str]] = {
 }
 _ALGORITHMS = tuple(sorted((*_HASHERS, "bcrypt", "ntlm")))
 _BCRYPT_ALPHABET = b"./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-MAX_BCRYPT_ROUNDS = 12
+BCRYPT_MAX_ROUNDS = 31
 
 
 @dataclass(frozen=True)
@@ -83,10 +83,8 @@ class HashGenerator(PairedGenerator):
             )
         if algorithm == "bcrypt":
             rounds = coerce_int(spec, "rounds", type_name="hash", default=12)
-            if not 4 <= rounds <= MAX_BCRYPT_ROUNDS:
-                raise ValueError(
-                    f"hash 'rounds' must be between 4 and MAX_BCRYPT_ROUNDS ({MAX_BCRYPT_ROUNDS})"
-                )
+            if not 4 <= rounds <= BCRYPT_MAX_ROUNDS:
+                raise ValueError("hash 'rounds' must be between 4 and 31")
             oversized = next((word for word in words if len(word.encode("utf-8")) > 72), None)
             if oversized is not None:
                 raise ValueError("hash bcrypt 'values' entries must be at most 72 UTF-8 bytes")

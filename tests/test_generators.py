@@ -20,7 +20,6 @@ from ton.generators import (
     StringGenerator,
 )
 from ton.generators.base import coerce_float
-from ton.generators.hash import MAX_BCRYPT_ROUNDS
 
 
 def _rng() -> Random:
@@ -314,12 +313,17 @@ def test_hash_generator_rejects_bcrypt_plaintext_over_72_bytes(value: str) -> No
         HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 4, "values": [value]})
 
 
-def test_hash_generator_rejects_bcrypt_rounds_above_cap() -> None:
-    with pytest.raises(ValueError, match="MAX_BCRYPT_ROUNDS"):
+def test_hash_generator_accepts_full_bcrypt_cost_range() -> None:
+    prepared = HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 13, "values": ["secret"]})
+    assert prepared.rounds == 13
+
+
+def test_hash_generator_rejects_unrepresentable_bcrypt_rounds() -> None:
+    with pytest.raises(ValueError, match="between 4 and 31"):
         HashGenerator().prepare(
             {
                 "algorithm": "bcrypt",
-                "rounds": MAX_BCRYPT_ROUNDS + 1,
+                "rounds": 32,
                 "values": ["secret"],
             }
         )

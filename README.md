@@ -951,9 +951,9 @@ Digest drawn from a fixed plaintext list. **Paired**: a single row may reference
 |-------------|----------|------------------------------------------------------|
 | `algorithm` | string   | `md5`, `sha1`, `sha256` (default), `sha512`, `bcrypt`, or `ntlm` |
 | `values`    | string[] | non-empty plaintext pool                            |
-| `rounds`    | int      | bcrypt cost (default `12`; range `4`–`12`)          |
+| `rounds`    | int      | bcrypt cost (default `12`; range `4`–`31`)          |
 
-`bcrypt` requires the optional `ton[bcrypt]` extra and accepts `rounds` from `4` to `12` (default `12`). TON derives a stable bcrypt salt from the plaintext so synthetic fixtures remain reproducible.
+`bcrypt` requires the optional `ton[bcrypt]` extra and accepts `rounds` from `4` to `31` (default `12`). TON derives a stable bcrypt salt from the plaintext so synthetic fixtures remain reproducible.
 Plaintext entries are limited by bcrypt's format to 72 UTF-8 bytes and are
 rejected during config preparation when they exceed that boundary.
 

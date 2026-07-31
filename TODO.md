@@ -17,7 +17,6 @@ Last full rescan: 2026-07-16 (all categories; cache files/directories excluded).
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SEC-012 | open | S | `_output.py:85` `target_mode` flips the process-wide umask to 0 and restores it to read it. In an embedding/threaded process any file created in that window lands at 0666/0777. Derive the mode without mutating global umask. |
 
 ## code complexity
 

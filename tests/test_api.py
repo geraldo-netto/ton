@@ -156,6 +156,19 @@ def test_public_output_sink_replaces_atomically_and_preserves_mode(tmp_path: Pat
     assert stat.S_IMODE(output.stat().st_mode) == expected_mode
 
 
+def test_new_output_mode_does_not_mutate_process_umask(monkeypatch, tmp_path: Path) -> None:
+    from ton import _output
+
+    mutate_umask = mock.Mock(side_effect=AssertionError("process umask mutated"))
+    monkeypatch.setattr(_output.os, "umask", mutate_umask)
+
+    mode = _output.target_mode(str(tmp_path / "new-output.txt"))
+
+    assert mode & ~0o666 == 0
+    mutate_umask.assert_not_called()
+    assert list(tmp_path.glob(".ton-mode.*")) == []
+
+
 def test_public_output_sink_rolls_back_failed_write(tmp_path: Path) -> None:
     output = tmp_path / "rows.txt"
     output.write_text("old\n", encoding="utf-8")

@@ -125,9 +125,23 @@ def target_mode(path: str) -> int:
     try:
         return stat.S_IMODE(os.stat(path).st_mode)
     except FileNotFoundError:
-        current = os.umask(0)
-        os.umask(current)
-        return 0o666 & ~current
+        directory = os.path.dirname(os.path.abspath(path)) or "."
+        return _new_file_mode(directory)
+
+
+def _new_file_mode(directory: str) -> int:
+    """Probe default file permissions without mutating the process umask."""
+    with tempfile.TemporaryDirectory(prefix=".ton-mode.", dir=directory) as probe_dir:
+        probe_path = os.path.join(probe_dir, "probe")
+        descriptor = os.open(
+            probe_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o666,
+        )
+        try:
+            return stat.S_IMODE(os.fstat(descriptor).st_mode)
+        finally:
+            os.close(descriptor)
 
 
 def _fsync_directory(directory: str) -> None:

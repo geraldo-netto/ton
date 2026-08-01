@@ -47,9 +47,12 @@ def test_engine_runs_validator_and_passes() -> None:
 
 def test_engine_validator_failure_raises() -> None:
     catalog = _catalog_with(_EvenLength())
-    engine = Engine(_config(["abc"], ["plugin.check"]), validators=catalog.validators())
-    with pytest.raises(ValidationError, match="failed validator 'even_length'"):
+    engine = Engine(
+        _config(["credential-secret"], ["plugin.check"]), validators=catalog.validators()
+    )
+    with pytest.raises(ValidationError, match="failed validator 'even_length'") as raised:
         list(engine)
+    assert "credential-secret" not in str(raised.value)
 
 
 def test_engine_unknown_validator_reference_rejected() -> None:
@@ -124,8 +127,12 @@ def test_cli_validation_failure_exits_2(monkeypatch, write_config, capsys) -> No
     from ton import cli
 
     catalog = _catalog_with(_Never())
-    engine = Engine.from_config(_config(["x"], ["plugin.check"]), validators=catalog.validators())
+    engine = Engine.from_config(
+        _config(["credential-secret"], ["plugin.check"]), validators=catalog.validators()
+    )
     monkeypatch.setattr(cli, "_build_engine", lambda args, config: engine)
     config = write_config()
     assert main([str(config)]) == 2
-    assert "validation failed" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert "validation failed" in error
+    assert "credential-secret" not in error

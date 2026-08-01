@@ -445,8 +445,7 @@ class Engine:
                 )
             if not valid:
                 raise ValidationError(
-                    f"Value {value!r} for variable {type_key!r} failed "
-                    f"validator {validator.type_name!r}"
+                    f"Value for variable {type_key!r} failed validator {validator.type_name!r}"
                 )
 
     def _handle_proof_failures(

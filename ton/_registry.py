@@ -170,10 +170,22 @@ class ExtensionCatalog:
             return tuple(sorted(names))
 
     def get_data_type(self, reference: str) -> Generator:
-        return self.generators()[normalize_reference(reference)]
+        with self._lock:
+            return self._clone_prototype(self._generators, reference)
 
     def get_transform(self, reference: str) -> Transform:
-        return self.transforms()[normalize_reference(reference)]
+        with self._lock:
+            return self._clone_prototype(self._transforms, reference)
+
+    @staticmethod
+    def _clone_prototype(store: Mapping[str, Mapping[str, _T]], reference: str) -> _T:
+        normalized = normalize_reference(reference)
+        namespace, name = normalized.split(".", 1)
+        try:
+            prototype = store[namespace][name]
+        except KeyError:
+            raise KeyError(normalized) from None
+        return deepcopy(prototype)
 
     def _flattened(self, key: str, store: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
         cached = self._flat_cache.get(key)

@@ -262,6 +262,48 @@ def test_catalog_returns_fresh_transform_and_validator_instances() -> None:
     assert first_validators["non_empty"] is not second_validators["non_empty"]
 
 
+def test_catalog_point_getters_clone_only_requested_prototype() -> None:
+    class ExplodingGenerator(Generator):
+        type_name = "bomb"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "bomb"
+
+        def __deepcopy__(self, memo: dict[int, object]) -> ExplodingGenerator:
+            raise AssertionError("unrequested generator was cloned")
+
+    class ExplodingTransform(BaseTransform):
+        type_name: ClassVar[str] = "bomb"
+
+        def __deepcopy__(self, memo: dict[int, object]) -> ExplodingTransform:
+            raise AssertionError("unrequested transform was cloned")
+
+    catalog = ExtensionCatalog(
+        generators={"target": StringGenerator(), "bomb": ExplodingGenerator()},
+        transforms={"target": BaseTransform(), "bomb": ExplodingTransform()},
+    )
+
+    first_generator = catalog.get_data_type("target")
+    second_generator = catalog.get_data_type("core.target")
+    first_transform = catalog.get_transform("target")
+    second_transform = catalog.get_transform("core.target")
+
+    assert isinstance(first_generator, StringGenerator)
+    assert first_generator is not second_generator
+    assert isinstance(first_transform, BaseTransform)
+    assert first_transform is not second_transform
+
+
+@pytest.mark.parametrize("getter", ["get_data_type", "get_transform"])
+def test_catalog_point_getters_report_normalized_missing_reference(getter: str) -> None:
+    catalog = build_extension_catalog()
+
+    with pytest.raises(KeyError) as raised:
+        getattr(catalog, getter)("missing")
+
+    assert raised.value.args == ("core.missing",)
+
+
 def test_catalog_serializes_registration_and_snapshot_reads() -> None:
     catalog = build_extension_catalog()
     started = threading.Event()

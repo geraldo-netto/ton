@@ -38,7 +38,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| PERF-014 | open | M | Make `ExtensionCatalog.get_data_type()` and `get_transform()` resolve and clone only the requested prototype. Each point lookup currently calls `generators()`/`transforms()`, deep-copying the entire flattened catalog and every plugin prototype; preserve per-call isolation and qualified/bare alias rules without catalog-wide work. |
 
 ## scalability
 

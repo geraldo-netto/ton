@@ -85,6 +85,19 @@ def test_tracked_text_files_do_not_contain_private_paths_or_secrets() -> None:
     assert offenders == []
 
 
+def test_ci_actions_are_pinned_to_commit_shas() -> None:
+    workflows = (REPO_ROOT / ".github" / "workflows").glob("*.y*ml")
+    action_lines = [
+        line
+        for path in workflows
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if re.search(r"uses:\s+[^@\s]+@", line)
+    ]
+
+    assert action_lines
+    assert all(re.search(r"@[0-9a-f]{40}\s+#\s+v\d", line) for line in action_lines)
+
+
 def test_proof_failure_redacted_masks_sensitive_fields() -> None:
     failure = ProofFailure(
         row=1,

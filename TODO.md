@@ -17,7 +17,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SEC-021 | open | S | CI executes mutable third-party action tags (`actions/checkout@v4`, `actions/setup-python@v5`; `.github/workflows/ci.yml:21-24,39-42,68-71,84-87`). Pin actions to reviewed commit SHAs (with version comments) so a moved/compromised tag cannot change trusted build code. |
 
 ## code complexity
 

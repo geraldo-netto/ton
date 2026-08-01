@@ -7,12 +7,15 @@ import subprocess
 import sys
 import threading
 from random import Random
+from types import SimpleNamespace
 from typing import Any, ClassVar
 from unittest import mock
 
 import pytest
 
 from ton._registry import (
+    ENTRY_POINT_GROUP,
+    EntryPointSelector,
     ExtensionCatalog,
     RegistryError,
     build_extension_catalog,
@@ -148,12 +151,16 @@ def test_registry_with_entry_points_honors_allowlist() -> None:
     allowed.name = "allowed"
     allowed.value = "pkg:Allowed"
     allowed.load.return_value = CustomGenerator
+    allowed.dist = SimpleNamespace(name="trusted-pkg", version="1")
     skipped = mock.Mock()
     skipped.name = "skipped"
     skipped.value = "pkg:Skipped"
+    skipped.dist = SimpleNamespace(name="trusted-pkg", version="1")
 
     with mock.patch("ton._registry.entry_points", return_value=[allowed, skipped]):
-        registry = registry_with_entry_points(allowed_names={"allowed"})
+        registry = registry_with_entry_points(
+            allowed_selectors={EntryPointSelector(ENTRY_POINT_GROUP, "trusted-pkg", "allowed")}
+        )
 
     assert registry["allowed"].generate({}, Random(0)) == "custom"
     assert registry["plugin.allowed"].generate({}, Random(0)) == "custom"
@@ -373,18 +380,106 @@ def test_catalog_entry_points_honor_allowlist() -> None:
     allowed.name = "acme.trim"
     allowed.value = "pkg:Transform"
     allowed.load.return_value = BaseTransform
+    allowed.dist = SimpleNamespace(name="acme-plugins", version="1")
     skipped = mock.Mock()
     skipped.name = "acme.skip"
     skipped.value = "pkg:Skip"
+    skipped.dist = SimpleNamespace(name="acme-plugins", version="1")
 
     def _entry_points(group: str):
         return [allowed, skipped] if group == "ton.transforms" else []
 
     with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
-        catalog = catalog_with_entry_points(allowed_names={"acme.trim"})
+        catalog = catalog_with_entry_points(
+            allowed_selectors={EntryPointSelector("ton.transforms", "acme-plugins", "acme.trim")}
+        )
 
     assert "acme.trim" in catalog.list_transforms()
     skipped.load.assert_not_called()
+
+
+def test_entry_point_selector_binds_group_distribution_and_name() -> None:
+    class CustomGenerator(Generator):
+        type_name = "custom"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            del prepared, rng
+            return "trusted"
+
+    trusted = mock.Mock()
+    trusted.name = "acme.custom"
+    trusted.value = "trusted_pkg:Generator"
+    trusted.dist = SimpleNamespace(name="Trusted_Pkg", version="1")
+    trusted.load.return_value = CustomGenerator
+    impersonator = mock.Mock()
+    impersonator.name = "acme.custom"
+    impersonator.value = "evil_pkg:Generator"
+    impersonator.dist = SimpleNamespace(name="evil-pkg", version="1")
+    wrong_group = mock.Mock()
+    wrong_group.name = "acme.custom"
+    wrong_group.value = "trusted_pkg:Validator"
+    wrong_group.dist = SimpleNamespace(name="trusted-pkg", version="1")
+    unidentified = mock.Mock()
+    unidentified.name = "acme.custom"
+    unidentified.value = "unknown_pkg:Generator"
+    unidentified.dist = None
+    invalid_distribution = mock.Mock()
+    invalid_distribution.name = "acme.custom"
+    invalid_distribution.value = "invalid_pkg:Generator"
+    invalid_distribution.dist = SimpleNamespace(name="invalid/name", version="1")
+
+    def _entry_points(group: str) -> list[Any]:
+        if group == "ton.generators":
+            return [impersonator, trusted, unidentified, invalid_distribution]
+        if group == "ton.validators":
+            return [wrong_group]
+        return []
+
+    selector = EntryPointSelector.parse("ton.generators:trusted-pkg:acme.custom")
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points(allowed_selectors={selector})
+
+    assert catalog.get_data_type("acme.custom").generate({}, Random(0)) == "trusted"
+    impersonator.load.assert_not_called()
+    wrong_group.load.assert_not_called()
+    unidentified.load.assert_not_called()
+    invalid_distribution.load.assert_not_called()
+
+
+def test_catalog_rejects_duplicate_providers_before_loading() -> None:
+    first = mock.Mock()
+    first.name = "acme.custom"
+    first.value = "first_pkg:Generator"
+    first.dist = SimpleNamespace(name="first-pkg", version="1")
+    second = mock.Mock()
+    second.name = "acme.custom"
+    second.value = "second_pkg:Generator"
+    second.dist = SimpleNamespace(name="second-pkg", version="1")
+
+    def _entry_points(group: str) -> list[Any]:
+        return [second, first] if group == "ton.generators" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points()
+
+    assert "acme.custom" not in catalog.list_data_types()
+    first.load.assert_not_called()
+    second.load.assert_not_called()
+
+
+def test_entry_point_selector_rejects_name_only_and_unknown_group() -> None:
+    selector = EntryPointSelector.parse("ton.generators:Trusted_Pkg:custom")
+    assert selector.distribution == "trusted-pkg"
+    assert str(selector) == "ton.generators:trusted-pkg:custom"
+
+    with pytest.raises(RegistryError, match="GROUP:DISTRIBUTION:NAME"):
+        EntryPointSelector.parse("custom")
+    with pytest.raises(RegistryError, match="unsupported entry-point group"):
+        EntryPointSelector.parse("unknown:acme:custom")
+    with pytest.raises(RegistryError, match="entry-point name"):
+        EntryPointSelector.parse("ton.generators:acme:")
+    with pytest.raises(RegistryError, match="invalid distribution"):
+        EntryPointSelector.parse("ton.generators:invalid/name:custom")
 
 
 def test_catalog_entry_points_skip_wrong_plugin_kind() -> None:

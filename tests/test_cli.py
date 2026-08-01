@@ -1157,10 +1157,28 @@ def test_cli_entry_point_allowlist_option_still_generates_rows(
     write_config, capsys: pytest.CaptureFixture[str]
 ) -> None:
     config = write_config()
-    exit_code = main([str(config), "--entry-point", "trusted", "--seed", "0"])
+    exit_code = main(
+        [
+            str(config),
+            "--entry-point",
+            "ton.generators:trusted-pkg:trusted",
+            "--seed",
+            "0",
+        ]
+    )
     captured = capsys.readouterr()
     assert exit_code == 0
     assert len(captured.out.strip().splitlines()) == 4
+
+
+def test_cli_rejects_name_only_entry_point_selector(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main(["--entry-point", "trusted", "--list-namespaces"])
+
+    assert exc.value.code == 2
+    assert "GROUP:DISTRIBUTION:NAME" in capsys.readouterr().err
 
 
 def test_open_output_streams_existing_fifo(tmp_path: Path) -> None:

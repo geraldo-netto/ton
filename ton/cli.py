@@ -158,10 +158,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--entry-point",
         action="append",
-        metavar="NAME",
+        type=_entry_point_selector,
+        metavar="GROUP:DISTRIBUTION:NAME",
         dest="entry_point_allowlist",
         default=[],
-        help="Allow only this entry-point name. May be passed more than once.",
+        help="Allow only this exact entry-point provider. May be passed more than once.",
     )
     parser.add_argument(
         "--log-level",
@@ -190,6 +191,13 @@ def _positive_int(value: str) -> int:
     if parsed < 1:
         raise argparse.ArgumentTypeError(f"must be >= 1 (got {value})")
     return parsed
+
+
+def _entry_point_selector(value: str) -> api.EntryPointSelector:
+    try:
+        return api.EntryPointSelector.parse(value)
+    except api.RegistryError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def main(argv: Sequence[str] | None = None) -> int:

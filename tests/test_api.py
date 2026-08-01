@@ -19,6 +19,7 @@ EXPECTED_PUBLIC_API = {
     "ConfigError",
     "Engine",
     "EngineOptions",
+    "EntryPointSelector",
     "ExtensionCatalog",
     "Generator",
     "GeneratorExecutionError",
@@ -109,18 +110,20 @@ def test_build_registry_warns_pointing_at_catalog() -> None:
 def test_build_registry_can_opt_into_entry_points(monkeypatch) -> None:
     seen: dict[str, object] = {}
 
-    def _fake_registry(*, allowed_names=None):
-        seen["allowed_names"] = allowed_names
+    def _fake_registry(*, allowed_selectors=None):
+        seen["allowed_selectors"] = allowed_selectors
         return {}
 
     monkeypatch.setattr(api, "registry_with_entry_points", _fake_registry)
     with pytest.warns(DeprecationWarning):
         registry = api.build_registry(
             include_entry_points=True,
-            allowed_entry_points={"custom"},
+            allowed_entry_points={"ton.generators:trusted-pkg:custom"},
         )
     assert registry == {}
-    assert seen["allowed_names"] == {"custom"}
+    assert seen["allowed_selectors"] == {
+        api.EntryPointSelector("ton.generators", "trusted-pkg", "custom")
+    }
 
 
 def test_custom_registry_can_override_or_add_types() -> None:

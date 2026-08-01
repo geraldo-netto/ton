@@ -66,7 +66,7 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 | `--redact-proof-failures` | Mask values, paired ids, and field specs in proof-report records.                 |
 | `--list-namespaces`    | List available namespaces, data types, transforms, and validators, then exit.        |
 | `--entry-points`       | Load trusted third-party plugins from the `ton.generators`, `ton.transforms`, and `ton.validators` entry-point groups. |
-| `--entry-point NAME`   | Allow only this trusted entry-point name; repeat for multiple names.                 |
+| `--entry-point GROUP:DISTRIBUTION:NAME` | Allow only this exact trusted entry-point provider; repeat for multiple providers. |
 | `--version`            | Print the package version.                                                           |
 
 With `--proof-check audit` the run still exits `0`; the failure count is printed
@@ -329,8 +329,8 @@ for row in api.generate(config_dict,
 catalog across Engines does not share generator state. Generator attributes
 must therefore support `copy.deepcopy`.
 
-A broken plugin is isolated: load failures are logged as `entry_point_failed` and skipped; one bad package never aborts the whole catalog build.
-Entry points execute installed package code while loading, so TON loads them only when explicitly requested, either through `api.build_extension_catalog(include_entry_points=True)` or the CLI `--entry-points` / `--entry-point NAME` flags. (`api.build_registry` remains as a deprecated generator-only shim.)
+A broken plugin is isolated: load failures are logged as `entry_point_failed` and skipped; one bad package never aborts the whole catalog build. Duplicate providers for the same group and entry-point name are all rejected before plugin code loads.
+Entry points execute installed package code while loading, so TON loads them only when explicitly requested, either through `api.build_extension_catalog(include_entry_points=True)` or the CLI `--entry-points` flag. To load only named providers, pass exact `GROUP:DISTRIBUTION:NAME` selectors through `allowed_entry_points` or repeat the CLI `--entry-point GROUP:DISTRIBUTION:NAME` option. Distribution names are normalized case-insensitively across `.`, `_`, and `-`; name-only allowlists are rejected. (`api.build_registry` remains as a deprecated generator-only shim.)
 
 Parallel runs use the public `ton.concurrency` helpers re-exported by `ton.api`.
 `write_shard` is the bounded-memory process-pool primitive used in the complete

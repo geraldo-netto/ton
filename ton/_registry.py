@@ -16,9 +16,12 @@ compatibility.
 from __future__ import annotations
 
 import inspect
+import re
 import threading
+from collections import Counter
 from collections.abc import Container, Iterable, Iterator, Mapping
 from copy import deepcopy
+from dataclasses import dataclass
 from importlib.metadata import entry_points
 from typing import Any, TypeVar
 
@@ -49,6 +52,37 @@ _BUILTIN_GENERATOR_CLASSES: frozenset[type[Generator]] = frozenset(BUILTIN_GENER
 
 class RegistryError(ValueError):
     """Raised when plugin registration would make lookup ambiguous."""
+
+
+@dataclass(frozen=True, order=True)
+class EntryPointSelector:
+    """Trusted entry-point identity in ``GROUP:DISTRIBUTION:NAME`` form."""
+
+    group: str
+    distribution: str
+    name: str
+
+    def __post_init__(self) -> None:
+        if self.group not in {
+            ENTRY_POINT_GROUP,
+            TRANSFORM_ENTRY_POINT_GROUP,
+            VALIDATOR_ENTRY_POINT_GROUP,
+        }:
+            raise RegistryError(f"unsupported entry-point group {self.group!r}")
+        object.__setattr__(self, "distribution", _normalize_distribution_name(self.distribution))
+        if not self.name or ":" in self.name:
+            raise RegistryError("entry-point name must be non-empty and cannot contain ':'")
+
+    @classmethod
+    def parse(cls, value: str) -> EntryPointSelector:
+        """Parse ``GROUP:DISTRIBUTION:NAME`` into a trusted selector."""
+        parts = value.split(":", 2)
+        if len(parts) != 3:
+            raise RegistryError("entry-point selector must use GROUP:DISTRIBUTION:NAME")
+        return cls(*parts)
+
+    def __str__(self) -> str:
+        return f"{self.group}:{self.distribution}:{self.name}"
 
 
 class ExtensionCatalog:
@@ -220,7 +254,7 @@ def build_extension_catalog() -> ExtensionCatalog:
 
 def catalog_with_entry_points(
     *,
-    allowed_names: Container[str] | None = None,
+    allowed_selectors: Container[EntryPointSelector] | None = None,
 ) -> ExtensionCatalog:
     """Return a catalog merged with trusted plugin entry points."""
     catalog = build_extension_catalog()
@@ -228,19 +262,19 @@ def catalog_with_entry_points(
         catalog,
         group=ENTRY_POINT_GROUP,
         kind="data_type",
-        allowed_names=allowed_names,
+        allowed_selectors=allowed_selectors,
     )
     _load_catalog_entry_points(
         catalog,
         group=TRANSFORM_ENTRY_POINT_GROUP,
         kind="transform",
-        allowed_names=allowed_names,
+        allowed_selectors=allowed_selectors,
     )
     _load_catalog_entry_points(
         catalog,
         group=VALIDATOR_ENTRY_POINT_GROUP,
         kind="validator",
-        allowed_names=allowed_names,
+        allowed_selectors=allowed_selectors,
     )
     return catalog
 
@@ -250,12 +284,18 @@ def _load_catalog_entry_points(
     *,
     group: str,
     kind: str,
-    allowed_names: Container[str] | None,
+    allowed_selectors: Container[EntryPointSelector] | None,
 ) -> None:
     loaded = 0
     failed = 0
-    for ep in entry_points(group=group):
-        if allowed_names is not None and ep.name not in allowed_names:
+    candidates = _entry_point_candidates(group, allowed_selectors)
+    duplicate_names = {
+        name for name, count in Counter(str(ep.name) for ep in candidates).items() if count > 1
+    }
+    for ep in candidates:
+        if str(ep.name) in duplicate_names:
+            failed += 1
+            _log_entry_point_failed(ep, RegistryError("duplicate entry-point providers"))
             continue
         try:
             plugin = ep.load()()
@@ -263,7 +303,7 @@ def _load_catalog_entry_points(
             _validate_entry_point_plugin(kind, plugin)
             _stamp_plugin_dist(plugin, ep)
             _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
-        except Exception as exc:  # noqa: BLE001 - per-entry sandbox
+        except Exception as exc:  # noqa: BLE001 - per-entry failure isolation
             failed += 1
             _log_entry_point_failed(ep, exc)
             continue
@@ -281,6 +321,48 @@ def _load_catalog_entry_points(
                 "group": group,
             },
         )
+
+
+def _entry_point_candidates(
+    group: str,
+    allowed_selectors: Container[EntryPointSelector] | None,
+) -> list[Any]:
+    """Return trusted candidates in provider-stable order without importing them."""
+    candidates = []
+    for ep in entry_points(group=group):
+        if allowed_selectors is not None:
+            selector = _selector_for_entry_point(group, ep)
+            if selector is None or selector not in allowed_selectors:
+                continue
+        candidates.append(ep)
+    return sorted(candidates, key=_entry_point_sort_key)
+
+
+def _selector_for_entry_point(group: str, ep: object) -> EntryPointSelector | None:
+    distribution, _ = _entry_point_dist(ep)
+    name = getattr(ep, "name", None)
+    if not isinstance(distribution, str) or not isinstance(name, str):
+        return None
+    try:
+        return EntryPointSelector(group, distribution, name)
+    except RegistryError:
+        return None
+
+
+def _entry_point_sort_key(ep: object) -> tuple[str, str, str]:
+    distribution, _ = _entry_point_dist(ep)
+    return (
+        distribution if isinstance(distribution, str) else "",
+        str(getattr(ep, "name", "")),
+        str(getattr(ep, "value", "")),
+    )
+
+
+def _normalize_distribution_name(value: str) -> str:
+    normalized = re.sub(r"[-_.]+", "-", value).lower()
+    if not normalized or any(not part.isalnum() for part in normalized.split("-")):
+        raise RegistryError(f"invalid distribution name {value!r}")
+    return normalized
 
 
 def _register_entry_point_plugin(
@@ -455,7 +537,7 @@ def default_registry() -> dict[str, Generator]:
 
 def registry_with_entry_points(
     *,
-    allowed_names: Container[str] | None = None,
+    allowed_selectors: Container[EntryPointSelector] | None = None,
 ) -> dict[str, Generator]:
     """Return the built-in registry merged with entry-point generators.
 
@@ -468,11 +550,11 @@ def registry_with_entry_points(
     unqualified entry-point name lands in the ``plugin`` namespace
     (``plugin.widget``) and is also promoted to the bare key ``widget``
     only when no built-in already claims it. Core registrations are never
-    replaced. When ``allowed_names`` is provided, only matching
-    entry-point names are loaded; all others are ignored without
-    importing their target.
+    replaced. When ``allowed_selectors`` is provided, only exact
+    group/distribution/name identities are loaded; all others are ignored
+    without importing their target.
     """
-    catalog = catalog_with_entry_points(allowed_names=allowed_names)
+    catalog = catalog_with_entry_points(allowed_selectors=allowed_selectors)
     # Copy the cached flattened view before mutating it: catalog.generators()
     # returns the shared cache (PERF-003), so promoting plugin names to bare
     # keys must not scribble on it.

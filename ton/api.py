@@ -41,7 +41,7 @@ Typical use::
 from __future__ import annotations
 
 import warnings
-from collections.abc import Container, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
 
 from . import _config
@@ -67,6 +67,7 @@ from ._output import (
 )
 from ._proof import ProvenanceRecord
 from ._registry import (
+    EntryPointSelector,
     ExtensionCatalog,
     RegistryError,
     catalog_with_entry_points,
@@ -87,6 +88,7 @@ __all__ = [
     "ConfigError",
     "Engine",
     "EngineOptions",
+    "EntryPointSelector",
     "Generator",
     "GeneratorExecutionError",
     "LogEvent",
@@ -157,7 +159,7 @@ def validate_config(
 def build_registry(
     include_entry_points: bool = False,
     *,
-    allowed_entry_points: Container[str] | None = None,
+    allowed_entry_points: Iterable[str | EntryPointSelector] | None = None,
 ) -> dict[str, Generator]:
     """Return a fresh generator-only registry of generator instances.
 
@@ -182,19 +184,38 @@ def build_registry(
         stacklevel=2,
     )
     if include_entry_points:
-        return registry_with_entry_points(allowed_names=allowed_entry_points)
+        return registry_with_entry_points(
+            allowed_selectors=_normalize_entry_point_selectors(allowed_entry_points)
+        )
     return default_registry()
 
 
 def build_extension_catalog(
     include_entry_points: bool = False,
     *,
-    allowed_entry_points: Container[str] | None = None,
+    allowed_entry_points: Iterable[str | EntryPointSelector] | None = None,
 ) -> ExtensionCatalog:
-    """Return a catalog for data types, transforms, and validators."""
+    """Return a catalog for data types, transforms, and validators.
+
+    Allowed entry points use exact ``GROUP:DISTRIBUTION:NAME`` selectors;
+    name-only allowlists are intentionally rejected.
+    """
     if include_entry_points:
-        return catalog_with_entry_points(allowed_names=allowed_entry_points)
+        return catalog_with_entry_points(
+            allowed_selectors=_normalize_entry_point_selectors(allowed_entry_points)
+        )
     return _build_extension_catalog()
+
+
+def _normalize_entry_point_selectors(
+    values: Iterable[str | EntryPointSelector] | None,
+) -> frozenset[EntryPointSelector] | None:
+    if values is None:
+        return None
+    return frozenset(
+        value if isinstance(value, EntryPointSelector) else EntryPointSelector.parse(value)
+        for value in values
+    )
 
 
 def generate(

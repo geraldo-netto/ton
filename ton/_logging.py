@@ -36,7 +36,7 @@ class LogEvent(str, Enum):
 
     Promotes the previously stringly-typed event values into a typed
     enum so consumers can ``match LogEvent(record.event)`` instead of
-    string-comparing (TODO PAT-010). The enum subclasses ``str`` so the
+    string-comparing (PAT-010). The enum subclasses ``str`` so the
     serialised value in log handlers / JSON sinks stays the same
     canonical string ("engine_constructed", "engine_milestone", ...).
 

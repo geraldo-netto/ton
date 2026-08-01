@@ -180,7 +180,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _non_negative_int(value: str) -> int:
-    """argparse helper rejecting negative integers (TODO REL-017)."""
+    """argparse helper rejecting negative integers (REL-017)."""
     parsed = int(value)
     if parsed < 0:
         raise argparse.ArgumentTypeError(f"must be >= 0 (got {value})")
@@ -221,7 +221,7 @@ def _run(args: argparse.Namespace) -> int:
         return 130
     except Exception as exc:  # noqa: BLE001 - top-level CLI safety net
         # ``logger.exception`` records the traceback for any handler
-        # attached via ``--log-level`` (TODO OBS-008); the print line
+        # attached via ``--log-level`` (OBS-008); the print line
         # keeps the v1 "ton: ..." stderr contract for users without a
         # log handler configured.
         _logger.exception(
@@ -505,7 +505,7 @@ def _catalog_from_args(args: argparse.Namespace) -> api.ExtensionCatalog:
 
     Single source of truth for the catalog used by engine construction,
     ``--validate``, and ``--list-namespaces`` so all three observe the
-    same plugin surface (TODO CFG-003).
+    same plugin surface (CFG-003).
     """
     allowed = set(args.entry_point_allowlist) or None
     return api.build_extension_catalog(
@@ -626,8 +626,8 @@ def _stream(
     write_state: _WriteState,
 ) -> int:
     """Write rows and flush periodically, emitting an ``engine_progress`` event
-    every ``progress_every`` rows (TODO OBS-006). Skips the first
-    ``resume_from`` rows before writing any output (TODO SCALE-003).
+    every ``progress_every`` rows (OBS-006). Skips the first
+    ``resume_from`` rows before writing any output (SCALE-003).
 
     Returns the total row count actually written for use by --verbose
     summaries.
@@ -654,7 +654,7 @@ def _stream(
 
 
 def _emit_progress(rows: int, elapsed: float) -> None:
-    """Emit one progress event via the ``ton`` logger (TODO OBS-006).
+    """Emit one progress event via the ``ton`` logger (OBS-006).
 
     The CLI installs :class:`_ProgressJSONHandler` on the logger when
     ``--progress`` is set so the event is surfaced as a JSON-on-stderr
@@ -681,7 +681,7 @@ class _ProgressJSONHandler(logging.Handler):
     """Stderr handler that writes ``engine_progress`` events as JSON.
 
     Other log events are ignored so the JSON-on-stderr stream stays
-    parseable (TODO OBS-006).
+    parseable (OBS-006).
     """
 
     def __init__(self) -> None:

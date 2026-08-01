@@ -1,14 +1,14 @@
 """Registry mapping JSON ``type`` discriminators to Generator instances.
 
 The default registry is sourced from the explicit allowlist
-``ton.generators.BUILTIN_GENERATOR_CLASSES`` (TODO ARCH-005). Walking
+``ton.generators.BUILTIN_GENERATOR_CLASSES`` (ARCH-005). Walking
 ``Generator.__subclasses__()`` is still exposed via
 :func:`discover_generator_classes` for callers that want full
 introspection, but the default registry no longer picks up in-process
 test fixtures or unrelated third-party subclasses.
 
 Construction goes through :func:`make_registry` so callers can request
-only the type names they need (TODO PERF-012); the legacy
+only the type names they need (PERF-012); the legacy
 :func:`default_registry` builds the full dictionary for backwards
 compatibility.
 """
@@ -467,7 +467,7 @@ def discover_generator_classes() -> list[type[Generator]]:
     that is explicitly registered as a built-in.
 
     Walks the full subclass tree but filters by the built-in allowlist so
-    test fixtures and third-party plugins do not leak in (TODO ARCH-005).
+    test fixtures and third-party plugins do not leak in (ARCH-005).
     """
     return [
         cls
@@ -489,7 +489,7 @@ def _walk_subclasses(root: type[Generator]) -> Iterator[type[Generator]]:
 
 
 #: Process-wide cache of the discovered generator classes, indexed by
-#: ``type_name`` so per-name lookups stay O(1) (TODO PERF-012).
+#: ``type_name`` so per-name lookups stay O(1) (PERF-012).
 _DEFAULT_CLASSES: dict[str, type[Generator]] = {}
 _DEFAULT_CLASSES_LOCK = threading.Lock()
 
@@ -542,7 +542,7 @@ def make_registry(type_names: Iterable[str] | None = None) -> dict[str, Generato
     (matches :func:`default_registry`). When passed an iterable of names,
     only those generators are constructed -- the Engine uses this to
     skip the per-construction cost of generators it does not need
-    (TODO PERF-012).
+    (PERF-012).
 
     Unknown names are silently dropped; the Engine's existing
     "Unknown type" validation catches them with a better message.
@@ -685,7 +685,7 @@ def _entry_point_dist(ep: object) -> tuple[str | None, str | None]:
 
     ``EntryPoint.dist`` is only present on importlib.metadata 3.10+ and
     can still be ``None`` for entry points discovered outside any
-    installed distribution; tolerate either case (TODO OBS-005).
+    installed distribution; tolerate either case (OBS-005).
     """
     dist = getattr(ep, "dist", None)
     if dist is None:

@@ -4,7 +4,7 @@ Per-type validation (e.g. ``minValue <= maxValue``, ``decimals >= 0``,
 ``values`` non-empty) lives in each :class:`ton.generators.Generator`'s
 ``prepare`` method and runs when the :class:`ton.engine.Engine` is
 constructed. This module is intentionally type-agnostic so the two
-validation surfaces cannot drift (TODO REL-011).
+validation surfaces cannot drift (REL-011).
 """
 
 from __future__ import annotations
@@ -202,7 +202,7 @@ def _validate_validator_refs(name: str, validators: Any) -> None:
 
 
 def _validate_template_references(template: str, types: dict[str, Any]) -> None:
-    """Delegate to :func:`ton.template.validate_against` (TODO DEC-002)."""
+    """Delegate to :func:`ton.template.validate_against` (DEC-002)."""
     try:
         validate_against(template, types.keys())
     except UndeclaredVariableError as exc:

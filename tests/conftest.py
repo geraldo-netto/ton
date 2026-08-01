@@ -2,7 +2,7 @@
 
 Centralizes the small "config dict" / "config on disk" helpers that
 were duplicated across test_engine.py, test_api.py, and test_cli.py
-(TODO DUP-002).
+(DUP-002).
 """
 
 from __future__ import annotations

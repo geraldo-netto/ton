@@ -194,7 +194,7 @@ class PairedGenerator(Generator):
     The single-valued shortcut path :meth:`generate` returns the
     primary by default. Subclasses that want the id half instead can
     flip :attr:`generate_returns_id` to True without overriding
-    :meth:`generate` (TODO ARCH-005).
+    :meth:`generate` (ARCH-005).
     """
 
     is_paired: ClassVar[bool] = True
@@ -284,7 +284,7 @@ def coerce_int(
     When ``default`` is omitted the key is required; passing any value
     (including ``None``) treats it as optional. Used by integer / decimal
     / char / bytes / text / sequence / uuid generators so their per-field
-    coercion + validation surface stays centralized (TODO DUP-006).
+    coercion + validation surface stays centralized (DUP-006).
     """
     raw = _value_or_default(spec, key, type_name, default)
     if isinstance(raw, bool):
@@ -328,7 +328,7 @@ def coerce_bool(
 
 def require_min_le_max(type_name: str, lo: Any, hi: Any) -> None:
     """Raise when ``hi < lo``. Centralizes the bounds check used by the
-    integer / decimal / date / timestamp_unix generators (TODO DUP-004).
+    integer / decimal / date / timestamp_unix generators (DUP-004).
     """
     if hi < lo:
         raise ValueError(f"{type_name} 'maxValue' ({hi}) must be >= 'minValue' ({lo})")

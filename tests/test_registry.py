@@ -55,7 +55,7 @@ def test_public_packages_import_cleanly_in_fresh_interpreter(imports: str) -> No
 
 #: Every built-in type that ships with TON. If this list grows or
 #: shrinks, the registry should reflect it without anyone editing
-#: ton/registry.py (TODO DUP-003).
+#: ton/registry.py (DUP-003).
 EXPECTED_TYPES = {
     "boolean",
     "bytes",

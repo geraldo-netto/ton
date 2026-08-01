@@ -79,7 +79,7 @@ def derive_seed(parent_seed: int, worker_id: int) -> int:
     (e.g. starting from seeds N and N+1 with the same algorithm). The
     derived integer is also recorded in each worker's
     :class:`~ton._proof.ProofFailure` provenance so audit records can be
-    traced back to the worker that produced them (TODO CONC-001).
+    traced back to the worker that produced them (CONC-001).
     """
     payload = struct.pack(">QQ", _uint64(parent_seed), _uint64(worker_id))
     digest = hashlib.blake2b(payload, digest_size=8).digest()
@@ -117,7 +117,7 @@ def fork_engine(
     use plugin ``transforms`` and proof-check options the same way the
     parent process does. The worker's derived seed is threaded into the
     engine as ``seed`` so proof/provenance records are attributable to
-    the worker (TODO CONC-001).
+    the worker (CONC-001).
     """
     seed = derive_seed(parent_seed, worker_id)
     rng = Random(seed)

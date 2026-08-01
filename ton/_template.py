@@ -52,7 +52,7 @@ def parse(template: str) -> list[Token]:
 
     ``$$`` escapes are skipped; they are not placeholders. Result is
     memoized so config-side validation and engine-side rendering share
-    the same parse work (TODO PERF-007).
+    the same parse work (PERF-007).
     """
     return list(_parse_cached(template))
 
@@ -87,7 +87,7 @@ def validate_against(template: str, declared: Iterable[str]) -> None:
     """Raise if any placeholder in ``template`` is missing from ``declared``.
 
     Single source of truth for the "template references undeclared
-    variable" check (TODO DEC-002). Both ``ton.config`` and
+    variable" check (DEC-002). Both ``ton.config`` and
     ``ton.engine`` call this so neither has to know how the template
     is parsed.
     """
@@ -105,7 +105,7 @@ def split_segments(template: str) -> tuple[list[str], list[Token]]:
     Returns ``(literals, tokens)`` where ``len(literals) == len(tokens) + 1``.
     Each literal has already had ``$$`` escapes decoded to ``$`` so the
     caller can ``"".join`` literals and rendered values directly without
-    running the regex per row (TODO PERF-009).
+    running the regex per row (PERF-009).
     """
     literals: list[str] = []
     tokens: list[Token] = []

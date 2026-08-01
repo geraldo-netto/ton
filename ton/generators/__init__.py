@@ -45,7 +45,7 @@ from .weighted import WeightedGenerator
 #: ``ton._registry.default_registry`` so in-process test fixtures or
 #: third-party subclasses (which still appear in
 #: ``Generator.__subclasses__()``) do not leak into the default registry
-#: (TODO ARCH-005).
+#: (ARCH-005).
 BUILTIN_GENERATOR_CLASSES: tuple[type[Generator], ...] = (
     BooleanGenerator,
     BytesGenerator,

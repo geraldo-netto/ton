@@ -109,4 +109,3 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| DOC-003 | open | S | Remove or reword stale `TODO <id>` annotations that refer to already-closed findings absent from `TODO.md` (for example `TODO PERF-007`, `TODO ARCH-005`, and `TODO CONC-003`). They currently look like untracked open work despite this file stating that closed items live in commit history; retain issue provenance without the `TODO` marker or maintain an explicit closed index. |

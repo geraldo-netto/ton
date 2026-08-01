@@ -15,7 +15,7 @@ instance). When the engine is replicated across worker processes via
 counter -- callers that need globally-unique ids across workers
 should set ``start`` to ``worker_id * chunk_size``.
 
-Thread-safety (TODO CONC-003)
+Thread-safety (CONC-003)
 -----------------------------
 ``itertools.count`` is **not** thread-safe; reading the counter from
 multiple Python threads against the same prepared spec can hand out

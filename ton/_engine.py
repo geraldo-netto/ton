@@ -235,7 +235,7 @@ class Engine:
 
         Wraps :func:`ton._config.load` + :meth:`from_config` so callers
         do not need to import the private config module just to load a
-        file (TODO PAT-009). Accepts ``seed`` for parity with
+        file (PAT-009). Accepts ``seed`` for parity with
         :meth:`from_config`; when ``rng`` is also given, ``rng`` wins and
         ``seed`` is recorded only as proof/provenance context.
         """
@@ -260,7 +260,7 @@ class Engine:
         """Number of rows yielded by the most recent / current iteration.
 
         Public counterpart of the private ``count`` previously kept only
-        for the milestone log (TODO SCALE-004). Library callers can
+        for the milestone log (SCALE-004). Library callers can
         watch this attribute from another thread to monitor progress.
         """
         return self._rows_emitted

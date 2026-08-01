@@ -29,3 +29,16 @@ def test_documented_quality_commands_match_ci_and_pre_commit_gate() -> None:
         assert command in CI
         assert command in PRE_COMMIT
     assert "mypy ton tests" not in README
+
+
+def test_closed_review_ids_are_not_left_as_todo_annotations() -> None:
+    marker = "TO" + "DO "
+    python_files = tuple((ROOT / "ton").rglob("*.py")) + tuple((ROOT / "tests").rglob("*.py"))
+
+    stale = [
+        str(path.relative_to(ROOT))
+        for path in python_files
+        if marker in path.read_text(encoding="utf-8")
+    ]
+
+    assert stale == []

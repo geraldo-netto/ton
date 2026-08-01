@@ -144,7 +144,7 @@ def _build_decimal_steps(prepared: DecimalSpec) -> DecimalSteps:
     if prepared.pad_with_zero:
         # Width must cover the widest possible rendering -- include the
         # '-' sign on negative bounds and the decimal point + fraction
-        # (TODO REL-014).
+        # (REL-014).
         pad_width = max(
             len(_format_step(min_step, scale, prepared.decimals)),
             len(_format_step(max_step, scale, prepared.decimals)),

@@ -39,7 +39,7 @@ class IntegerGenerator(Generator):
         if coerce_bool(spec, "padWithZero", type_name="integer", default=False):
             # Width must cover the widest possible rendering so a positive
             # value and the corresponding negative line up in fixed-width
-            # output (TODO REL-014).
+            # output (REL-014).
             pad_width = max(len(str(min_value)), len(str(max_value)))
         return IntegerSpec(min_value=min_value, max_value=max_value, pad_width=pad_width)
 

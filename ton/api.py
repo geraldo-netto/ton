@@ -3,14 +3,14 @@
 This is the *only* module external callers should import from.
 :mod:`ton._engine`, :mod:`ton._template`, :mod:`ton._registry`, and
 :mod:`ton._config` are private (single leading underscore, per PEP 8)
-and may change between releases without notice (TODO ARCH-004).
+and may change between releases without notice (ARCH-004).
 
 The supported surface, re-exported here, is:
 
 * :func:`load_config` -- read and validate a JSON config file
 * :func:`generate` / :func:`generate_from_file` -- iterators of rows
 * :func:`build_extension_catalog` -- the canonical plugin-loading API:
-  namespaced data types, transforms, and validators (TODO PLUG-004)
+  namespaced data types, transforms, and validators (PLUG-004)
 * :func:`build_registry` -- *deprecated* generator-only registry; kept
   as a thin compatibility shim over the catalog
 * :data:`ConfigError`, :data:`TemplateError`,
@@ -154,7 +154,7 @@ def validate_config(
 ) -> None:
     """Validate config references against an extension catalog.
 
-    This is the canonical catalog-aware validation path (TODO CFG-003):
+    This is the canonical catalog-aware validation path (CFG-003):
     it reports unknown type/transform references with the available-name
     lists and plugin-namespace diagnostics. :func:`load_config` performs
     structural-only validation, and constructing an :class:`Engine`
@@ -174,7 +174,7 @@ def build_registry(
 
     .. deprecated::
         :func:`build_extension_catalog` is the canonical plugin-loading
-        API (TODO PLUG-004). It loads generators, transforms, and
+        API (PLUG-004). It loads generators, transforms, and
         validators under one namespaced surface, whereas this helper only
         loads generators and promotes plugin names to bare keys with
         different shadowing rules. Prefer

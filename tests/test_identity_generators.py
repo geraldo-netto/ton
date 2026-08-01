@@ -7,6 +7,7 @@ from random import Random
 
 import pytest
 
+from ton._transforms import TransformResult
 from ton.generators.identity import EmailGenerator, NameGenerator, PhoneGenerator
 
 
@@ -42,6 +43,17 @@ def test_email_uses_lowercase_local_and_known_domain() -> None:
 def test_email_rejects_empty_domains() -> None:
     with pytest.raises(ValueError):
         EmailGenerator().prepare({"domains": []})
+
+
+def test_email_proof_reuses_precomputed_name_sets(monkeypatch) -> None:
+    from ton.generators import identity
+
+    generator = EmailGenerator()
+    prepared = generator.prepare({"domains": ["example.com"]})
+    monkeypatch.setattr(identity, "GIVEN_NAMES", ())
+    monkeypatch.setattr(identity, "FAMILY_NAMES", ())
+
+    assert generator.prove(prepared, TransformResult("alex.adams@example.com")).ok
 
 
 def test_phone_format_replaces_only_hash() -> None:

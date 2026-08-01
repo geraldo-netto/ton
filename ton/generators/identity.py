@@ -38,6 +38,9 @@ from .._transforms import TransformResult
 from ._identity_data import EMAIL_DOMAINS, FAMILY_NAMES, GIVEN_NAMES
 from .base import Generator, proof_result, require_string_tuple
 
+_LOWER_GIVEN_NAMES = frozenset(name.lower() for name in GIVEN_NAMES)
+_LOWER_FAMILY_NAMES = frozenset(name.lower() for name in FAMILY_NAMES)
+
 # ---------------------------------------------------------------------------
 # name
 # ---------------------------------------------------------------------------
@@ -109,8 +112,8 @@ class EmailGenerator(Generator):
         valid = bool(
             separator
             and dot
-            and given in {name.lower() for name in GIVEN_NAMES}
-            and family in {name.lower() for name in FAMILY_NAMES}
+            and given in _LOWER_GIVEN_NAMES
+            and family in _LOWER_FAMILY_NAMES
             and domain in prepared.domains
         )
         return proof_result(valid, "value is not a configured email")

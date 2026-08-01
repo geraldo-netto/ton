@@ -980,10 +980,16 @@ Digest drawn from a fixed plaintext list. **Paired**: a single row may reference
 | `algorithm` | string   | `md5`, `sha1`, `sha256` (default), `sha512`, `bcrypt`, or `ntlm` |
 | `values`    | string[] | non-empty plaintext pool                            |
 | `rounds`    | int      | bcrypt cost (default `12`; range `4`–`31`)          |
+| `cache`     | boolean  | cache selected bcrypt digests (default `false`)     |
 
 `bcrypt` requires the optional `ton[bcrypt]` extra and accepts `rounds` from `4` to `31` (default `12`). TON derives a stable bcrypt salt from the plaintext so synthetic fixtures remain reproducible.
 Plaintext entries are limited by bcrypt's format to 72 UTF-8 bytes and are
 rejected during config preparation when they exceed that boundary.
+Digest caching is disabled by default so memory does not grow with the selected
+plaintext pool. Operators may set `cache: true` for bcrypt workloads that
+prefer reusing expensive digests and can accommodate one cached value per
+selected plaintext. Inexpensive digest algorithms are recomputed without a
+duplicate cache.
 
 > **Fixture-data warning:** Treat every `hash` output as synthetic fixture data,
 > never as stored credentials. Deterministic bcrypt salts are unsuitable for

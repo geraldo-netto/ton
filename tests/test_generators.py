@@ -278,7 +278,7 @@ def test_hash_generator_bcrypt_is_deterministic() -> None:
     )
 
 
-def test_hash_generator_bcrypt_hashes_selected_values_once(monkeypatch) -> None:
+def test_hash_generator_bcrypt_cache_is_operator_controlled(monkeypatch) -> None:
     from ton.generators import hash as hash_module
 
     words = [f"secret-{index}" for index in range(10_000)]
@@ -288,7 +288,9 @@ def test_hash_generator_bcrypt_hashes_selected_values_once(monkeypatch) -> None:
     rng.choice.side_effect = [words[-1], words[-1], words[0]]
     generator = HashGenerator()
 
-    prepared = generator.prepare({"algorithm": "bcrypt", "rounds": 4, "values": words})
+    prepared = generator.prepare(
+        {"algorithm": "bcrypt", "rounds": 4, "values": words, "cache": True}
+    )
 
     digest.assert_not_called()
     assert generator.generate_pair(prepared, rng) == (words[-1], f"{words[-1]}:4")
@@ -296,10 +298,11 @@ def test_hash_generator_bcrypt_hashes_selected_values_once(monkeypatch) -> None:
     assert generator.generate_pair(prepared, rng) == (words[0], f"{words[0]}:4")
     assert digest.call_args_list == [mock.call(words[-1], 4), mock.call(words[0], 4)]
     assert len(prepared.words) == len(words)
+    assert prepared.cache is not None
     assert len(prepared.cache) == 2
 
 
-def test_hash_generator_digests_selected_values_once(monkeypatch) -> None:
+def test_hash_generator_does_not_cache_inexpensive_digests(monkeypatch) -> None:
     from ton.generators import hash as hash_module
 
     words = [f"secret-{index}" for index in range(10_000)]
@@ -315,8 +318,31 @@ def test_hash_generator_digests_selected_values_once(monkeypatch) -> None:
     assert generator.generate_pair(prepared, rng) == (words[-1], words[-1].upper())
     assert generator.generate_pair(prepared, rng) == (words[-1], words[-1].upper())
     assert generator.generate_pair(prepared, rng) == (words[0], words[0].upper())
-    assert digest.call_args_list == [mock.call(words[-1].encode()), mock.call(words[0].encode())]
-    assert len(prepared.cache) == 2
+    assert digest.call_args_list == [
+        mock.call(words[-1].encode()),
+        mock.call(words[-1].encode()),
+        mock.call(words[0].encode()),
+    ]
+
+
+def test_hash_generator_bcrypt_cache_defaults_off(monkeypatch) -> None:
+    from ton.generators import hash as hash_module
+
+    digest = mock.Mock(return_value="digest")
+    monkeypatch.setattr(hash_module, "_bcrypt_digest", digest)
+    generator = HashGenerator()
+    prepared = generator.prepare({"algorithm": "bcrypt", "rounds": 4, "values": ["secret"]})
+
+    generator.generate_pair(prepared, _rng())
+    generator.generate_pair(prepared, _rng())
+
+    assert prepared.cache is None
+    assert digest.call_count == 2
+
+
+def test_hash_generator_rejects_cache_for_inexpensive_digest() -> None:
+    with pytest.raises(ValueError, match="only for the bcrypt"):
+        HashGenerator().prepare({"algorithm": "sha256", "values": ["secret"], "cache": True})
 
 
 def test_hash_generator_rejects_bad_bcrypt_rounds() -> None:

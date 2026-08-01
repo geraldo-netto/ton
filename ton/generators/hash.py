@@ -20,7 +20,7 @@ from typing import Any
 from .._proof import ProofResult
 from .._transforms import TransformResult
 from ._md4 import md4 as _pure_md4
-from .base import PairedGenerator, coerce_int, proof_result, require_string_tuple
+from .base import PairedGenerator, coerce_bool, coerce_int, proof_result, require_string_tuple
 
 
 def _select_md4_backend() -> Callable[[bytes], bytes]:
@@ -53,20 +53,19 @@ BCRYPT_MAX_ROUNDS = 31
 
 @dataclass(frozen=True)
 class BcryptPairSpec:
-    """Validated bcrypt pool with digests cached only after selection."""
+    """Validated bcrypt pool with optional operator-controlled caching."""
 
     words: tuple[str, ...]
     rounds: int
-    cache: dict[str, str] = field(default_factory=dict, compare=False, repr=False)
+    cache: dict[str, str] | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
 class DigestPairSpec:
-    """Validated digest pool with results cached only after selection."""
+    """Validated pool for inexpensive deterministic digests."""
 
     words: tuple[str, ...]
     algorithm: str
-    cache: dict[str, str] = field(default_factory=dict, compare=False, repr=False)
 
 
 class HashGenerator(PairedGenerator):
@@ -91,7 +90,12 @@ class HashGenerator(PairedGenerator):
             if oversized is not None:
                 raise ValueError("hash bcrypt 'values' entries must be at most 72 UTF-8 bytes")
             _load_bcrypt()
-            return BcryptPairSpec(words=words, rounds=rounds)
+            cache: dict[str, str] | None = (
+                {} if coerce_bool(spec, "cache", type_name="hash", default=False) else None
+            )
+            return BcryptPairSpec(words=words, rounds=rounds, cache=cache)
+        if "cache" in spec:
+            raise ValueError("hash 'cache' is supported only for the bcrypt algorithm")
         return DigestPairSpec(words=words, algorithm=algorithm)
 
     def generate_pair(
@@ -99,17 +103,9 @@ class HashGenerator(PairedGenerator):
     ) -> tuple[str, str]:
         if isinstance(prepared, BcryptPairSpec):
             plaintext = rng.choice(prepared.words)
-            digest = prepared.cache.get(plaintext)
-            if digest is None:
-                digest = _bcrypt_digest(plaintext, prepared.rounds)
-                prepared.cache[plaintext] = digest
-            return plaintext, digest
+            return plaintext, _bcrypt_digest_cached(prepared, plaintext)
         plaintext = rng.choice(prepared.words)
-        digest = prepared.cache.get(plaintext)
-        if digest is None:
-            digest = _digest(prepared.algorithm, plaintext)
-            prepared.cache[plaintext] = digest
-        return plaintext, digest
+        return plaintext, _digest(prepared.algorithm, plaintext)
 
     def prove(
         self, prepared: DigestPairSpec | BcryptPairSpec, result: TransformResult
@@ -118,16 +114,20 @@ class HashGenerator(PairedGenerator):
         if plaintext is None or plaintext not in prepared.words:
             return proof_result(False, "hash plaintext is not in 'values'")
         if isinstance(prepared, BcryptPairSpec):
-            expected = prepared.cache.get(plaintext)
-            if expected is None:
-                expected = _bcrypt_digest(plaintext, prepared.rounds)
-                prepared.cache[plaintext] = expected
+            expected = _bcrypt_digest_cached(prepared, plaintext)
         else:
-            expected = prepared.cache.get(plaintext)
-            if expected is None:
-                expected = _digest(prepared.algorithm, plaintext)
-                prepared.cache[plaintext] = expected
+            expected = _digest(prepared.algorithm, plaintext)
         return proof_result(result.value == expected, "digest does not match plaintext")
+
+
+def _bcrypt_digest_cached(prepared: BcryptPairSpec, plaintext: str) -> str:
+    if prepared.cache is None:
+        return _bcrypt_digest(plaintext, prepared.rounds)
+    digest = prepared.cache.get(plaintext)
+    if digest is None:
+        digest = _bcrypt_digest(plaintext, prepared.rounds)
+        prepared.cache[plaintext] = digest
+    return digest
 
 
 def _digest(algorithm: str, plaintext: str) -> str:

@@ -78,7 +78,7 @@ BUILTIN_GENERATOR_CONFIG_KEYS: dict[str, frozenset[str]] = {
     "date": frozenset(("minValue", "maxValue", "format")),
     "decimal": frozenset(("minValue", "maxValue", "decimals", "padWithZero")),
     "email": frozenset(("domains",)),
-    "hash": frozenset(("values", "algorithm", "rounds")),
+    "hash": frozenset(("values", "algorithm", "rounds", "cache")),
     "ipv4": frozenset(("cidr",)),
     "ipv6": frozenset(("cidr",)),
     "integer": frozenset(("minValue", "maxValue", "padWithZero")),

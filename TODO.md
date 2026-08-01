@@ -73,7 +73,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| PLUG-005 | open | M | Report and fail unsatisfied explicit entry-point selectors. A typoed or uninstalled `--entry-point GROUP:DISTRIBUTION:NAME` currently yields no candidate, no summary, and a successful `--list-namespaces`/core-only run; distinguish exact-selector missing/load-failed outcomes from broad `--entry-points` failure isolation and surface them through the catalog API and CLI. |
 
 ## CLI / option integrity
 

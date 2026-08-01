@@ -29,6 +29,7 @@ from .api import (
     EngineOptions,
     LogEvent,
     ProofError,
+    RegistryError,
     TemplateError,
     ValidationError,
     configure_stderr,
@@ -238,8 +239,8 @@ def _run_inner(args: argparse.Namespace) -> int:
     if option_error is not None:
         return option_error
     if args.list_namespaces:
-        _print_namespaces(args)
-        return 0
+        result = _map_config_errors(lambda: _print_namespaces(args))
+        return result if isinstance(result, int) else 0
     if args.config is None:
         print("ton: config path is required", file=sys.stderr)
         return 1
@@ -326,6 +327,9 @@ def _map_config_errors(operation: Callable[[], _T]) -> _T | int:
     except FileNotFoundError as exc:
         print(f"ton: {exc}", file=sys.stderr)
         return 1
+    except RegistryError as exc:
+        print(f"ton: plugin error: {exc}", file=sys.stderr)
+        return 2
     except (ConfigError, TemplateError, json.JSONDecodeError) as exc:
         print(f"ton: invalid config: {exc}", file=sys.stderr)
         return 2

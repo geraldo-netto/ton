@@ -332,8 +332,11 @@ for row in api.generate(config_dict,
 catalog across Engines does not share generator state. Generator attributes
 must therefore support `copy.deepcopy`.
 
-A broken plugin is isolated: load failures are logged as `entry_point_failed` and skipped; one bad package never aborts the whole catalog build. Duplicate providers for the same group and entry-point name are all rejected before plugin code loads.
-Entry points execute installed package code while loading, so TON loads them only when explicitly requested, either through `api.build_extension_catalog(include_entry_points=True)` or the CLI `--entry-points` flag. To load only named providers, pass exact `GROUP:DISTRIBUTION:NAME` selectors through `allowed_entry_points` or repeat the CLI `--entry-point GROUP:DISTRIBUTION:NAME` option. Distribution names are normalized case-insensitively across `.`, `_`, and `-`; name-only allowlists are rejected. (`api.build_registry` remains as a deprecated generator-only shim.)
+A broken plugin discovered through broad `--entry-points` loading is isolated:
+failures are logged as `entry_point_failed` and skipped, so one bad package does
+not abort the catalog build. Duplicate providers for the same group and
+entry-point name are rejected before plugin code loads.
+Entry points execute installed package code while loading, so TON loads them only when explicitly requested, either through `api.build_extension_catalog(include_entry_points=True)` or the CLI `--entry-points` flag. To load only named providers, pass exact `GROUP:DISTRIBUTION:NAME` selectors through `allowed_entry_points` or repeat the CLI `--entry-point GROUP:DISTRIBUTION:NAME` option. Every exact selector must be installed and load successfully; missing, duplicate, or broken selected providers raise `RegistryError` and make the CLI exit `2`. Distribution names are normalized case-insensitively across `.`, `_`, and `-`; name-only allowlists are rejected. (`api.build_registry` remains as a deprecated generator-only shim.)
 
 Parallel runs use the public `ton.concurrency` helpers re-exported by `ton.api`.
 `write_shard` is the bounded-memory process-pool primitive used in the complete
@@ -1082,7 +1085,7 @@ Library code emits structured INFO events on a single logger named `ton`. Attach
 - `--no-clobber` upgrades the silent overwrite to a hard refusal.
 - Regular `-o PATH` writes are staged through a same-directory temp file and atomically replace the final path only after generation succeeds. FIFO targets remain direct streams, opened without following symlinks where supported and verified from the opened descriptor before writing.
 - Staged filenames include owner and creation metadata. Library callers can use `api.inspect_staged_outputs(PATH)` to report abandoned stages and `api.cleanup_staged_outputs(PATH, stale_after_seconds=...)` to remove only old, managed stages whose creating process is confirmed dead. Legacy stages without ownership metadata are reported but never removed automatically.
-- Third-party generators from the `ton.generators` entry-point group are opt-in and failure-isolated per entry: `ImportError`, construction failures, and non-`Generator` factories are logged and skipped instead of aborting the registry build. Plugin code is imported and constructed inside the TON process with the caller's full process privileges; enable only trusted packages. Entry point names and values are sanitized to printable ASCII before being logged (control codes / unicode lookalikes become `?`).
+- Third-party generators from the `ton.generators` entry-point group are opt-in. Broad discovery failure-isolates each provider; exact selectors fail closed when the requested provider is absent or broken. Plugin code is imported and constructed inside the TON process with the caller's full process privileges; enable only trusted packages. Entry point names and values are sanitized to printable ASCII before being logged (control codes / unicode lookalikes become `?`).
 - `hash` with `algorithm: "ntlm"` uses MD4 by design. Treat its output as fixture data, never as a credential.
 
 ## Bundled example configs

@@ -19,7 +19,7 @@ import inspect
 import re
 import threading
 from collections import Counter
-from collections.abc import Container, Iterable, Iterator, Mapping
+from collections.abc import Collection, Iterable, Iterator, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from importlib.metadata import entry_points
@@ -266,28 +266,27 @@ def build_extension_catalog() -> ExtensionCatalog:
 
 def catalog_with_entry_points(
     *,
-    allowed_selectors: Container[EntryPointSelector] | None = None,
+    allowed_selectors: Collection[EntryPointSelector] | None = None,
 ) -> ExtensionCatalog:
     """Return a catalog merged with trusted plugin entry points."""
     catalog = build_extension_catalog()
-    _load_catalog_entry_points(
-        catalog,
-        group=ENTRY_POINT_GROUP,
-        kind="data_type",
-        allowed_selectors=allowed_selectors,
-    )
-    _load_catalog_entry_points(
-        catalog,
-        group=TRANSFORM_ENTRY_POINT_GROUP,
-        kind="transform",
-        allowed_selectors=allowed_selectors,
-    )
-    _load_catalog_entry_points(
-        catalog,
-        group=VALIDATOR_ENTRY_POINT_GROUP,
-        kind="validator",
-        allowed_selectors=allowed_selectors,
-    )
+    failures: set[str] = set()
+    for group, kind in (
+        (ENTRY_POINT_GROUP, "data_type"),
+        (TRANSFORM_ENTRY_POINT_GROUP, "transform"),
+        (VALIDATOR_ENTRY_POINT_GROUP, "validator"),
+    ):
+        failures.update(
+            _load_catalog_entry_points(
+                catalog,
+                group=group,
+                kind=kind,
+                allowed_selectors=allowed_selectors,
+            )
+        )
+    if failures:
+        details = "; ".join(sorted(failures))
+        raise RegistryError(f"explicit entry-point selector unsatisfied: {details}")
     return catalog
 
 
@@ -296,18 +295,33 @@ def _load_catalog_entry_points(
     *,
     group: str,
     kind: str,
-    allowed_selectors: Container[EntryPointSelector] | None,
-) -> None:
+    allowed_selectors: Collection[EntryPointSelector] | None,
+) -> set[str]:
     loaded = 0
-    failed = 0
+    requested = (
+        {selector for selector in allowed_selectors if selector.group == group}
+        if allowed_selectors is not None
+        else set()
+    )
     candidates = _entry_point_candidates(group, allowed_selectors)
+    matched = {
+        selector
+        for ep in candidates
+        if (selector := _selector_for_entry_point(group, ep)) is not None
+    }
+    missing = requested - matched
+    failed = len(missing)
+    explicit_failures = {f"{selector} was not found" for selector in missing}
     duplicate_names = {
         name for name, count in Counter(str(ep.name) for ep in candidates).items() if count > 1
     }
     for ep in candidates:
+        selector = _selector_for_entry_point(group, ep)
         if str(ep.name) in duplicate_names:
             failed += 1
             _log_entry_point_failed(ep, RegistryError("duplicate entry-point providers"))
+            if selector is not None and allowed_selectors is not None:
+                explicit_failures.add(f"{selector} has duplicate providers")
             continue
         try:
             plugin = ep.load()()
@@ -318,6 +332,8 @@ def _load_catalog_entry_points(
         except Exception as exc:  # noqa: BLE001 - per-entry failure isolation
             failed += 1
             _log_entry_point_failed(ep, exc)
+            if selector is not None and allowed_selectors is not None:
+                explicit_failures.add(f"{selector} failed to load ({type(exc).__name__})")
             continue
         loaded += 1
         _log_entry_point_loaded(ep)
@@ -333,11 +349,12 @@ def _load_catalog_entry_points(
                 "group": group,
             },
         )
+    return explicit_failures
 
 
 def _entry_point_candidates(
     group: str,
-    allowed_selectors: Container[EntryPointSelector] | None,
+    allowed_selectors: Collection[EntryPointSelector] | None,
 ) -> list[Any]:
     """Return trusted candidates in provider-stable order without importing them."""
     candidates = []
@@ -549,7 +566,7 @@ def default_registry() -> dict[str, Generator]:
 
 def registry_with_entry_points(
     *,
-    allowed_selectors: Container[EntryPointSelector] | None = None,
+    allowed_selectors: Collection[EntryPointSelector] | None = None,
 ) -> dict[str, Generator]:
     """Return the built-in registry merged with entry-point generators.
 

@@ -10,6 +10,7 @@ import stat
 import sys
 from pathlib import Path
 from random import Random
+from types import SimpleNamespace
 from typing import Any
 from unittest import mock
 
@@ -1167,7 +1168,7 @@ def test_cli_atomic_output_new_file_respects_umask(write_config, tmp_path: Path)
     assert stat.S_IMODE(os.stat(out_file).st_mode) == 0o644
 
 
-def test_cli_entry_point_allowlist_option_still_generates_rows(
+def test_cli_entry_point_selector_fails_when_provider_is_missing(
     write_config, capsys: pytest.CaptureFixture[str]
 ) -> None:
     config = write_config()
@@ -1181,8 +1182,60 @@ def test_cli_entry_point_allowlist_option_still_generates_rows(
         ]
     )
     captured = capsys.readouterr()
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "plugin error" in captured.err
+    assert "was not found" in captured.err
+
+
+def test_cli_entry_point_selector_surfaces_load_failure(
+    monkeypatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    failing = mock.Mock()
+    failing.name = "acme.custom"
+    failing.value = "pkg:Custom"
+    failing.dist = SimpleNamespace(name="acme-package", version="1")
+    failing.load.side_effect = ImportError("missing dependency")
+
+    def _entry_points(group: str):
+        return [failing] if group == "ton.generators" else []
+
+    monkeypatch.setattr("ton._registry.entry_points", _entry_points)
+    exit_code = main(
+        [
+            "--entry-point",
+            "ton.generators:acme-package:acme.custom",
+            "--list-namespaces",
+        ]
+    )
+
+    assert exit_code == 2
+    assert "failed to load (ImportError)" in capsys.readouterr().err
+
+
+def test_cli_entry_point_selector_loads_exact_provider(
+    monkeypatch, write_config, capsys: pytest.CaptureFixture[str]
+) -> None:
+    selected = mock.Mock()
+    selected.name = "acme.custom"
+    selected.value = "pkg:Custom"
+    selected.dist = SimpleNamespace(name="acme-package", version="1")
+    selected.load.return_value = _FailingGenerator
+
+    def _entry_points(group: str):
+        return [selected] if group == "ton.generators" else []
+
+    monkeypatch.setattr("ton._registry.entry_points", _entry_points)
+    exit_code = main(
+        [
+            str(write_config()),
+            "--entry-point",
+            "ton.generators:acme-package:acme.custom",
+        ]
+    )
+
     assert exit_code == 0
-    assert len(captured.out.strip().splitlines()) == 4
+    assert len(capsys.readouterr().out.strip().splitlines()) == 4
 
 
 def test_cli_rejects_name_only_entry_point_selector(

@@ -440,6 +440,63 @@ def test_catalog_entry_points_honor_allowlist() -> None:
     skipped.load.assert_not_called()
 
 
+def test_catalog_explicit_selector_reports_missing_provider() -> None:
+    selector = EntryPointSelector("ton.generators", "missing-package", "missing")
+
+    with (
+        mock.patch("ton._registry.entry_points", return_value=[]),
+        pytest.raises(
+            RegistryError, match=r"ton\.generators:missing-package:missing was not found"
+        ),
+    ):
+        catalog_with_entry_points(allowed_selectors={selector})
+
+
+def test_catalog_reports_all_missing_explicit_selectors() -> None:
+    selectors = {
+        EntryPointSelector("ton.generators", "missing-package", "generator"),
+        EntryPointSelector("ton.transforms", "missing-package", "transform"),
+    }
+
+    with (
+        mock.patch("ton._registry.entry_points", return_value=[]),
+        pytest.raises(RegistryError) as raised,
+    ):
+        catalog_with_entry_points(allowed_selectors=selectors)
+
+    assert "ton.generators:missing-package:generator was not found" in str(raised.value)
+    assert "ton.transforms:missing-package:transform was not found" in str(raised.value)
+
+
+def test_catalog_explicit_selector_reports_load_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    failing = mock.Mock()
+    failing.name = "acme.custom"
+    failing.value = "pkg:Custom"
+    failing.dist = SimpleNamespace(name="acme-package", version="1")
+    failing.load.side_effect = ImportError("missing dependency")
+    selector = EntryPointSelector("ton.generators", "acme-package", "acme.custom")
+
+    def _entry_points(group: str) -> list[Any]:
+        return [failing] if group == "ton.generators" else []
+
+    with (
+        caplog.at_level("INFO", logger="ton"),
+        mock.patch("ton._registry.entry_points", side_effect=_entry_points),
+        pytest.raises(RegistryError, match=r"failed to load \(ImportError\)"),
+    ):
+        catalog_with_entry_points(allowed_selectors={selector})
+
+    summary = next(
+        record
+        for record in caplog.records
+        if getattr(record, "event", "") == "entry_points_summary"
+    )
+    assert summary.loaded == 0
+    assert summary.failed == 1
+
+
 def test_entry_point_selector_binds_group_distribution_and_name() -> None:
     class CustomGenerator(Generator):
         type_name = "custom"
@@ -505,6 +562,30 @@ def test_catalog_rejects_duplicate_providers_before_loading() -> None:
         catalog = catalog_with_entry_points()
 
     assert "acme.custom" not in catalog.list_data_types()
+    first.load.assert_not_called()
+    second.load.assert_not_called()
+
+
+def test_catalog_explicit_selector_reports_duplicate_provider() -> None:
+    first = mock.Mock()
+    first.name = "acme.custom"
+    first.value = "first_pkg:Generator"
+    first.dist = SimpleNamespace(name="acme-package", version="1")
+    second = mock.Mock()
+    second.name = "acme.custom"
+    second.value = "second_pkg:Generator"
+    second.dist = SimpleNamespace(name="acme-package", version="2")
+    selector = EntryPointSelector("ton.generators", "acme-package", "acme.custom")
+
+    def _entry_points(group: str) -> list[Any]:
+        return [first, second] if group == "ton.generators" else []
+
+    with (
+        mock.patch("ton._registry.entry_points", side_effect=_entry_points),
+        pytest.raises(RegistryError, match="duplicate providers"),
+    ):
+        catalog_with_entry_points(allowed_selectors={selector})
+
     first.load.assert_not_called()
     second.load.assert_not_called()
 

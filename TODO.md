@@ -83,7 +83,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CFG-005 | open | M | Validate keys owned by distribution choice wrappers and weighted record entries. Typos such as `weigth` are currently ignored and silently fall back to uniform weight, because extension-key validation stops at the top-level transform/generator and child spec; allow only `weight`/`spec` or `value`/`weight`, with indexed diagnostics and suggestions. |
 
 ## data governance
 

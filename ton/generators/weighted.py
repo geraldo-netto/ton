@@ -59,8 +59,11 @@ from .._distribution import (
     weighted_index,
 )
 from .._proof import ProofResult
+from .._speckeys import require_known_keys
 from .._transforms import TransformResult
 from .base import Generator, PreparationContext
+
+_RECORD_KEYS = frozenset(("value", "weight"))
 
 
 @dataclass(frozen=True)
@@ -167,7 +170,8 @@ def _coerce_record(raw_values: list[Any]) -> tuple[tuple[str, ...], tuple[float,
     values: list[str] = []
     weights: list[float] = []
     for index, item in enumerate(raw_values):
-        if not isinstance(item, Mapping) or "value" not in item:
+        require_known_keys(f"weighted.values[{index}]", item, _RECORD_KEYS)
+        if "value" not in item:
             raise ValueError(
                 "weighted record values must be objects containing 'value' "
                 f"(bad entry at index {index})"

@@ -533,7 +533,7 @@ Intel
 
 (Skew toward `Intel` matches the 90/8/2 weighting.)
 
-**Record form** — `values: [{"value": "...", "weight": N}, ...]` is the same thing with a less error-prone layout.
+**Record form** — `values: [{"value": "...", "weight": N}, ...]` is the same thing with a less error-prone layout. Record entries accept only `value` and `weight`.
 
 **Composite form** — any registered generator can be weighted, not just literal strings:
 
@@ -558,6 +558,8 @@ common
 ```
 
 Composite `choices` may themselves nest `weighted` / `oneOf` / `sequence_of`. Paired generators (`hash`) cannot be used as a composite child — the `[id]` half would be unreachable from outside the wrapper, so the engine rejects such configs at construction time.
+Choice wrappers accept only `weight` and `spec`; misspelled or extra keys are
+rejected with an indexed configuration path and a suggestion when available.
 
 #### Transform chains
 

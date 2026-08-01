@@ -424,6 +424,30 @@ def test_builtin_generator_rejects_unknown_owned_key() -> None:
         api.validate_config(payload)
 
 
+def test_validate_config_rejects_weighted_choice_wrapper_typo() -> None:
+    payload = {
+        "rows": 1,
+        "format": "$value$",
+        "types": {
+            "value": {
+                "type": "weighted",
+                "choices": [
+                    {
+                        "weigth": 2,
+                        "spec": {"type": "string", "values": ["x"]},
+                    }
+                ],
+            }
+        },
+    }
+
+    with pytest.raises(
+        ConfigError,
+        match=r"weighted\.choices\[0\]\.weigth.*Did you mean 'weight'",
+    ):
+        api.validate_config(payload)
+
+
 def test_plugin_generator_may_own_custom_keys() -> None:
     from random import Random
     from typing import Any

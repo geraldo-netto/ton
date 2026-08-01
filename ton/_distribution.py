@@ -9,6 +9,10 @@ from math import isfinite
 from random import Random
 from typing import Any, cast
 
+from ._speckeys import require_known_keys
+
+_CHOICE_KEYS = frozenset(("weight", "spec"))
+
 
 @dataclass(frozen=True)
 class WeightedChoiceSet:
@@ -59,6 +63,7 @@ def _prepare_choice(
         raise ValueError(
             f"{label} 'choices[{index}]' must be an object with 'weight' and 'spec' keys"
         )
+    require_known_keys(f"{label}.choices[{index}]", choice, _CHOICE_KEYS)
     weight = _coerce_weight(index, choice, label)
     child = context.prepare_child(label, f"'choices[{index}].spec'", choice.get("spec"))
     return weight, child

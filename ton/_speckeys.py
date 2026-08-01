@@ -31,3 +31,14 @@ def extension_key_error(
         return None
     key = sorted(unknown)[0]
     return unknown_key_message(path, key, allowed)
+
+
+def require_known_keys(
+    path: str,
+    spec: Mapping[str, Any],
+    allowed: frozenset[str],
+) -> None:
+    """Reject the first unknown key in an extension-owned nested object."""
+    error = extension_key_error(path, spec, allowed, frozenset())
+    if error is not None:
+        raise ValueError(error)

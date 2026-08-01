@@ -43,6 +43,20 @@ def test_weighted_record_form_rejects_bad_entries(values: list[object]) -> None:
         WeightedGenerator().prepare({"values": values})
 
 
+def test_weighted_record_form_rejects_unknown_key_with_suggestion() -> None:
+    with pytest.raises(ValueError, match=r"weighted\.values\[0\]\.weigth.*Did you mean 'weight'"):
+        WeightedGenerator().prepare(
+            {"values": [{"value": "x", "weigth": 2}]},
+        )
+
+
+def test_weighted_record_form_suggests_misspelled_value_key() -> None:
+    with pytest.raises(ValueError, match=r"weighted\.values\[0\]\.valeu.*Did you mean 'value'"):
+        WeightedGenerator().prepare(
+            {"values": [{"valeu": "x", "weight": 2}]},
+        )
+
+
 @pytest.mark.parametrize(
     "values",
     [
@@ -297,6 +311,20 @@ def test_weighted_composite_rejects_boolean_weight_with_path() -> None:
             {
                 "choices": [
                     {"weight": True, "spec": {"type": "string", "values": ["x"]}},
+                ]
+            },
+            default_registry(),
+        )
+
+
+def test_weighted_composite_rejects_unknown_wrapper_key_with_suggestion() -> None:
+    gen = WeightedGenerator()
+
+    with pytest.raises(ValueError, match=r"weighted\.choices\[0\]\.weigth.*Did you mean 'weight'"):
+        gen.prepare_composite(
+            {
+                "choices": [
+                    {"weigth": 1, "spec": {"type": "string", "values": ["x"]}},
                 ]
             },
             default_registry(),

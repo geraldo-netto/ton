@@ -122,13 +122,14 @@ class ProofChecker:
             for failure in failures:
                 if self.failure_sink is not None or len(self.failures) < MAX_AUDIT_SAMPLE:
                     failure = replace(failure, spec=spec)
-                self._record_audit(failure)
-                self._log_failure(failure)
+                visible = self._record_audit(failure)
+                self._log_failure(visible)
             return None
-        self._log_failure(failures[0])
-        return failures[0]
+        visible = failures[0].redacted() if self.redact else failures[0]
+        self._log_failure(visible)
+        return visible
 
-    def _record_audit(self, failure: ProofFailure) -> None:
+    def _record_audit(self, failure: ProofFailure) -> ProofFailure:
         """Tally, retain a bounded sample, and stream every audit failure."""
         self.failure_count += 1
         self.failure_counts[failure.type_key] = self.failure_counts.get(failure.type_key, 0) + 1
@@ -142,6 +143,7 @@ class ProofChecker:
                 raise
             except Exception as exc:
                 raise ProofFailureSinkError(str(exc)) from exc
+        return visible
 
     def build_failures(
         self,

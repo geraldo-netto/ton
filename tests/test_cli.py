@@ -474,13 +474,14 @@ def test_cli_proof_report_preserves_or_redacts_paired_values(
     record = json.loads(report.read_text(encoding="utf-8"))
     assert captured.out.strip() == "plaintext:digest"
     assert record["redacted"] is redact
-    assert record["reason"] == "pair mismatch"
     if redact:
+        assert record["reason"] == REDACTED
         assert record["value"] == REDACTED
         assert record["id_value"] == REDACTED
         assert record["spec"] is None
         assert engines[0].proof_failures[0].value == REDACTED
     else:
+        assert record["reason"] == "pair mismatch"
         assert record["value"] == "digest"
         assert record["id_value"] == "plaintext"
         assert record["spec"] == {"type": "failing_pair"}

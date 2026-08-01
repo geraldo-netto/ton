@@ -136,7 +136,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--redact-proof-failures",
         action="store_true",
-        help="Mask values, paired ids, and field specs in --proof-report JSON Lines.",
+        help="Mask values, paired ids, reasons, and field specs in proof reports and logs.",
     )
     parser.add_argument(
         "--list-namespaces",

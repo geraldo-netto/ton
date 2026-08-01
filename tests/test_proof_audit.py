@@ -4,18 +4,31 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 from random import Random
 from typing import Any
 
 import pytest
 
 from ton import _proofcheck as proofcheck
-from ton._engine import Engine
+from ton._engine import Engine, ProofError
 from ton._proof import REDACTED, PreparedField, ProofFailure, ProofResult
 from ton._proofaudit import PROOF_AUDIT_SCHEMA, ProofAuditWriteError, ProofAuditWriter
 from ton._proofcheck import ProofChecker, ProofFailureSinkError
 from ton._transforms import TransformResult
 from ton.generators import Generator
+
+
+class _EchoingReasonGenerator(Generator):
+    type_name = "echoing_reason"
+
+    def generate(self, prepared: Any, rng: Random) -> str:
+        del prepared, rng
+        return "credential-secret"
+
+    def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+        del prepared
+        return ProofResult(ok=False, reason=f"rejected {result.value}")
 
 
 def _failure() -> ProofFailure:
@@ -67,7 +80,7 @@ def test_proof_audit_writer_uses_failure_redaction_state() -> None:
     assert record["id_value"] == REDACTED
     assert record["spec"] is None
     assert record["spec_ref"] is None
-    assert record["reason"] == "mismatch"
+    assert record["reason"] == REDACTED
 
 
 @pytest.mark.parametrize("redact", [False, True])
@@ -87,6 +100,60 @@ def test_proof_checker_owns_sink_redaction(redact: bool) -> None:
     assert record["redacted"] is redact
     assert record["value"] == checker.failures[0].value
     assert record["spec"] == checker.failures[0].spec
+    assert record["reason"] == (REDACTED if redact else "mismatch")
+
+
+def test_redaction_masks_echoing_reason_in_audit_report_and_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    stream = io.StringIO()
+    engine = Engine.from_config(
+        {
+            "rows": 1,
+            "format": "$credential$",
+            "types": {"credential": {"type": "echoing_reason"}},
+        },
+        registry={"echoing_reason": _EchoingReasonGenerator()},
+        proof_mode="audit",
+        redact_proof_failures=True,
+    )
+    engine._set_proof_failure_sink(ProofAuditWriter(stream))
+
+    with caplog.at_level(logging.WARNING, logger="ton"):
+        assert list(engine) == ["credential-secret"]
+
+    record = json.loads(stream.getvalue())
+    failure_log = next(
+        item for item in caplog.records if getattr(item, "event", "") == "proof_check_failed"
+    )
+    assert record["reason"] == REDACTED
+    assert engine.proof_failures[0].reason == REDACTED
+    assert failure_log.reason == REDACTED
+    assert "credential-secret" not in stream.getvalue()
+
+
+def test_strict_proof_redaction_masks_echoing_reason(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    engine = Engine.from_config(
+        {
+            "rows": 1,
+            "format": "$credential$",
+            "types": {"credential": {"type": "echoing_reason"}},
+        },
+        registry={"echoing_reason": _EchoingReasonGenerator()},
+        proof_mode="all",
+        redact_proof_failures=True,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="ton"), pytest.raises(ProofError) as raised:
+        next(iter(engine))
+
+    failure_log = next(
+        item for item in caplog.records if getattr(item, "event", "") == "proof_check_failed"
+    )
+    assert "credential-secret" not in str(raised.value)
+    assert failure_log.reason == REDACTED
 
 
 def test_proof_audit_writer_maps_stream_errors() -> None:

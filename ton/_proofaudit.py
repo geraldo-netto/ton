@@ -7,8 +7,9 @@ as ``--proof-report PATH``.
 
 Clear records include generated ``value``, paired ``id_value`` when present,
 and the field ``spec``. With redaction enabled those fields follow
-:meth:`ProofFailure.redacted`: values become ``"<redacted>"`` and the spec
-becomes ``null``. Diagnostic and provenance fields remain visible.
+:meth:`ProofFailure.redacted`: values and free-form reasons become
+``"<redacted>"`` and the spec becomes ``null``. Structural diagnostic and
+provenance fields remain visible.
 """
 
 from __future__ import annotations

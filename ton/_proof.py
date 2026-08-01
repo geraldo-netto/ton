@@ -74,14 +74,14 @@ class ProofFailure:
     def redacted(self) -> ProofFailure:
         """Return a copy with the sensitive fields masked (DG-002).
 
-        The generated ``value`` / ``id_value`` and the full field ``spec``
-        can carry synthetic identifiers or source value pools, so records
-        destined for manifests or audit exports should be redacted first.
-        The diagnostic fields (row, type_key, stage, reference, reason)
-        are preserved.
+        The generated ``value`` / ``id_value``, full field ``spec``, and
+        plugin-controlled ``reason`` can carry synthetic identifiers or
+        source value pools, so records destined for logs or audit exports
+        should be redacted first. Structural diagnostic fields remain visible.
         """
         return replace(
             self,
+            reason=REDACTED,
             value=REDACTED,
             id_value=REDACTED if self.id_value is not None else None,
             spec=None,

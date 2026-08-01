@@ -8,6 +8,7 @@ from random import Random
 
 import pytest
 
+from ton._transforms import TransformResult
 from ton.generators.network import (
     IPv4Generator,
     IPv6Generator,
@@ -81,3 +82,36 @@ def test_mac_rejects_bad_oui() -> None:
 def test_mac_rejects_multichar_separator() -> None:
     with pytest.raises(ValueError):
         MACGenerator().prepare({"separator": "::"})
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        {"separator": "a"},
+        {"separator": ""},
+        {"separator": "a", "uppercase": True, "oui": "AA:BB:CC"},
+    ],
+)
+def test_mac_proof_parses_generated_octets_structurally(spec: dict[str, object]) -> None:
+    generator = MACGenerator()
+    prepared = generator.prepare(spec)
+    value = generator.generate(prepared, Random(0))
+
+    assert generator.prove(prepared, TransformResult(value)).ok
+
+
+@pytest.mark.parametrize(
+    ("separator", "value"),
+    [
+        (":", "00:11:22:33:44"),
+        (":", "00:11:22:33:44:5g"),
+        (":", "00-11:22:33:44:55"),
+        ("a", "00a11a22a33a44b55"),
+        ("", "00112233445566"),
+    ],
+)
+def test_mac_proof_rejects_malformed_layout(separator: str, value: str) -> None:
+    generator = MACGenerator()
+    prepared = generator.prepare({"separator": separator})
+
+    assert not generator.prove(prepared, TransformResult(value)).ok

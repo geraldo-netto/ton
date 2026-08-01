@@ -144,27 +144,32 @@ class MACGenerator(Generator):
             raw = prepared.oui_bytes + rng.randbytes(3)
         else:
             raw = rng.randbytes(6)
-        octets = (f"{byte:02x}" for byte in raw)
+        octets = (f"{byte:02X}" if prepared.uppercase else f"{byte:02x}" for byte in raw)
         text = prepared.separator.join(octets) if prepared.separator else "".join(octets)
-        return text.upper() if prepared.uppercase else text
+        return text
 
     def prove(self, prepared: MACSpec, result: TransformResult) -> ProofResult:
-        compact = (
-            result.value.replace(prepared.separator, "") if prepared.separator else result.value
-        )
+        compact = _compact_mac(result.value, prepared.separator)
+        if compact is None:
+            return proof_result(False, "value is not a MAC address")
         try:
             raw = bytes.fromhex(compact)
         except ValueError:
             return proof_result(False, "value is not a MAC address")
-        case_ok = result.value == (
-            result.value.upper() if prepared.uppercase else result.value.lower()
-        )
+        case_ok = compact == (compact.upper() if prepared.uppercase else compact.lower())
         prefix_ok = prepared.oui_bytes is None or raw.startswith(prepared.oui_bytes)
-        separator_ok = not prepared.separator or result.value.count(prepared.separator) == 5
         return proof_result(
-            len(raw) == 6 and case_ok and prefix_ok and separator_ok,
+            len(raw) == 6 and case_ok and prefix_ok,
             "MAC address violates its format or OUI",
         )
+
+
+def _compact_mac(value: str, separator: str) -> str | None:
+    if not separator:
+        return value if len(value) == 12 else None
+    if len(value) != 17 or any(value[index] != separator for index in (2, 5, 8, 11, 14)):
+        return None
+    return "".join(value[index : index + 2] for index in (0, 3, 6, 9, 12, 15))
 
 
 def _parse_oui(value: Any) -> bytes:

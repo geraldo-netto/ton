@@ -5,8 +5,11 @@ from __future__ import annotations
 import os
 import stat
 import tempfile
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
+from dataclasses import dataclass
+from math import isfinite
 from typing import TextIO, cast
 
 from ._logging import LogEvent
@@ -63,6 +66,29 @@ class PartialOutputCommitError(OSError):
         )
 
 
+@dataclass(frozen=True)
+class StagedOutput:
+    """Inspection record for an unpublished same-directory output stage."""
+
+    path: str
+    owner_pid: int | None
+    created_at_ns: int
+    age_seconds: float
+    owner_running: bool | None
+
+    @property
+    def managed(self) -> bool:
+        """Whether TON can identify the stage owner and creation time."""
+        return self.owner_pid is not None
+
+
+@dataclass(frozen=True)
+class _StagedCandidate:
+    report: StagedOutput
+    device: int
+    inode: int
+
+
 def validate_output_target(path: str, *, no_clobber: bool = False) -> bool:
     """Validate ``path`` and return whether it names an existing FIFO."""
     if os.path.islink(path):
@@ -97,7 +123,7 @@ def atomic_output(
             encoding=encoding,
             newline="\n",
             dir=directory,
-            prefix=f".{basename}.",
+            prefix=_stage_prefix(basename),
             suffix=".tmp",
             delete=False,
         ) as stream:
@@ -135,6 +161,165 @@ def atomic_output(
         if tmp_name:
             with suppress(FileNotFoundError):
                 os.unlink(tmp_name)
+
+
+def inspect_staged_outputs(path: str) -> tuple[StagedOutput, ...]:
+    """Return unpublished stages associated with output ``path``.
+
+    Managed stages carry their creating PID and timestamp in the filename.
+    Older unowned ``.<basename>.*.tmp`` files are reported but never removed
+    automatically because a live writer cannot be ruled out safely.
+    """
+    return tuple(candidate.report for candidate in _staged_candidates(path))
+
+
+def cleanup_staged_outputs(
+    path: str,
+    *,
+    stale_after_seconds: float = 86_400,
+) -> tuple[str, ...]:
+    """Remove managed stages older than ``stale_after_seconds`` whose owner exited."""
+    if (
+        isinstance(stale_after_seconds, bool)
+        or not isinstance(stale_after_seconds, (int, float))
+        or not isfinite(stale_after_seconds)
+        or stale_after_seconds < 0
+    ):
+        raise ValueError("stale_after_seconds must be a finite non-negative number")
+    removed: list[str] = []
+    for candidate in _staged_candidates(path):
+        report = candidate.report
+        if (
+            not report.managed
+            or report.age_seconds < stale_after_seconds
+            or report.owner_running is not False
+        ):
+            continue
+        if _remove_abandoned_stage(candidate):
+            removed.append(report.path)
+    if removed:
+        _fsync_directory(os.path.dirname(os.path.abspath(path)) or ".")
+    return tuple(removed)
+
+
+def _stage_prefix(basename: str) -> str:
+    return f".{basename}.ton-{os.getpid()}-{time.time_ns()}-"
+
+
+def _staged_candidates(path: str) -> list[_StagedCandidate]:
+    directory = os.path.dirname(os.path.abspath(path)) or "."
+    basename = os.path.basename(path)
+    file_prefix = f".{basename}."
+    now_ns = time.time_ns()
+    candidates: list[_StagedCandidate] = []
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            if not entry.name.startswith(file_prefix) or not entry.name.endswith(".tmp"):
+                continue
+            try:
+                target = entry.stat(follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            if not stat.S_ISREG(target.st_mode):
+                continue
+            owner_pid, created_at_ns = _parse_stage_owner(entry.name, file_prefix)
+            created_at_ns = created_at_ns or target.st_mtime_ns
+            candidates.append(
+                _StagedCandidate(
+                    report=StagedOutput(
+                        path=entry.path,
+                        owner_pid=owner_pid,
+                        created_at_ns=created_at_ns,
+                        age_seconds=max(0.0, (now_ns - created_at_ns) / 1_000_000_000),
+                        owner_running=(
+                            _process_is_running(owner_pid) if owner_pid is not None else None
+                        ),
+                    ),
+                    device=target.st_dev,
+                    inode=target.st_ino,
+                )
+            )
+    return sorted(candidates, key=lambda candidate: candidate.report.path)
+
+
+def _parse_stage_owner(name: str, file_prefix: str) -> tuple[int | None, int | None]:
+    payload = name[len(file_prefix) : -len(".tmp")]
+    parts = payload.split("-", 3)
+    if len(parts) != 4 or parts[0] != "ton" or not parts[3]:
+        return None, None
+    try:
+        pid = int(parts[1])
+        created_at_ns = int(parts[2])
+    except ValueError:
+        return None, None
+    if pid < 1 or created_at_ns < 1:
+        return None, None
+    return pid, created_at_ns
+
+
+def _remove_abandoned_stage(candidate: _StagedCandidate) -> bool:
+    report = candidate.report
+    if report.owner_pid is None or _process_is_running(report.owner_pid) is not False:
+        return False
+    try:
+        current = os.stat(report.path, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    if (
+        not stat.S_ISREG(current.st_mode)
+        or current.st_dev != candidate.device
+        or current.st_ino != candidate.inode
+    ):
+        return False
+    try:
+        os.unlink(report.path)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _process_is_running(pid: int) -> bool | None:
+    if pid == os.getpid():
+        return True
+    if os.name == "nt":  # pragma: no cover - exercised on Windows
+        return _windows_process_is_running(pid)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except (OverflowError, ValueError):
+        return False
+    except OSError:
+        return None
+    return True
+
+
+def _windows_process_is_running(pid: int) -> bool | None:  # pragma: no cover - Windows only
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    open_process = kernel32.OpenProcess
+    open_process.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    open_process.restype = wintypes.HANDLE
+    get_exit_code = kernel32.GetExitCodeProcess
+    get_exit_code.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    get_exit_code.restype = wintypes.BOOL
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = (wintypes.HANDLE,)
+    close_handle.restype = wintypes.BOOL
+    handle = open_process(0x1000, False, pid)
+    if not handle:
+        return False if ctypes.get_last_error() == 87 else None  # type: ignore[attr-defined]
+    try:
+        exit_code = wintypes.DWORD()
+        if not get_exit_code(handle, ctypes.byref(exit_code)):
+            return None
+        return exit_code.value == 259
+    finally:
+        close_handle(handle)
 
 
 @contextmanager

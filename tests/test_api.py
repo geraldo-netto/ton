@@ -33,6 +33,7 @@ EXPECTED_PUBLIC_API = {
     "ProofEvaluationError",
     "ProvenanceRecord",
     "RegistryError",
+    "StagedOutput",
     "TemplateError",
     "Transform",
     "TransformExecutionError",
@@ -42,6 +43,7 @@ EXPECTED_PUBLIC_API = {
     "ValidatorExecutionError",
     "build_extension_catalog",
     "build_registry",
+    "cleanup_staged_outputs",
     "chunk_rows",
     "configure_stderr",
     "derive_rng",
@@ -51,6 +53,7 @@ EXPECTED_PUBLIC_API = {
     "generate",
     "generate_from_file",
     "load_config",
+    "inspect_staged_outputs",
     "logger",
     "normalize_reference",
     "open_output_path",
@@ -203,6 +206,185 @@ def test_public_output_sink_rolls_back_failed_write(tmp_path: Path) -> None:
 
     assert output.read_text(encoding="utf-8") == "old\n"
     assert list(tmp_path.glob(".rows.txt.*.tmp")) == []
+
+
+def test_output_stage_inspection_preserves_live_writer(tmp_path: Path) -> None:
+    output = tmp_path / "rows.txt"
+
+    with api.open_output_path(str(output)) as stream:
+        stream.write("partial\n")
+        stages = api.inspect_staged_outputs(str(output))
+
+        assert len(stages) == 1
+        assert stages[0].managed
+        assert stages[0].owner_pid == os.getpid()
+        assert stages[0].owner_running is True
+        assert api.cleanup_staged_outputs(str(output), stale_after_seconds=0) == ()
+
+    assert api.inspect_staged_outputs(str(output)) == ()
+
+
+def test_output_stage_cleanup_removes_only_confirmed_abandoned_writer(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from ton import _output
+
+    output = tmp_path / "rows.txt"
+    managed = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
+    legacy = tmp_path / ".rows.txt.legacy.tmp"
+    managed.write_text("partial\n", encoding="utf-8")
+    legacy.write_text("unknown\n", encoding="utf-8")
+    monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
+
+    stages = api.inspect_staged_outputs(str(output))
+    removed = api.cleanup_staged_outputs(str(output), stale_after_seconds=0)
+
+    assert [(stage.owner_pid, stage.managed) for stage in stages] == [
+        (None, False),
+        (999999, True),
+    ]
+    assert removed == (str(managed),)
+    assert not managed.exists()
+    assert legacy.exists()
+
+
+def test_output_stage_inspection_ignores_non_regular_candidates(tmp_path: Path) -> None:
+    output = tmp_path / "rows.txt"
+    target = tmp_path / "target.txt"
+    target.write_text("target\n", encoding="utf-8")
+    (tmp_path / ".rows.txt.legacy.tmp").symlink_to(target)
+
+    assert api.inspect_staged_outputs(str(output)) == ()
+
+
+def test_output_stage_inspection_tolerates_publish_race(monkeypatch, tmp_path: Path) -> None:
+    from ton import _output
+
+    entry = mock.Mock()
+    entry.name = ".rows.txt.ton-999999-1-token.tmp"
+    entry.stat.side_effect = FileNotFoundError
+    scan = mock.MagicMock()
+    scan.__enter__.return_value = [entry]
+    monkeypatch.setattr(_output.os, "scandir", mock.Mock(return_value=scan))
+
+    assert api.inspect_staged_outputs(str(tmp_path / "rows.txt")) == ()
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".rows.txt.ton-not-a-pid-1-token.tmp",
+        ".rows.txt.ton-1-not-a-time-token.tmp",
+        ".rows.txt.ton-0-1-token.tmp",
+        ".rows.txt.ton-1-0-token.tmp",
+    ],
+)
+def test_output_stage_inspection_treats_bad_metadata_as_unowned(name: str, tmp_path: Path) -> None:
+    output = tmp_path / "rows.txt"
+    (tmp_path / name).write_text("partial\n", encoding="utf-8")
+
+    stage = api.inspect_staged_outputs(str(output))[0]
+
+    assert not stage.managed
+    assert stage.owner_pid is None
+
+
+def test_output_stage_cleanup_waits_for_stale_age(monkeypatch, tmp_path: Path) -> None:
+    from ton import _output
+
+    output = tmp_path / "rows.txt"
+    created_at_ns = _output.time.time_ns()
+    stage = tmp_path / f".rows.txt.ton-999999-{created_at_ns}-token.tmp"
+    stage.write_text("partial\n", encoding="utf-8")
+    monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
+
+    assert api.cleanup_staged_outputs(str(output), stale_after_seconds=60) == ()
+    assert stage.exists()
+
+
+def test_output_stage_cleanup_rechecks_owner_liveness(monkeypatch, tmp_path: Path) -> None:
+    from ton import _output
+
+    output = tmp_path / "rows.txt"
+    stage = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
+    stage.write_text("partial\n", encoding="utf-8")
+    running = mock.Mock(side_effect=[False, True])
+    monkeypatch.setattr(_output, "_process_is_running", running)
+
+    assert api.cleanup_staged_outputs(str(output), stale_after_seconds=0) == ()
+    assert stage.exists()
+
+
+def test_output_stage_cleanup_tolerates_concurrent_disappearance(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from ton import _output
+
+    output = tmp_path / "rows.txt"
+    stage = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
+    stage.write_text("partial\n", encoding="utf-8")
+    monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
+    candidate = _output._staged_candidates(str(output))[0]
+    stage.unlink()
+
+    assert not _output._remove_abandoned_stage(candidate)
+
+
+def test_output_stage_cleanup_preserves_replaced_candidate(monkeypatch, tmp_path: Path) -> None:
+    from ton import _output
+
+    output = tmp_path / "rows.txt"
+    stage = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
+    replacement = tmp_path / "replacement.tmp"
+    stage.write_text("partial\n", encoding="utf-8")
+    replacement.write_text("live\n", encoding="utf-8")
+    monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
+    candidate = _output._staged_candidates(str(output))[0]
+    os.replace(replacement, stage)
+
+    assert not _output._remove_abandoned_stage(candidate)
+    assert stage.read_text(encoding="utf-8") == "live\n"
+
+
+def test_output_stage_cleanup_tolerates_unlink_race(monkeypatch, tmp_path: Path) -> None:
+    from ton import _output
+
+    output = tmp_path / "rows.txt"
+    stage = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
+    stage.write_text("partial\n", encoding="utf-8")
+    monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
+    candidate = _output._staged_candidates(str(output))[0]
+    monkeypatch.setattr(_output.os, "unlink", mock.Mock(side_effect=FileNotFoundError))
+
+    assert not _output._remove_abandoned_stage(candidate)
+
+
+@pytest.mark.parametrize(
+    ("side_effect", "expected"),
+    [
+        (None, True),
+        (ProcessLookupError(), False),
+        (PermissionError(), True),
+        (OverflowError(), False),
+        (ValueError(), False),
+        (OSError(), None),
+    ],
+)
+def test_output_stage_process_liveness_mapping(
+    monkeypatch, side_effect: BaseException | None, expected: bool | None
+) -> None:
+    from ton import _output
+
+    kill = mock.Mock(side_effect=side_effect)
+    monkeypatch.setattr(_output.os, "kill", kill)
+
+    assert _output._process_is_running(os.getpid() + 10_000) is expected
+
+
+@pytest.mark.parametrize("stale_after", [-1, True, float("inf"), "one day"])
+def test_output_stage_cleanup_rejects_invalid_age(stale_after: object, tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="finite non-negative"):
+        api.cleanup_staged_outputs(str(tmp_path / "rows.txt"), stale_after_seconds=stale_after)  # type: ignore[arg-type]
 
 
 def test_public_output_sink_no_clobber_publish_is_atomic(tmp_path: Path) -> None:

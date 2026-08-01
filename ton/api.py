@@ -63,6 +63,9 @@ from ._output import (
     OutputEncodingError,
     OutputPublishedError,
     PartialOutputCommitError,
+    StagedOutput,
+    cleanup_staged_outputs,
+    inspect_staged_outputs,
     open_output_path,
 )
 from ._proof import ProvenanceRecord
@@ -96,6 +99,7 @@ __all__ = [
     "OutputPublishedError",
     "PairedGenerator",
     "PartialOutputCommitError",
+    "StagedOutput",
     "PipelineStageError",
     "ProofError",
     "ProofEvaluationError",
@@ -111,6 +115,7 @@ __all__ = [
     "ExtensionCatalog",
     "build_extension_catalog",
     "build_registry",
+    "cleanup_staged_outputs",
     "configure_stderr",
     "chunk_rows",
     "derive_rng",
@@ -120,6 +125,7 @@ __all__ = [
     "generate",
     "generate_from_file",
     "load_config",
+    "inspect_staged_outputs",
     "logger",
     "normalize_reference",
     "open_output_path",

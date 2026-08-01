@@ -53,7 +53,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| ROB-001 | open | M | Add crash-recovery handling for same-directory `.<basename>.*.tmp` output/proof files. Context-manager cleanup covers Python exceptions and interrupts, but process termination or power loss leaves staged files indefinitely; define ownership/age metadata and a concurrency-safe inspect/reconcile path so later runs can report or clean stale artifacts without deleting a live writer's file. |
 
 ## architecture/modularity/SOLID
 

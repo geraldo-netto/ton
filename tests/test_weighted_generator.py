@@ -36,11 +36,22 @@ def test_weighted_record_form() -> None:
     "values",
     [
         [{"weight": 1}],
-        [{"value": "x"}, "y"],
     ],
 )
 def test_weighted_record_form_rejects_bad_entries(values: list[object]) -> None:
     with pytest.raises(ValueError, match="objects containing 'value'"):
+        WeightedGenerator().prepare({"values": values})
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        [{"value": "x", "weight": 1}, "y"],
+        ["y", {"value": "x", "weight": 1}],
+    ],
+)
+def test_weighted_rejects_mixed_legacy_value_shapes(values: list[object]) -> None:
+    with pytest.raises(ValueError, match="all objects or all scalar values"):
         WeightedGenerator().prepare({"values": values})
 
 

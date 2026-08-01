@@ -151,7 +151,10 @@ def _coerce(spec: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[float, ...]
     raw_values = spec.get("values")
     if not isinstance(raw_values, list):
         raise ValueError("weighted 'values' must be a list")
-    if raw_values and isinstance(raw_values[0], dict):
+    record_entries = tuple(isinstance(value, Mapping) for value in raw_values)
+    if any(record_entries) and not all(record_entries):
+        raise ValueError("weighted 'values' must be all objects or all scalar values")
+    if record_entries and all(record_entries):
         return _coerce_record(raw_values)
     return _coerce_parallel(spec, raw_values)
 

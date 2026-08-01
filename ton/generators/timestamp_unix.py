@@ -3,8 +3,6 @@
 Same bounds semantics as the ``date`` type but emits epoch seconds
 (or milliseconds) instead of a formatted string. Useful for log
 ingestion fixtures where the receiver expects numeric timestamps.
-``millis`` output is second-resolution epoch time multiplied by 1000,
-so generated millisecond values always end in ``000``.
 
 Spec fields::
 
@@ -20,12 +18,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from random import Random
 from typing import Any
 
 from .._proof import ProofResult
 from .._transforms import TransformResult
-from ._datetime import duration_seconds, parse_iso_bounds, uniform_offset_seconds
+from ._datetime import parse_iso_bounds
 from .base import Generator, proof_result
 
 _UNIT_MULTIPLIERS = {"seconds": 1, "millis": 1000}
@@ -33,9 +32,8 @@ _UNIT_MULTIPLIERS = {"seconds": 1, "millis": 1000}
 
 @dataclass(frozen=True)
 class TimestampUnixSpec:
-    lo_epoch_seconds: int
-    span_seconds: int
-    multiplier: int  # 1 for seconds, 1000 for millis
+    lo_epoch_units: int
+    hi_epoch_units: int
 
 
 class TimestampUnixGenerator(Generator):
@@ -50,25 +48,36 @@ class TimestampUnixGenerator(Generator):
             raise ValueError(
                 f"timestamp_unix 'unit' must be one of {sorted(_UNIT_MULTIPLIERS)} (got {unit!r})"
             )
-        return TimestampUnixSpec(
-            lo_epoch_seconds=int(lo.timestamp()),
-            span_seconds=duration_seconds(lo, hi),
-            multiplier=_UNIT_MULTIPLIERS[unit],
-        )
+        multiplier = _UNIT_MULTIPLIERS[unit]
+        lo_epoch_units = _ceil_epoch_units(lo, multiplier)
+        hi_epoch_units = _floor_epoch_units(hi, multiplier)
+        if lo_epoch_units > hi_epoch_units:
+            raise ValueError(f"timestamp_unix bounds contain no representable {unit} timestamp")
+        return TimestampUnixSpec(lo_epoch_units=lo_epoch_units, hi_epoch_units=hi_epoch_units)
 
     def generate(self, prepared: TimestampUnixSpec, rng: Random) -> str:
-        offset = uniform_offset_seconds(rng, prepared.span_seconds)
-        epoch_seconds = prepared.lo_epoch_seconds + offset
-        return str(epoch_seconds * prepared.multiplier)
+        return str(rng.randint(prepared.lo_epoch_units, prepared.hi_epoch_units))
 
     def prove(self, prepared: TimestampUnixSpec, result: TransformResult) -> ProofResult:
         try:
             value = int(result.value)
         except ValueError:
             return proof_result(False, "value is not a Unix timestamp")
-        lo = prepared.lo_epoch_seconds * prepared.multiplier
-        hi = (prepared.lo_epoch_seconds + prepared.span_seconds) * prepared.multiplier
         return proof_result(
-            lo <= value <= hi and value % prepared.multiplier == 0,
-            "timestamp is outside its bounds or unit",
+            prepared.lo_epoch_units <= value <= prepared.hi_epoch_units,
+            "timestamp is outside its bounds",
         )
+
+
+def _epoch_microseconds(value: datetime) -> int:
+    delta = value - datetime(1970, 1, 1, tzinfo=timezone.utc)
+    return ((delta.days * 86400 + delta.seconds) * 1_000_000) + delta.microseconds
+
+
+def _ceil_epoch_units(value: datetime, multiplier: int) -> int:
+    numerator = _epoch_microseconds(value) * multiplier
+    return -(-numerator // 1_000_000)
+
+
+def _floor_epoch_units(value: datetime, multiplier: int) -> int:
+    return _epoch_microseconds(value) * multiplier // 1_000_000

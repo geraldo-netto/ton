@@ -31,4 +31,4 @@ def test_parse_iso_accepts_zulu_suffix() -> None:
 def test_timestamp_generator_accepts_zulu_bounds() -> None:
     gen = TimestampUnixGenerator()
     prepared = gen.prepare({"minValue": "2024-01-01T00:00:00Z", "maxValue": "2024-01-01T00:00:00Z"})
-    assert prepared.span_seconds == 0
+    assert prepared.lo_epoch_units == prepared.hi_epoch_units

@@ -125,6 +125,26 @@ def test_distribution_transform_rejects_negative_weight() -> None:
         raise AssertionError("expected ValueError")
 
 
+def test_distribution_transform_rejects_boolean_weight_with_path() -> None:
+    transform = DistributionTransform()
+
+    try:
+        transform.prepare_composite(
+            {
+                "type": "distribution",
+                "choices": [
+                    {"weight": True, "spec": {"type": "string", "values": ["bad"]}},
+                    {"weight": 1, "spec": {"type": "string", "values": ["ok"]}},
+                ],
+            },
+            default_registry(),
+        )
+    except ValueError as exc:
+        assert "choices[0].weight" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
 def test_distribution_transform_rejects_zero_total_weight() -> None:
     transform = DistributionTransform()
 

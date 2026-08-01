@@ -52,6 +52,7 @@ from typing import Any, ClassVar
 
 from .._distribution import (
     WeightedChoiceSet,
+    coerce_weight,
     cumulative_weights,
     prepare_distribution,
     validate_weights,
@@ -172,7 +173,11 @@ def _coerce_record(raw_values: list[Any]) -> tuple[tuple[str, ...], tuple[float,
                 f"(bad entry at index {index})"
             )
         values.append(str(item["value"]))
-        weights.append(float(item.get("weight", 1.0)))
+        weights.append(
+            coerce_weight(item["weight"], f"weighted 'values[{index}].weight'")
+            if "weight" in item
+            else 1.0
+        )
     return tuple(values), tuple(weights)
 
 
@@ -193,7 +198,10 @@ def _coerce_parallel(
         raise ValueError("weighted 'weights' must be a list the same length as 'values'")
     return (
         tuple(str(v) for v in raw_values),
-        tuple(float(w) for w in weights),
+        tuple(
+            coerce_weight(weight, f"weighted 'weights[{index}]'")
+            for index, weight in enumerate(weights)
+        ),
     )
 
 

@@ -86,6 +86,18 @@ def test_weighted_rejects_non_finite_total() -> None:
         WeightedGenerator().prepare({"values": ["A", "B"], "weights": [1e308, 1e308]})
 
 
+@pytest.mark.parametrize(
+    ("spec", "path"),
+    [
+        ({"values": ["A"], "weights": [True]}, r"weights\[0\]"),
+        ({"values": [{"value": "A", "weight": False}]}, r"values\[0\]\.weight"),
+    ],
+)
+def test_weighted_legacy_rejects_boolean_weights(spec: dict[str, object], path: str) -> None:
+    with pytest.raises(ValueError, match=path):
+        WeightedGenerator().prepare(spec)
+
+
 # ---------------------------------------------------------------------------
 # Composite form: 'choices' with nested type specs (any registered type).
 # ---------------------------------------------------------------------------
@@ -275,6 +287,20 @@ def test_weighted_composite_rejects_non_numeric_weight() -> None:
     }
     with pytest.raises(TemplateError, match="numeric"):
         list(api.generate(config))
+
+
+def test_weighted_composite_rejects_boolean_weight_with_path() -> None:
+    gen = WeightedGenerator()
+
+    with pytest.raises(ValueError, match=r"choices\[0\]\.weight"):
+        gen.prepare_composite(
+            {
+                "choices": [
+                    {"weight": True, "spec": {"type": "string", "values": ["x"]}},
+                ]
+            },
+            default_registry(),
+        )
 
 
 def test_weighted_composite_rejects_choice_missing_spec() -> None:

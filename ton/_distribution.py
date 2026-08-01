@@ -67,10 +67,17 @@ def _prepare_choice(
 def _coerce_weight(index: int, choice: Mapping[str, Any], label: str) -> float:
     if "weight" not in choice:
         return 1.0
+    return coerce_weight(choice["weight"], f"{label} 'choices[{index}].weight'")
+
+
+def coerce_weight(value: Any, location: str) -> float:
+    """Convert a configured weight without accepting JSON booleans as numbers."""
+    if isinstance(value, bool):
+        raise ValueError(f"{location} must be numeric")
     try:
-        return float(choice["weight"])
+        return float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"{label} 'choices[{index}].weight' must be numeric") from exc
+        raise ValueError(f"{location} must be numeric") from exc
 
 
 def validate_weights(weights: Sequence[float], label: str) -> None:

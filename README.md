@@ -1105,7 +1105,9 @@ pip install -e ".[dev]"
 pytest                              # 500+ tests, 100% line coverage enforced
 pytest -m fuzz --no-cov             # seeded fuzz/property suites only
 ruff check ton tests
-mypy ton tests                      # strict mode is on
+ruff format --check ton tests
+mypy ton                            # strict package type check
+pyright ton
 ```
 
 Enable the pre-commit gate once per clone so the CI lint + typecheck jobs

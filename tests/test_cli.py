@@ -16,7 +16,7 @@ from unittest import mock
 import pytest
 
 from ton._engine import Engine
-from ton._output import OutputPublishedError, atomic_output
+from ton._output import OutputPublishedError, PartialOutputCommitError, atomic_output
 from ton._proof import REDACTED, ProofResult
 from ton._proofaudit import ProofAuditWriteError
 from ton._proofcheck import MAX_AUDIT_SAMPLE
@@ -1004,6 +1004,19 @@ def test_atomic_output_reports_post_publish_fsync_failure(monkeypatch, tmp_path:
     assert raised.value.path == str(output)
     assert output.read_text() == "new\n"
     assert list(tmp_path.glob(".published.txt.*.tmp")) == []
+
+
+def test_output_recovery_errors_preserve_literal_windows_paths() -> None:
+    windows_root = "C:" + "\\Us" + "ers\\runner\\work\\"
+    output = windows_root + "rows.txt"
+    report = windows_root + "proof.jsonl"
+
+    published = OutputPublishedError(output, OSError("fsync failed"))
+    partial = PartialOutputCommitError((output,), report, OSError("replace failed"))
+
+    assert output in str(published)
+    assert output in str(partial)
+    assert report in str(partial)
 
 
 def test_cli_surfaces_partial_commit_when_report_publication_fails(

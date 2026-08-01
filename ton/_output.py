@@ -38,7 +38,7 @@ class OutputPublishedError(OSError):
         self.destination_changed = True
         self.cause = cause
         super().__init__(
-            f"output was published to {path!r}, but finalization failed: {cause}; "
+            f"output was published to {path}, but finalization failed: {cause}; "
             "inspect the destination before retrying"
         )
 
@@ -55,10 +55,10 @@ class PartialOutputCommitError(OSError):
         self.published_paths = published_paths
         self.failed_path = failed_path
         self.cause = cause
-        published = ", ".join(repr(path) for path in published_paths)
+        published = ", ".join(published_paths)
         super().__init__(
             f"partial output commit; published/changed: {published}; failed target: "
-            f"{failed_path!r}; inspect these paths and keep or remove them consistently "
+            f"{failed_path}; inspect these paths and keep or remove them consistently "
             f"before retrying: {cause}"
         )
 

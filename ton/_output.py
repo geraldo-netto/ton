@@ -217,7 +217,9 @@ def _staged_candidates(path: str) -> list[_StagedCandidate]:
             if not entry.name.startswith(file_prefix) or not entry.name.endswith(".tmp"):
                 continue
             try:
-                target = entry.stat(follow_symlinks=False)
+                # Windows DirEntry metadata may omit the stable file identity
+                # fields populated by os.stat(), which cleanup rechecks below.
+                target = os.stat(entry.path, follow_symlinks=False)
             except FileNotFoundError:
                 continue
             if not stat.S_ISREG(target.st_mode):

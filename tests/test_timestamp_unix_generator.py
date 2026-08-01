@@ -86,8 +86,8 @@ def test_rejects_interval_without_representable_timestamp(unit: str) -> None:
     with pytest.raises(ValueError, match="no representable"):
         gen.prepare(
             {
-                "minValue": "1970-01-01T00:00:00.0001+00:00",
-                "maxValue": "1970-01-01T00:00:00.0009+00:00",
+                "minValue": "1970-01-01T00:00:00.000100+00:00",
+                "maxValue": "1970-01-01T00:00:00.000900+00:00",
                 "unit": unit,
             }
         )

@@ -285,9 +285,7 @@ def test_output_stage_cleanup_removes_only_confirmed_abandoned_writer(
 
 def test_output_stage_inspection_ignores_non_regular_candidates(tmp_path: Path) -> None:
     output = tmp_path / "rows.txt"
-    target = tmp_path / "target.txt"
-    target.write_text("target\n", encoding="utf-8")
-    (tmp_path / ".rows.txt.legacy.tmp").symlink_to(target)
+    (tmp_path / ".rows.txt.legacy.tmp").mkdir()
 
     assert api.inspect_staged_outputs(str(output)) == ()
 
@@ -297,12 +295,16 @@ def test_output_stage_inspection_tolerates_publish_race(monkeypatch, tmp_path: P
 
     entry = mock.Mock()
     entry.name = ".rows.txt.ton-999999-1-token.tmp"
-    entry.stat.side_effect = FileNotFoundError
+    entry.path = str(tmp_path / entry.name)
     scan = mock.MagicMock()
     scan.__enter__.return_value = [entry]
     monkeypatch.setattr(_output.os, "scandir", mock.Mock(return_value=scan))
+    stat_file = mock.Mock(side_effect=FileNotFoundError)
+    monkeypatch.setattr(_output.os, "stat", stat_file)
 
     assert api.inspect_staged_outputs(str(tmp_path / "rows.txt")) == ()
+    stat_file.assert_called_once_with(entry.path, follow_symlinks=False)
+    entry.stat.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -411,9 +413,22 @@ def test_output_stage_process_liveness_mapping(
     from ton import _output
 
     kill = mock.Mock(side_effect=side_effect)
+    monkeypatch.setattr(_output.os, "name", "posix")
     monkeypatch.setattr(_output.os, "kill", kill)
 
     assert _output._process_is_running(os.getpid() + 10_000) is expected
+
+
+def test_output_stage_process_liveness_uses_windows_probe(monkeypatch) -> None:
+    from ton import _output
+
+    probe = mock.Mock(return_value=None)
+    monkeypatch.setattr(_output.os, "name", "nt")
+    monkeypatch.setattr(_output, "_windows_process_is_running", probe)
+    pid = os.getpid() + 10_000
+
+    assert _output._process_is_running(pid) is None
+    probe.assert_called_once_with(pid)
 
 
 @pytest.mark.parametrize("stale_after", [-1, True, float("inf"), "one day"])

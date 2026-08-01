@@ -71,16 +71,7 @@ def validate_output_target(path: str, *, no_clobber: bool = False) -> bool:
         return False
     target = os.stat(path)
     if not (stat.S_ISREG(target.st_mode) or stat.S_ISFIFO(target.st_mode)):
-        _logger.error(
-            "output_special_file_rejected path=%s mode=%o",
-            path,
-            target.st_mode,
-            extra={
-                "event": LogEvent.OUTPUT_SPECIAL_FILE_REJECTED.value,
-                "path": path,
-                "mode": target.st_mode,
-            },
-        )
+        _log_special_file_rejected(path, target.st_mode)
         raise OSError(f"refusing to write to special file (not a regular file): {path}")
     if no_clobber:
         raise OSError(f"refusing to overwrite existing file: {path}")
@@ -155,7 +146,7 @@ def open_output_path(
 ) -> Iterator[TextIO]:
     """Open a validated path with FIFO or atomic regular-file semantics."""
     if validate_output_target(path, no_clobber=no_clobber):
-        with open(path, "w", encoding=encoding, newline="\n") as stream:
+        with _open_fifo(path, encoding=encoding) as stream:
             yield stream
         return
     with atomic_output(
@@ -165,6 +156,43 @@ def open_output_path(
         no_clobber=no_clobber,
     ) as stream:
         yield stream
+
+
+@contextmanager
+def _open_fifo(path: str, *, encoding: str) -> Iterator[TextIO]:
+    """Open and descriptor-check a FIFO without following symlinks."""
+    flags = os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path, flags)
+    try:
+        target = os.fstat(descriptor)
+        if not stat.S_ISFIFO(target.st_mode):
+            _log_special_file_rejected(path, target.st_mode)
+            raise OSError(f"refusing output target that changed before FIFO open: {path}")
+        with os.fdopen(
+            descriptor,
+            "w",
+            encoding=encoding,
+            newline="\n",
+            closefd=True,
+        ) as stream:
+            descriptor = -1
+            yield cast(TextIO, stream)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _log_special_file_rejected(path: str, mode: int) -> None:
+    _logger.error(
+        "output_special_file_rejected path=%s mode=%o",
+        path,
+        mode,
+        extra={
+            "event": LogEvent.OUTPUT_SPECIAL_FILE_REJECTED.value,
+            "path": path,
+            "mode": mode,
+        },
+    )
 
 
 def target_mode(path: str) -> int:

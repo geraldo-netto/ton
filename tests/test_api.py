@@ -280,6 +280,31 @@ def test_public_output_sink_matches_cli_symlink_policy(tmp_path: Path) -> None:
     assert target.read_text(encoding="utf-8") == "old\n"
 
 
+@pytest.mark.skipif(os.name == "nt", reason="requires POSIX FIFO and symlink support")
+def test_public_output_sink_rejects_fifo_symlink_swap(monkeypatch, tmp_path: Path) -> None:
+    from ton import _output
+
+    fifo = tmp_path / "rows.fifo"
+    victim = tmp_path / "victim.txt"
+    os.mkfifo(fifo)
+    victim.write_text("keep\n", encoding="utf-8")
+    validate = _output.validate_output_target
+
+    def validate_then_swap(path: str, *, no_clobber: bool = False) -> bool:
+        is_fifo = validate(path, no_clobber=no_clobber)
+        fifo.unlink()
+        fifo.symlink_to(victim)
+        return is_fifo
+
+    monkeypatch.setattr(_output, "validate_output_target", validate_then_swap)
+
+    with pytest.raises(OSError), api.open_output_path(str(fifo)):
+        pass
+
+    assert fifo.is_symlink()
+    assert victim.read_text(encoding="utf-8") == "keep\n"
+
+
 def test_output_encoding_error_carries_codec_and_field_context() -> None:
     error = api.OutputEncodingError("ascii", "ordinal not in range", field_name="city")
 

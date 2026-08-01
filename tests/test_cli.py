@@ -1201,13 +1201,44 @@ def test_open_output_streams_existing_fifo(tmp_path: Path) -> None:
             0,
         )
     )
-    opened = mock.mock_open()
+    descriptor = 42
+    wrapped = mock.mock_open()
     with (
         mock.patch("ton._output.os.stat", return_value=fifo_stat),
-        mock.patch("builtins.open", opened),
+        mock.patch("ton._output.os.open", return_value=descriptor) as open_descriptor,
+        mock.patch("ton._output.os.fstat", return_value=fifo_stat),
+        mock.patch("ton._output.os.fdopen", wrapped),
+        mock.patch("ton._output.os.close") as close_descriptor,
         _open_output(str(fifo)) as writer,
     ):
         writer.write("row\n")
 
-    opened.assert_called_once_with(str(fifo), "w", encoding="utf-8", newline="\n")
-    opened().write.assert_called_once_with("row\n")
+    expected_flags = os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    open_descriptor.assert_called_once_with(str(fifo), expected_flags)
+    wrapped.assert_called_once_with(
+        descriptor,
+        "w",
+        encoding="utf-8",
+        newline="\n",
+        closefd=True,
+    )
+    wrapped().write.assert_called_once_with("row\n")
+    close_descriptor.assert_not_called()
+
+
+def test_open_output_rejects_changed_fifo_descriptor(tmp_path: Path) -> None:
+    from ton.cli import _open_output
+
+    path = tmp_path / "rows.fifo"
+    regular_stat = os.stat_result((stat.S_IFREG | 0o600, 0, 0, 1, 0, 0, 0, 0, 0, 0))
+    with (
+        mock.patch("ton._output.validate_output_target", return_value=True),
+        mock.patch("ton._output.os.open", return_value=42),
+        mock.patch("ton._output.os.fstat", return_value=regular_stat),
+        mock.patch("ton._output.os.close") as close_descriptor,
+        pytest.raises(OSError, match="changed before FIFO open"),
+        _open_output(str(path)),
+    ):
+        pass
+
+    close_descriptor.assert_called_once_with(42)

@@ -33,7 +33,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-024 | open | S | Validate `chunk_rows(total_rows, ...)` with the same non-negative-integer contract as config `rows`. Negative totals currently return zero/negative shard sizes through `divmod`, even though this is a public helper; reject negative values and booleans with focused tests. |
 
 ## performance
 

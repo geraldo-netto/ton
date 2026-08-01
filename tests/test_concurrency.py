@@ -42,6 +42,12 @@ def test_chunk_rows_rejects_invalid_worker_coordinates(workers: int, worker_id: 
         chunk_rows(10, workers, worker_id)
 
 
+@pytest.mark.parametrize("total_rows", [-1, True])
+def test_chunk_rows_rejects_invalid_total_rows(total_rows: int) -> None:
+    with pytest.raises(ValueError, match="non-negative integer"):
+        chunk_rows(total_rows, 1, 0)
+
+
 def test_derive_rng_is_deterministic_for_same_inputs() -> None:
     a = derive_rng(parent_seed=42, worker_id=3)
     b = derive_rng(parent_seed=42, worker_id=3)

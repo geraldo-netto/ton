@@ -60,6 +60,8 @@ _UINT64_MODULUS = 1 << 64
 
 def chunk_rows(total_rows: int, workers: int, worker_id: int) -> int:
     """Return this worker's share without dropping remainder rows."""
+    if not isinstance(total_rows, int) or isinstance(total_rows, bool) or total_rows < 0:
+        raise ValueError("total_rows must be a non-negative integer")
     if workers < 1:
         raise ValueError("workers must be >= 1")
     if not 0 <= worker_id < workers:

@@ -33,7 +33,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| REL-022 | open | M | Enforce positional regex-anchor semantics or reject unsupported placements during `RegexGenerator.prepare()`. Anchors are currently discarded everywhere, so valid patterns such as `a^b`, `a$b`, and `a\bb` generate `ab`, which does not match the configured pattern and immediately fails proof mode. Add prepare/generate/prove regressions for start/end/word-boundary anchors inside branches and groups. |
 | REL-023 | open | S | Reject mixed legacy `weighted.values` shapes deterministically. Dispatch currently depends only on whether the first element is a mapping, so a scalar followed by a `{value, weight}` record is silently stringified while the reverse order is rejected. Validate the entire list as either all scalar values or all records and test both mixed orders. |
 | REL-024 | open | S | Validate `chunk_rows(total_rows, ...)` with the same non-negative-integer contract as config `rows`. Negative totals currently return zero/negative shard sizes through `divmod`, even though this is a public helper; reject negative values and booleans with focused tests. |
 

@@ -13,8 +13,9 @@ patterns: literals, character classes (``[abc]``, ``[^abc]``,
 quantifiers (``? * + {n} {n,m}``), alternation (``a|b``), and groups
 (``(...)``, ``(?:...)``). Unbounded quantifiers (``*`` and ``+``) are
 capped at ``MAX_UNBOUNDED_REPEAT`` extra repetitions so generation
-always terminates. Anchors (``^``, ``$``, ``\\b``) are accepted and
-ignored.
+always terminates. Start/end anchors are supported only where they assert
+the boundary of every generated alternative; word-boundary anchors are
+rejected during preparation.
 
 Implementation uses a small vendored parser (:mod:`ton.generators._regex_parse`)
 rather than CPython's private ``sre_parse`` / ``sre_constants``, which carry
@@ -68,6 +69,7 @@ class RegexGenerator(Generator):
             parsed = rx.parse(pattern)
         except RegexParseError as exc:
             raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
+        _validate_anchors(parsed)
         return RegexSpec(pattern=pattern, parsed=_prepare_nodes(parsed))
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:
@@ -85,6 +87,25 @@ class RegexGenerator(Generator):
 # ---------------------------------------------------------------------------
 # AST -> string
 # ---------------------------------------------------------------------------
+
+
+def _validate_anchors(seq: Iterable[tuple[Any, Any]]) -> None:
+    work = [(tuple(seq), True, True)]
+    while work:
+        nodes, at_start, at_end = work.pop()
+        for index, (op, arg) in enumerate(nodes):
+            node_at_start = at_start and index == 0
+            node_at_end = at_end and index == len(nodes) - 1
+            if op is rx.AT:
+                if (arg == "^" and node_at_start) or (arg == "$" and node_at_end):
+                    continue
+                raise ValueError(f"regex 'pattern' has unsupported positional anchor {arg!r}")
+            if op is rx.SUBPATTERN:
+                work.append((tuple(arg[3]), node_at_start, node_at_end))
+            elif op is rx.BRANCH:
+                work.extend((tuple(branch), node_at_start, node_at_end) for branch in arg[1])
+            elif op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
+                work.append((tuple(arg[2]), False, False))
 
 
 def _prepare_nodes(seq: Iterable[tuple[Any, Any]]) -> tuple[tuple[Any, Any], ...]:

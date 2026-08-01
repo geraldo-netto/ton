@@ -10,7 +10,10 @@ recursive-descent parser over the supported common subset:
 * the ``\\d \\w \\s`` escapes and their negations,
 * quantifiers ``? * + {n} {n,m} {n,}`` (with lazy ``?`` suffix),
 * alternation ``a|b`` and groups ``(...)`` / ``(?:...)``,
-* anchors ``^ $ \\b`` (accepted and ignored).
+* start/end anchors ``^ $`` (validated by the generator).
+
+Word-boundary anchors are parsed so the generator can reject them with a
+specific preparation error instead of silently changing their semantics.
 
 Nodes are ``(op, arg)`` tuples whose shapes match what the emitter in
 :mod:`ton.generators.regex` consumes, so the emit/flatten/expansion code

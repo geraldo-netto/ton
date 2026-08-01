@@ -7,6 +7,7 @@ from random import Random
 
 import pytest
 
+from ton._transforms import TransformResult
 from ton.generators.regex import RegexGenerator
 
 
@@ -49,9 +50,31 @@ def test_rejects_invalid_regex() -> None:
         RegexGenerator().prepare({"pattern": "[unclosed"})
 
 
-def test_anchors_ignored() -> None:
-    value = _draw(r"^foo$", seed=0)
-    assert value == "foo"
+@pytest.mark.parametrize("pattern", [r"^foo$", r"(^foo$)", r"(^foo|^bar)$", r"^(foo$|bar$)"])
+def test_edge_anchors_match_generated_values(pattern: str) -> None:
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": pattern})
+    value = generator.generate(prepared, Random(0))
+
+    assert generator.prove(prepared, TransformResult(value)).ok
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        r"a^b",
+        r"a$b",
+        r"a\bb",
+        r"(a^b)",
+        r"a(^b|c)",
+        r"(a$|b)c",
+        r"(^a)+",
+        r"(a\b|b)",
+    ],
+)
+def test_rejects_unsupported_anchor_positions(pattern: str) -> None:
+    with pytest.raises(ValueError, match="unsupported positional anchor"):
+        RegexGenerator().prepare({"pattern": pattern})
 
 
 def test_unbounded_repeat_terminates() -> None:

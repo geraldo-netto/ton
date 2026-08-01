@@ -951,9 +951,10 @@ Produce strings matching a user-supplied regex. Supports literals, character
 classes, escapes (`\d \w \s` and their negations), quantifiers, alternation,
 and groups. Start/end anchors are supported at the boundary of every
 alternative; internal start/end anchors and word-boundary anchors are rejected
-during preparation. Unbounded `*` / `+` choose up to 8 additional repetitions
-so each draw terminates. Explicit quantifiers and group nesting have no fixed
-expansion ceiling; nested patterns are prepared and emitted iteratively.
+during preparation. Unbounded `*` / `+` use a geometric distribution: every
+finite repetition count is reachable and each draw terminates with probability
+1. Explicit quantifiers and group nesting have no fixed expansion ceiling;
+nested patterns are prepared and emitted iteratively.
 
 | field     | type   | description                       |
 |-----------|--------|-----------------------------------|

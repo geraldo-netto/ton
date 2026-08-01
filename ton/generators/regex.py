@@ -11,9 +11,9 @@ Supports the regex constructs that show up in fixture/identifier
 patterns: literals, character classes (``[abc]``, ``[^abc]``,
 ``[a-z]``), the standard escapes (``\\d \\w \\s`` and their negations),
 quantifiers (``? * + {n} {n,m}``), alternation (``a|b``), and groups
-(``(...)``, ``(?:...)``). Unbounded quantifiers (``*`` and ``+``) are
-capped at ``MAX_UNBOUNDED_REPEAT`` extra repetitions so generation
-always terminates. Start/end anchors are supported only where they assert
+(``(...)``, ``(?:...)``). Unbounded quantifiers (``*`` and ``+``) use a
+geometric draw with unbounded support and almost-sure termination.
+Start/end anchors are supported only where they assert
 the boundary of every generated alternative; word-boundary anchors are
 rejected during preparation.
 
@@ -38,9 +38,6 @@ from .._transforms import TransformResult
 from . import _regex_parse as rx
 from ._regex_parse import RegexParseError
 from .base import Generator, proof_result
-
-#: Upper bound on the *extra* repetitions allowed for ``*`` and ``+``.
-MAX_UNBOUNDED_REPEAT = 8
 
 _PRINTABLE_ASCII = tuple(chr(c) for c in range(0x20, 0x7F))
 _DIGITS = tuple(string.digits)
@@ -159,8 +156,7 @@ def _emit_into(seq: Iterable[tuple[Any, Any]], rng: Random, out: list[str]) -> N
         op, arg = payload
         if op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
             lo, hi, sub = arg
-            bounded_hi = lo + MAX_UNBOUNDED_REPEAT if hi == rx.MAXREPEAT else hi
-            work.append(("repeat", (rng.randint(lo, bounded_hi), sub)))
+            work.append(("repeat", (_repeat_count(rng, lo, hi), sub)))
         elif op is rx.BRANCH:
             work.extend(("node", node) for node in reversed(tuple(rng.choice(arg[1]))))
         elif op is rx.SUBPATTERN:
@@ -170,6 +166,15 @@ def _emit_into(seq: Iterable[tuple[Any, Any]], rng: Random, out: list[str]) -> N
             if handler is None:
                 raise ValueError(f"regex generator: unsupported construct {op!r}")
             handler(arg, rng, out)
+
+
+def _repeat_count(rng: Random, minimum: int, maximum: Any) -> int:
+    if maximum != rx.MAXREPEAT:
+        return rng.randint(minimum, maximum)
+    count = minimum
+    while rng.getrandbits(1):
+        count += 1
+    return count
 
 
 def _emit_literal(arg: Any, rng: Random, out: list[str]) -> None:

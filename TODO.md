@@ -43,7 +43,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SCAL-002 | open | M | Remove the fixed `MAX_UNBOUNDED_REPEAT = 8` expansion ceiling from the regex generator. It silently narrows every valid `*`, `+`, and `{n,}` pattern, contrary to TON's operator-controlled batch resource policy; use a terminating distribution with unbounded support or an explicit operator setting that does not impose a restrictive default, and document/test seeded behavior. |
 | SCAL-003 | open | M | Prevent `DigestPairSpec.cache`/`BcryptPairSpec.cache` from growing to one digest per selected pool value during long runs. Cheap hashes need no duplicate full-pool cache, while expensive bcrypt needs an operator-controlled or spillable strategy rather than an implicit process-lifetime dictionary; retain deterministic output and avoid a hard pool-size cap. |
 
 ## concurrency

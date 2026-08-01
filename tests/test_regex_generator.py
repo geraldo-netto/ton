@@ -78,9 +78,13 @@ def test_rejects_unsupported_anchor_positions(pattern: str) -> None:
 
 
 def test_unbounded_repeat_terminates() -> None:
-    # 'a+' would loop forever if uncapped; we cap at MAX_UNBOUNDED_REPEAT.
     value = _draw("a+", seed=0)
     assert re.match(r"^a+$", value)
+
+
+def test_unbounded_repeat_has_seeded_unbounded_support() -> None:
+    assert _draw("a*", seed=95) == "a" * 10
+    assert _draw("a*", seed=95) == _draw("a*", seed=95)
 
 
 @pytest.mark.parametrize(

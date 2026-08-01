@@ -63,7 +63,7 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 | `--proof-check MODE`   | Proof-check generated values: `off`, `sample`, `all`, or `audit` (collect, don't abort). |
 | `--proof-sample-rate N`| With `--proof-check sample`, check every `N`th generated row.                        |
 | `--proof-report PATH`  | With audit mode, stream every failure as UTF-8 JSON Lines to `PATH`.                 |
-| `--redact-proof-failures` | Mask values, paired ids, reasons, and field specs in proof reports and logs.      |
+| `--redact-proof-failures` | Mask values, paired ids, reasons, and field specs in proof diagnostics and logs. |
 | `--list-namespaces`    | List available namespaces, data types, transforms, and validators, then exit.        |
 | `--entry-points`       | Load trusted third-party plugins from the `ton.generators`, `ton.transforms`, and `ton.validators` entry-point groups. |
 | `--entry-point GROUP:DISTRIBUTION:NAME` | Allow only this exact trusted entry-point provider; repeat for multiple providers. |
@@ -297,8 +297,9 @@ rows = api.generate_from_file(
 
 `proof_mode` is `off`, `sample`, `all`, or `audit`; sample mode checks every
 Nth row. Redaction removes values, plugin-controlled reasons, and specs from
-retained audit failures, structured logs, and CLI proof reports. It does not
-alter generated rows.
+strict failure diagnostics, retained audit failures, structured logs, and CLI
+proof reports. It can be used with `sample` or `all` without creating a proof
+report and does not alter generated rows.
 
 Custom plugins register via three entry-point groups in any installed package: `ton.generators` (data types), `ton.transforms`, and `ton.validators`:
 

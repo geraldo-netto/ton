@@ -703,21 +703,49 @@ def test_cli_proof_report_requires_audit(
     assert not report.exists()
 
 
-def test_cli_redaction_requires_proof_report(
-    write_config, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("proof_mode", ["sample", "all"])
+def test_cli_strict_redaction_does_not_require_proof_report(
+    proof_mode: str,
+    monkeypatch,
+    write_config,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    assert (
-        main(
+    from ton import cli
+
+    def build_engine(args, config) -> Engine:
+        del config
+        return Engine.from_config(
+            {
+                "rows": 1,
+                "format": "$value$",
+                "types": {"value": {"type": "failing"}},
+            },
+            registry={"failing": _FailingGenerator()},
+            proof_mode=args.proof_check,
+            proof_sample_rate=args.proof_sample_rate,
+            redact_proof_failures=args.redact_proof_failures,
+        )
+
+    monkeypatch.setattr(cli, "_build_engine", build_engine)
+    with caplog.at_level(logging.WARNING, logger="ton"):
+        exit_code = main(
             [
                 str(write_config()),
                 "--proof-check",
-                "audit",
+                proof_mode,
                 "--redact-proof-failures",
             ]
         )
-        == 2
+
+    failure_log = next(
+        record for record in caplog.records if getattr(record, "event", "") == "proof_check_failed"
     )
-    assert "--redact-proof-failures requires --proof-report" in capsys.readouterr().err
+    error = capsys.readouterr().err
+    assert exit_code == 2
+    assert REDACTED in error
+    assert "bad value" not in error
+    assert failure_log.reason == REDACTED
 
 
 def test_cli_rejects_shared_data_and_proof_report_path(

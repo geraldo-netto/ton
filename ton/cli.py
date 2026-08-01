@@ -137,7 +137,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--redact-proof-failures",
         action="store_true",
-        help="Mask values, paired ids, reasons, and field specs in proof reports and logs.",
+        help="Mask values, paired ids, reasons, and field specs in proof diagnostics and logs.",
     )
     parser.add_argument(
         "--list-namespaces",
@@ -254,9 +254,6 @@ def _run_inner(args: argparse.Namespace) -> int:
 
 
 def _validate_proof_report_args(args: argparse.Namespace) -> int | None:
-    if args.redact_proof_failures and args.proof_report is None:
-        print("ton: --redact-proof-failures requires --proof-report", file=sys.stderr)
-        return 2
     if args.proof_report is not None and args.proof_check != "audit":
         print("ton: --proof-report requires --proof-check=audit", file=sys.stderr)
         return 2

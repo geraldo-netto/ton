@@ -78,7 +78,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id      | status | effort | description |
 |---------|--------|--------|-------------|
-| CLI-003 | open | S | Allow `--redact-proof-failures` to protect strict proof diagnostics and structured logs without requiring `--proof-report` (which also forces audit mode). The engine already supports redaction independently, but the CLI argument gate prevents users of `--proof-check=sample/all` from selecting it; align validation, help, README, and exit-path tests. |
 
 ## configuration discoverability
 

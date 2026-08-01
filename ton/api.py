@@ -68,7 +68,8 @@ from ._output import (
     inspect_staged_outputs,
     open_output_path,
 )
-from ._proof import ProvenanceRecord
+from ._proof import ProofFailure, ProvenanceRecord
+from ._proofcheck import ProofFailureSink
 from ._registry import (
     EntryPointSelector,
     ExtensionCatalog,
@@ -103,6 +104,8 @@ __all__ = [
     "PipelineStageError",
     "ProofError",
     "ProofEvaluationError",
+    "ProofFailure",
+    "ProofFailureSink",
     "ProvenanceRecord",
     "RegistryError",
     "TemplateError",
@@ -235,6 +238,7 @@ def generate(
     proof_sample_rate: int = 1,
     milestone_rows: int = 0,
     redact_proof_failures: bool = False,
+    proof_failure_sink: ProofFailureSink | None = None,
 ) -> Iterator[str]:
     """Yield generated rows for an in-memory config mapping.
 
@@ -253,6 +257,7 @@ def generate(
                 seed=seed,
                 milestone_rows=milestone_rows,
                 redact_proof_failures=redact_proof_failures,
+                proof_failure_sink=proof_failure_sink,
             ),
         )
     )
@@ -269,6 +274,7 @@ def generate_from_file(
     proof_sample_rate: int = 1,
     milestone_rows: int = 0,
     redact_proof_failures: bool = False,
+    proof_failure_sink: ProofFailureSink | None = None,
 ) -> Iterator[str]:
     """Yield generated rows for a config loaded from ``path``."""
     return generate(
@@ -281,4 +287,5 @@ def generate_from_file(
         proof_sample_rate=proof_sample_rate,
         milestone_rows=milestone_rows,
         redact_proof_failures=redact_proof_failures,
+        proof_failure_sink=proof_failure_sink,
     )

@@ -116,8 +116,8 @@ def test_redaction_masks_echoing_reason_in_audit_report_and_log(
         registry={"echoing_reason": _EchoingReasonGenerator()},
         proof_mode="audit",
         redact_proof_failures=True,
+        proof_failure_sink=ProofAuditWriter(stream),
     )
-    engine._set_proof_failure_sink(ProofAuditWriter(stream))
 
     with caplog.at_level(logging.WARNING, logger="ton"):
         assert list(engine) == ["credential-secret"]
@@ -249,13 +249,59 @@ def test_engine_preserves_proof_sink_failure_boundary() -> None:
         {"rows": 1, "format": "$v$", "types": {"v": {"type": "failing"}}},
         registry={"failing": FailingGenerator()},
         proof_mode="audit",
+        proof_failure_sink=reject_failure,
     )
-    engine._set_proof_failure_sink(reject_failure)
 
     with pytest.raises(ProofFailureSinkError, match="sink unavailable") as exc:
         list(engine)
 
     assert isinstance(exc.value.__cause__, RuntimeError)
+
+
+@pytest.mark.parametrize("proof_mode", ["off", "sample", "all"])
+def test_proof_failure_sink_requires_audit_mode(proof_mode: str) -> None:
+    with pytest.raises(ValueError, match="requires proof_mode='audit'"):
+        Engine.from_config(
+            {
+                "rows": 0,
+                "format": "$value$",
+                "types": {"value": {"type": "string", "values": ["valid"]}},
+            },
+            proof_mode=proof_mode,
+            proof_failure_sink=lambda failure: None,
+        )
+
+
+def test_proof_failure_sink_must_be_callable() -> None:
+    with pytest.raises(TypeError, match="must be callable"):
+        Engine.from_config(
+            {
+                "rows": 0,
+                "format": "$value$",
+                "types": {"value": {"type": "string", "values": ["valid"]}},
+            },
+            proof_mode="audit",
+            proof_failure_sink=object(),  # type: ignore[arg-type]
+        )
+
+
+def test_proof_failure_sink_cannot_change_after_iteration_starts() -> None:
+    engine = Engine.from_config(
+        {
+            "rows": 1,
+            "format": "$value$",
+            "types": {"value": {"type": "string", "values": ["valid"]}},
+        },
+        proof_mode="audit",
+    )
+    iterator = iter(engine)
+
+    with pytest.raises(RuntimeError, match="during iteration"):
+        engine.set_proof_failure_sink(lambda failure: None)
+
+    assert list(iterator) == ["valid"]
+    with pytest.raises(RuntimeError, match="after iteration starts"):
+        engine.set_proof_failure_sink(lambda failure: None)
 
 
 def test_proof_checker_preserves_existing_sink_error() -> None:

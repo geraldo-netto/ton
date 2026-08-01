@@ -270,6 +270,8 @@ Public extension and provenance types:
 - `Engine.provenance` returns immutable `ProvenanceRecord` entries containing
   each field's source type, transform chain, proof settings/failure count, and
   plugin package/version when available.
+- `ProofFailure` is the immutable audit record delivered to the public
+  `ProofFailureSink` callback type.
 
 `OutputEncodingError` is the public output-domain error for a value that a
 configured text codec cannot represent. Its `encoding` attribute names the
@@ -278,7 +280,7 @@ for a rendered row), and the message includes the codec failure reason.
 
 `generate(config, *, seed=None, registry=None, transforms=None,
 validators=None, proof_mode="off", proof_sample_rate=1,
-milestone_rows=0, redact_proof_failures=False)` and `generate_from_file`
+milestone_rows=0, redact_proof_failures=False, proof_failure_sink=None)` and `generate_from_file`
 accept the same generation options. For example:
 
 ```python
@@ -629,6 +631,13 @@ CLI streams every failure to the report even after the bounded in-memory
 `Engine.proof_failures` sample is full. Reports contain clear values by default;
 `--redact-proof-failures` replaces `value` and a present `id_value` with
 `"<redacted>"` and writes `spec`/`spec_ref` as `null`, while preserving diagnostic fields.
+
+Library callers can stream every audit failure without retaining it in memory
+by passing a callable as `proof_failure_sink` to `EngineOptions`,
+`Engine.from_config`, `api.generate`, or `concurrency.fork_engine`. The sink is
+valid only with `proof_mode="audit"`; it must be installed before iteration.
+`Engine.set_proof_failure_sink(...)` supports resources opened after engine
+construction and enforces that lifecycle.
 
 Proof-report files use atomic replacement and honor `--no-clobber`. An
 open/write failure exits `1`, removes temporary report/data files, and never

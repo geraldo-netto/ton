@@ -241,6 +241,25 @@ def test_fork_engine_threads_validators_and_redaction() -> None:
     assert engine._proof.redact is True
 
 
+def test_fork_engine_threads_public_proof_failure_sink() -> None:
+    failures = []
+    config = {
+        "rows": 0,
+        "format": "$value$",
+        "types": {"value": {"type": "string", "values": ["valid"]}},
+    }
+
+    engine = fork_engine(
+        config,
+        parent_seed=5,
+        worker_id=0,
+        proof_mode="audit",
+        proof_failure_sink=failures.append,
+    )
+
+    assert engine._proof.failure_sink == failures.append
+
+
 @pytest.mark.parametrize(
     "start_method",
     [

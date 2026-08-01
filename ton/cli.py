@@ -363,7 +363,7 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
             args.proof_report,
             no_clobber=args.no_clobber,
         ) as failure_sink:
-            engine._set_proof_failure_sink(failure_sink)
+            engine.set_proof_failure_sink(failure_sink)
             with _open_output(args.output, no_clobber=args.no_clobber, encoding=encoding) as stream:
                 _stream(
                     engine,

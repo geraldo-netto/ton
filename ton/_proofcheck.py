@@ -65,7 +65,8 @@ class ProofChecker:
         #: When set, retained audit records are masked (DG-002).
         self.redact = redact
         #: Optional bounded-memory destination for every audit failure.
-        self.failure_sink = failure_sink
+        self.failure_sink: ProofFailureSink | None = None
+        self.set_failure_sink(failure_sink)
         #: Bounded sample of detailed failures (see MAX_AUDIT_SAMPLE).
         self.failures: list[ProofFailure] = []
         #: Total audit failures seen, independent of the sample cap.
@@ -82,6 +83,14 @@ class ProofChecker:
         self.failures.clear()
         self.failure_count = 0
         self.failure_counts.clear()
+
+    def set_failure_sink(self, failure_sink: ProofFailureSink | None) -> None:
+        """Validate and install the destination for streamed audit failures."""
+        if failure_sink is not None and self.mode != "audit":
+            raise ValueError("proof_failure_sink requires proof_mode='audit'")
+        if failure_sink is not None and not callable(failure_sink):
+            raise TypeError("proof_failure_sink must be callable")
+        self.failure_sink = failure_sink
 
     def should_check(self, rows_emitted: int) -> bool:
         if self.mode == "off":

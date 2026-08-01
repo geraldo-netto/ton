@@ -13,6 +13,8 @@ from unittest import mock
 import pytest
 
 from ton import api
+from ton._proof import ProofResult
+from ton._transforms import TransformResult
 from ton.generators import Generator
 
 EXPECTED_PUBLIC_API = {
@@ -31,6 +33,8 @@ EXPECTED_PUBLIC_API = {
     "PipelineStageError",
     "ProofError",
     "ProofEvaluationError",
+    "ProofFailure",
+    "ProofFailureSink",
     "ProvenanceRecord",
     "RegistryError",
     "StagedOutput",
@@ -89,6 +93,37 @@ def test_generate_is_seed_deterministic(basic_config: dict) -> None:
     first = list(api.generate(basic_config, seed=42))
     second = list(api.generate(basic_config, seed=42))
     assert first == second
+
+
+def test_generate_streams_audit_failures_through_public_sink() -> None:
+    class RejectingGenerator(Generator):
+        type_name = "rejecting"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            return "invalid"
+
+        def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
+            return ProofResult(ok=False, reason="rejected")
+
+    failures = []
+    config = {
+        "rows": 1,
+        "format": "$value$",
+        "types": {"value": {"type": "rejecting"}},
+    }
+
+    rows = list(
+        api.generate(
+            config,
+            registry={"rejecting": RejectingGenerator()},
+            proof_mode="audit",
+            proof_failure_sink=failures.append,
+        )
+    )
+
+    assert rows == ["invalid"]
+    assert len(failures) == 1
+    assert failures[0].reason == "rejected"
 
 
 def test_generate_from_file_round_trip(write_config) -> None:

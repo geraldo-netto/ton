@@ -49,6 +49,7 @@ from ._engine import Engine, EngineOptions
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._output import open_output_path
+from ._proofcheck import ProofFailureSink
 from ._registry import runtime_type_name
 from ._template import parse
 from ._transforms import Transform
@@ -108,6 +109,7 @@ def fork_engine(
     proof_sample_rate: int = 1,
     milestone_rows: int = 0,
     redact_proof_failures: bool = False,
+    proof_failure_sink: ProofFailureSink | None = None,
 ) -> Engine:
     """Build an Engine with a per-worker RNG and an optional row override.
 
@@ -141,6 +143,7 @@ def fork_engine(
             proof_sample_rate=proof_sample_rate,
             milestone_rows=milestone_rows,
             redact_proof_failures=redact_proof_failures,
+            proof_failure_sink=proof_failure_sink,
         ),
     )
     _logger.info(

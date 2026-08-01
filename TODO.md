@@ -58,7 +58,6 @@ Last full rescan: 2026-08-01 (all categories; cache/build files and directories 
 
 | id       | status | effort | description |
 |----------|--------|--------|-------------|
-| ARCH-006 | open | M | Expose the streaming proof-failure sink through the public engine/API option model. The only attachment point is private `Engine._set_proof_failure_sink()`, so library callers cannot consume every audit failure in bounded memory without relying on internals, even though `EngineOptions` is the public construction boundary. Add the public type/option, lifecycle validation, docs, and tests. |
 
 ## decoupling
 

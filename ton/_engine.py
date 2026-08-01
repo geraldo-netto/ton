@@ -80,7 +80,7 @@ class EngineOptions:
     knows how to turn them into an engine (including deriving the RNG
     from ``seed``), and the boundary helpers -- :func:`ton.api.generate`,
     :func:`ton.concurrency.fork_engine`, the CLI -- construct one instead
-    of re-enumerating the same seven parameters at every call site.
+    of maintaining separate option models.
     """
 
     registry: Mapping[str, Generator] | None = None
@@ -92,6 +92,7 @@ class EngineOptions:
     seed: int | None = None
     milestone_rows: int = 0
     redact_proof_failures: bool = False
+    proof_failure_sink: ProofFailureSink | None = None
 
 
 class Engine:
@@ -115,6 +116,7 @@ class Engine:
         seed: int | None = None,
         milestone_rows: int = 0,
         redact_proof_failures: bool = False,
+        proof_failure_sink: ProofFailureSink | None = None,
     ) -> None:
         _config.validate_structure(config)
         plan = compile_plan(
@@ -131,6 +133,7 @@ class Engine:
             sample_rate=proof_sample_rate,
             seed=seed,
             redact=redact_proof_failures,
+            failure_sink=proof_failure_sink,
         )
         self._seed = seed
         self._milestone_rows = max(0, int(milestone_rows))
@@ -172,6 +175,7 @@ class Engine:
             seed=options.seed,
             milestone_rows=options.milestone_rows,
             redact_proof_failures=options.redact_proof_failures,
+            proof_failure_sink=options.proof_failure_sink,
         )
 
     @classmethod
@@ -188,6 +192,7 @@ class Engine:
         proof_sample_rate: int = 1,
         milestone_rows: int = 0,
         redact_proof_failures: bool = False,
+        proof_failure_sink: ProofFailureSink | None = None,
     ) -> Engine:
         """Build an Engine, deriving the RNG from ``seed`` when ``rng`` is None.
 
@@ -206,6 +211,7 @@ class Engine:
                 seed=seed,
                 milestone_rows=milestone_rows,
                 redact_proof_failures=redact_proof_failures,
+                proof_failure_sink=proof_failure_sink,
             ),
         )
 
@@ -223,6 +229,7 @@ class Engine:
         proof_sample_rate: int = 1,
         milestone_rows: int = 0,
         redact_proof_failures: bool = False,
+        proof_failure_sink: ProofFailureSink | None = None,
     ) -> Engine:
         """Build an Engine from a JSON config on disk.
 
@@ -244,6 +251,7 @@ class Engine:
                 proof_sample_rate=proof_sample_rate,
                 milestone_rows=milestone_rows,
                 redact_proof_failures=redact_proof_failures,
+                proof_failure_sink=proof_failure_sink,
             ),
         )
 
@@ -272,12 +280,19 @@ class Engine:
         """Total audit proof failures seen, independent of the sample cap."""
         return self._proof.failure_count
 
-    def _set_proof_failure_sink(
+    def set_proof_failure_sink(
         self,
         failure_sink: ProofFailureSink | None,
     ) -> None:
-        """Attach the CLI-owned streaming report destination before iteration."""
-        self._proof.failure_sink = failure_sink
+        """Attach an audit sink before this single-shot engine starts iterating."""
+        if not self._iteration_lock.acquire(blocking=False):
+            raise RuntimeError("cannot change proof_failure_sink during iteration")
+        try:
+            if self._iteration_started:
+                raise RuntimeError("cannot change proof_failure_sink after iteration starts")
+            self._proof.set_failure_sink(failure_sink)
+        finally:
+            self._iteration_lock.release()
 
     @property
     def provenance(self) -> tuple[ProvenanceRecord, ...]:

@@ -134,12 +134,12 @@ def atomic_output(
         os.chmod(tmp_name, mode)
         try:
             if no_clobber:
-                os.link(tmp_name, path)
+                os.link(tmp_name, path)  # NOSONAR -- the operator authorizes this output path.
                 published = True
                 os.unlink(tmp_name)
             else:
                 destination_existed = os.path.exists(path)
-                os.replace(tmp_name, path)
+                os.replace(tmp_name, path)  # NOSONAR -- the operator authorizes this output path.
                 published = True
                 if destination_existed:
                     _logger.warning(
@@ -349,7 +349,7 @@ def open_output_path(
 def _open_fifo(path: str, *, encoding: str) -> Iterator[TextIO]:
     """Open and descriptor-check a FIFO without following symlinks."""
     flags = os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
-    descriptor = os.open(path, flags)
+    descriptor = os.open(path, flags)  # NOSONAR -- the operator authorizes this output path.
     try:
         target = os.fstat(descriptor)
         if not stat.S_ISFIFO(target.st_mode):
@@ -411,7 +411,7 @@ def _fsync_directory(directory: str) -> None:
     if os.name == "nt":
         return
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-    descriptor = os.open(directory, flags)
+    descriptor = os.open(directory, flags)  # NOSONAR -- derived from the authorized output path.
     try:
         os.fsync(descriptor)
     finally:

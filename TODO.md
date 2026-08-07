@@ -20,7 +20,6 @@ Targeted SonarCloud review: 2026-08-07 (all 133 open findings for `geraldo-netto
 | id | status | effort | description |
 |----|--------|--------|-------------|
 | SEC-007 | open | L | Replace `RegexGenerator.prove()`'s user-pattern `re.fullmatch()` with a ReDoS-resilient matcher whose worst-case work is bounded polynomially, preferably a Thompson NFA/automaton over TON's prepared AST. `(a+)+$` shows exponential rejection growth, and a one-row `(a+)+^` config exceeded a 3-second subprocess timeout in `proof_mode="all"` because generation ignores the internal anchor before proofing. Coordinate anchor semantics with REL-022, cover nested repeats/overlapping alternations/failing suffixes with deterministic complexity regressions, and do not mitigate by imposing pattern, repeat, row-width, or input-length caps. |
-| SONAR-SEC-001 | open | S | `ton/_output.py:137,142,352,414` — resolve four `pythonsecurity:S8707` findings by documenting and suppressing the false-positive path-sandbox assumption at the exact filesystem sinks. TON is a local CLI whose operator-selected output path is the authorization boundary; `_output` already rejects symlinks/special files and provides atomic/no-clobber semantics, so constraining writes to the current directory would break the public contract without adding a real privilege boundary. |
 
 ## code complexity
 

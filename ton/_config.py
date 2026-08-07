@@ -145,7 +145,7 @@ def _validate_root(data: Any) -> None:
         raise ConfigError(f"Config missing required keys: {missing}")
     unknown = set(data) - ROOT_KEYS
     if unknown:
-        key = sorted(unknown)[0]
+        key = min(unknown)
         raise ConfigError(_unknown_key_message("config", key, ROOT_KEYS))
 
 

@@ -79,7 +79,7 @@ class ProofFailure:
         source value pools, so records destined for logs or audit exports
         should be redacted first. Structural diagnostic fields remain visible.
         """
-        return replace(
+        redacted: ProofFailure = replace(
             self,
             reason=REDACTED,
             value=REDACTED,
@@ -87,6 +87,7 @@ class ProofFailure:
             spec=None,
             is_redacted=True,
         )
+        return redacted
 
 
 @dataclass(frozen=True)

@@ -29,7 +29,7 @@ def extension_key_error(
     unknown = set(spec) - allowed
     if not unknown:
         return None
-    key = sorted(unknown)[0]
+    key = min(unknown)
     return unknown_key_message(path, key, allowed)
 
 

@@ -212,25 +212,25 @@ class ProofChecker:
         row: int,
         spec: Mapping[str, Any] | None,
     ) -> tuple[ProofFailure, ...]:
-        if not field.uses_source:
-            return ()
-        try:
-            proof = field.generator.prove(field.source_prepared, source_result)
-        except Exception as exc:
-            raise ProofHookError("source", field.generator.type_name, exc) from exc
-        if proof.ok:
-            return ()
-        return (
-            self._make_failure(
-                type_key=type_key,
-                stage="source",
-                reference=field.generator.type_name,
-                reason=proof.reason,
-                result=source_result,
-                row=row,
-                spec=spec,
-            ),
-        )
+        failures: list[ProofFailure] = []
+        if field.uses_source:
+            try:
+                proof = field.generator.prove(field.source_prepared, source_result)
+            except Exception as exc:
+                raise ProofHookError("source", field.generator.type_name, exc) from exc
+            if not proof.ok:
+                failures.append(
+                    self._make_failure(
+                        type_key=type_key,
+                        stage="source",
+                        reference=field.generator.type_name,
+                        reason=proof.reason,
+                        result=source_result,
+                        row=row,
+                        spec=spec,
+                    )
+                )
+        return tuple(failures)
 
     def _make_failure(
         self,

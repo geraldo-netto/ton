@@ -387,7 +387,6 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
         ):
             return _report_partial_commit(
                 engine,
-                args,
                 PartialOutputCommitError((exc.path,), args.proof_report, exc),
                 write_state.rows_written,
             )
@@ -426,7 +425,6 @@ def _handle_proof_report_error(
             published.append(error.__cause__.path)
         return _report_partial_commit(
             engine,
-            args,
             PartialOutputCommitError(tuple(published), args.proof_report, error),
             rows_written,
         )
@@ -437,7 +435,6 @@ def _handle_proof_report_error(
 
 def _report_partial_commit(
     engine: Engine,
-    args: argparse.Namespace,
     error: PartialOutputCommitError,
     rows_written: int,
 ) -> int:

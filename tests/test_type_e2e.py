@@ -235,7 +235,8 @@ def _check_mac(rows: list[str], config: dict[str, Any]) -> None:
 def _check_name(rows: list[str], config: dict[str, Any]) -> None:
     for r in rows:
         parts = r.split(" ")
-        assert len(parts) == 2 and all(parts)
+        assert len(parts) == 2
+        assert all(parts)
 
 
 def _check_email(rows: list[str], config: dict[str, Any]) -> None:

@@ -530,7 +530,9 @@ def test_same_seed_yields_same_value(seed: int) -> None:
     spec = {"minValue": 0, "maxValue": 1_000_000, "padWithZero": False}
     gen = IntegerGenerator()
     prepared = gen.prepare(spec)
-    assert gen.generate(prepared, Random(seed)) == gen.generate(prepared, Random(seed))
+    first = gen.generate(prepared, Random(seed))
+    second = gen.generate(prepared, Random(seed))
+    assert first == second
 
 
 @pytest.mark.parametrize(

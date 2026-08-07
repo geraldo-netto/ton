@@ -108,4 +108,6 @@ def test_rejects_unknown_unit() -> None:
 def test_seed_deterministic() -> None:
     gen = TimestampUnixGenerator()
     prepared = gen.prepare({"minValue": "2024-01-01", "maxValue": "2024-12-31"})
-    assert gen.generate(prepared, Random(7)) == gen.generate(prepared, Random(7))
+    first = gen.generate(prepared, Random(7))
+    second = gen.generate(prepared, Random(7))
+    assert first == second

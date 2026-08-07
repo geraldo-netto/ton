@@ -379,8 +379,12 @@ def test_validate_config_accepts_core_identity_transform() -> None:
 def test_unknown_key_policy_defines_root_and_common_field_keys() -> None:
     from ton._config import COMMON_FIELD_KEYS, ROOT_KEYS, _unknown_key_message
 
-    assert {"rows", "format", "types", "encoding", "maxRowWidth"} == ROOT_KEYS
-    assert {"type", "transforms", "validators"} == COMMON_FIELD_KEYS
+    actual_root_keys = ROOT_KEYS
+    actual_common_keys = COMMON_FIELD_KEYS
+    expected_root_keys = {"rows", "format", "types", "encoding", "maxRowWidth"}
+    expected_common_keys = {"type", "transforms", "validators"}
+    assert actual_root_keys == expected_root_keys
+    assert actual_common_keys == expected_common_keys
     assert "Did you mean 'rows'?" in _unknown_key_message("config", "row", ROOT_KEYS)
 
 

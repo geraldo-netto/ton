@@ -57,7 +57,9 @@ def test_one_of_seed_deterministic() -> None:
             }
         },
     }
-    assert list(api.generate(config, seed=7)) == list(api.generate(config, seed=7))
+    first = list(api.generate(config, seed=7))
+    second = list(api.generate(config, seed=7))
+    assert first == second
 
 
 def test_one_of_rejects_empty_choices() -> None:
@@ -146,7 +148,8 @@ def test_sequence_of_concatenates_count_draws_with_separator() -> None:
         parts = row.split("-")
         assert len(parts) == 4
         for p in parts:
-            assert p.isdigit() and 0 <= int(p) <= 9
+            assert p.isdigit()
+            assert 0 <= int(p) <= 9
 
 
 def test_sequence_of_empty_separator_concatenates_directly() -> None:

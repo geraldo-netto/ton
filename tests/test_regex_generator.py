@@ -83,8 +83,10 @@ def test_unbounded_repeat_terminates() -> None:
 
 
 def test_unbounded_repeat_has_seeded_unbounded_support() -> None:
-    assert _draw("a*", seed=95) == "a" * 10
-    assert _draw("a*", seed=95) == _draw("a*", seed=95)
+    first = _draw("a*", seed=95)
+    second = _draw("a*", seed=95)
+    assert first == "a" * 10
+    assert second == first
 
 
 @pytest.mark.parametrize(

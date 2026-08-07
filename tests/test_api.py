@@ -78,7 +78,9 @@ def test_public_api_surface_matches_supported_checklist() -> None:
 
 def test_concurrency_helpers_are_available_from_public_facade() -> None:
     assert api.chunk_rows(10, 3, 0) == 4
-    assert api.derive_rng(1, 0).random() == api.derive_rng(1, 0).random()
+    first = api.derive_rng(1, 0).random()
+    second = api.derive_rng(1, 0).random()
+    assert first == second
     assert callable(api.fork_engine)
 
 

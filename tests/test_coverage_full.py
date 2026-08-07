@@ -227,7 +227,8 @@ def test_engine_logs_generate_failed_and_wraps_in_template_error(
     with caplog.at_level(logging.ERROR, logger="ton"), pytest.raises(TemplateError):
         list(engine)
     events = [r for r in caplog.records if getattr(r, "event", None) == "generate_failed"]
-    assert events and getattr(events[0], "generator_type", "") == "_RaisingGenerator"
+    assert events
+    assert getattr(events[0], "generator_type", "") == "_RaisingGenerator"
 
 
 # ---------------------------------------------------------------------------
@@ -388,7 +389,8 @@ def test_registry_skips_broken_entry_point(
     events = [
         r for r in caplog.records if getattr(r, "event", None) == _LE.ENTRY_POINT_FAILED.value
     ]
-    assert events and getattr(events[0], "error_type", "") == "ImportError"
+    assert events
+    assert getattr(events[0], "error_type", "") == "ImportError"
     assert "missing dep" not in events[0].getMessage()
 
 
@@ -479,7 +481,8 @@ def test_cli_resume_overshoot_warns_and_empties(
     assert code == 0
     assert out.read_text() == ""
     err = capsys.readouterr().err
-    assert "999" in err and "total rows" in err
+    assert "999" in err
+    assert "total rows" in err
 
 
 # ---------------------------------------------------------------------------
@@ -544,14 +547,16 @@ def test_regex_emit_category_top_level_dispatch() -> None:
     mod = _regex_internals()
     out: list[str] = []
     mod._emit_category(mod.rx.CATEGORY_DIGIT, Random(0), out)
-    assert out and out[0].isdigit()
+    assert out
+    assert out[0].isdigit()
 
 
 def test_regex_emit_range_top_level_dispatch() -> None:
     mod = _regex_internals()
     out: list[str] = []
     mod._emit_range((ord("a"), ord("c")), Random(0), out)
-    assert out and out[0] in {"a", "b", "c"}
+    assert out
+    assert out[0] in {"a", "b", "c"}
 
 
 def test_regex_emit_not_literal_top_level_dispatch() -> None:
@@ -559,7 +564,8 @@ def test_regex_emit_not_literal_top_level_dispatch() -> None:
     out: list[str] = []
     pool = mod._prepare_nodes(((mod.rx.NOT_LITERAL, ord("a")),))[0][1]
     mod._emit_not_literal(pool, Random(0), out)
-    assert out and out[0] != "a"
+    assert out
+    assert out[0] != "a"
 
 
 def test_regex_rejects_unsupported_construct() -> None:

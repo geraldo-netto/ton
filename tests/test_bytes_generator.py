@@ -46,7 +46,9 @@ def test_base32_encoding_round_trip() -> None:
 def test_seed_determinism() -> None:
     gen = BytesGenerator()
     prepared = gen.prepare({"length": 8, "encoding": "hex"})
-    assert gen.generate(prepared, Random(42)) == gen.generate(prepared, Random(42))
+    first = gen.generate(prepared, Random(42))
+    second = gen.generate(prepared, Random(42))
+    assert first == second
 
 
 def test_rejects_zero_length() -> None:

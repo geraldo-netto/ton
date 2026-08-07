@@ -1083,7 +1083,8 @@ def test_cli_surfaces_partial_commit_when_report_publication_fails(
     )
     error = capsys.readouterr().err
     assert "partial output commit" in error
-    assert str(output) in error and str(report) in error
+    assert str(output) in error
+    assert str(report) in error
     assert "before retrying" in error
     assert output.exists()
     assert not report.exists()
@@ -1118,7 +1119,8 @@ def test_cli_surfaces_partial_commit_when_data_finalization_fails(
     )
     error = capsys.readouterr().err
     assert "partial output commit" in error
-    assert str(output) in error and str(report) in error
+    assert str(output) in error
+    assert str(report) in error
     assert output.exists()
     assert not report.exists()
 
@@ -1156,7 +1158,8 @@ def test_cli_reports_both_outputs_when_report_finalization_fails(
     )
     error = capsys.readouterr().err
     assert "partial output commit" in error
-    assert str(output) in error and str(report) in error
+    assert str(output) in error
+    assert str(report) in error
     assert output.exists()
     assert report.exists()
 

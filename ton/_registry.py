@@ -316,27 +316,18 @@ def _load_catalog_entry_points(
         name for name, count in Counter(str(ep.name) for ep in candidates).items() if count > 1
     }
     for ep in candidates:
-        selector = _selector_for_entry_point(group, ep)
-        if str(ep.name) in duplicate_names:
-            failed += 1
-            _log_entry_point_failed(ep, RegistryError("duplicate entry-point providers"))
-            if selector is not None and allowed_selectors is not None:
-                explicit_failures.add(f"{selector} has duplicate providers")
-            continue
-        try:
-            plugin = ep.load()()
-            namespace, name = _entry_point_namespace_name(ep.name, kind, plugin)
-            _validate_entry_point_plugin(kind, plugin)
-            _stamp_plugin_dist(plugin, ep)
-            _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
-        except Exception as exc:  # noqa: BLE001 - per-entry failure isolation
-            failed += 1
-            _log_entry_point_failed(ep, exc)
-            if selector is not None and allowed_selectors is not None:
-                explicit_failures.add(f"{selector} failed to load ({type(exc).__name__})")
-            continue
-        loaded += 1
-        _log_entry_point_loaded(ep)
+        succeeded, explicit_failure = _load_catalog_candidate(
+            catalog,
+            ep,
+            group=group,
+            kind=kind,
+            duplicate=str(ep.name) in duplicate_names,
+            allowed_selectors=allowed_selectors,
+        )
+        loaded += int(succeeded)
+        failed += int(not succeeded)
+        if explicit_failure is not None:
+            explicit_failures.add(explicit_failure)
     if loaded or failed:
         _logger.info(
             "entry_points_summary loaded=%d failed=%d",
@@ -350,6 +341,48 @@ def _load_catalog_entry_points(
             },
         )
     return explicit_failures
+
+
+def _load_catalog_candidate(
+    catalog: ExtensionCatalog,
+    ep: Any,
+    *,
+    group: str,
+    kind: str,
+    duplicate: bool,
+    allowed_selectors: Collection[EntryPointSelector] | None,
+) -> tuple[bool, str | None]:
+    selector = _selector_for_entry_point(group, ep)
+    if duplicate:
+        _log_entry_point_failed(ep, RegistryError("duplicate entry-point providers"))
+        return False, _explicit_entry_point_failure(
+            selector, allowed_selectors, "has duplicate providers"
+        )
+    try:
+        plugin = ep.load()()
+        namespace, name = _entry_point_namespace_name(ep.name, kind, plugin)
+        _validate_entry_point_plugin(kind, plugin)
+        _stamp_plugin_dist(plugin, ep)
+        _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
+    except Exception as exc:  # noqa: BLE001 - per-entry failure isolation
+        _log_entry_point_failed(ep, exc)
+        return False, _explicit_entry_point_failure(
+            selector,
+            allowed_selectors,
+            f"failed to load ({type(exc).__name__})",
+        )
+    _log_entry_point_loaded(ep)
+    return True, None
+
+
+def _explicit_entry_point_failure(
+    selector: EntryPointSelector | None,
+    allowed_selectors: Collection[EntryPointSelector] | None,
+    message: str,
+) -> str | None:
+    if selector is None or allowed_selectors is None:
+        return None
+    return f"{selector} {message}"
 
 
 def _entry_point_candidates(

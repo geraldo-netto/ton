@@ -10,6 +10,7 @@ validation surfaces cannot drift (REL-011).
 from __future__ import annotations
 
 import codecs
+import difflib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -167,19 +168,30 @@ def _validate_types(types: Any) -> None:
 
 
 def _validate_type_spec(name: str, spec: Any) -> None:
+    validated = _require_type_spec(name, spec)
+    _validate_common_field_key_typos(name, validated)
+    _validate_transform_specs(name, validated.get("transforms", []))
+    _validate_validator_refs(name, validated.get("validators", []))
+
+
+def _require_type_spec(name: str, spec: Any) -> dict[str, Any]:
     if not isinstance(spec, dict) or "type" not in spec:
         raise ConfigError(f"Type spec {name!r} must be an object with a 'type' field.")
     if not isinstance(spec["type"], str) or not spec["type"]:
         raise ConfigError(f"Type spec {name!r} 'type' must be a non-empty string.")
+    return cast(dict[str, Any], spec)
+
+
+def _validate_common_field_key_typos(name: str, spec: Mapping[str, Any]) -> None:
     for key in spec:
         if key in COMMON_FIELD_KEYS:
             continue
-        import difflib
-
         matches = difflib.get_close_matches(key, COMMON_FIELD_KEYS, n=1, cutoff=0.8)
         if matches:
             raise ConfigError(_unknown_key_message(f"types.{name}", key, COMMON_FIELD_KEYS))
-    transforms = spec.get("transforms", [])
+
+
+def _validate_transform_specs(name: str, transforms: Any) -> None:
     if not isinstance(transforms, list):
         raise ConfigError(f"Type spec {name!r} 'transforms' must be a list.")
     for index, transform in enumerate(transforms):
@@ -191,7 +203,6 @@ def _validate_type_spec(name: str, spec: Any) -> None:
             raise ConfigError(
                 f"Type spec {name!r} transform {index} 'type' must be a non-empty string."
             )
-    _validate_validator_refs(name, spec.get("validators", []))
 
 
 def _validate_validator_refs(name: str, validators: Any) -> None:

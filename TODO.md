@@ -26,7 +26,6 @@ Targeted SonarCloud review: 2026-08-07 (all 133 open findings for `geraldo-netto
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SONAR-CC-001 | open | M | `ton/_config.py:169`, `ton/_registry.py:293`, and `ton/generators/regex.py:89` — reduce the three `python:S3776` cognitive-complexity findings by extracting focused validation/loading helpers; keep every new function at complexity <= 10. |
 
 ## code duplication
 

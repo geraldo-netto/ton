@@ -45,6 +45,7 @@ _WORD = tuple(string.ascii_letters + string.digits + "_")
 _SPACE = tuple(" \t\n\r\f\v")
 #: Pool for ``.`` (any char except newline); computed once (PERF-001).
 _ANY_POOL = tuple(c for c in _PRINTABLE_ASCII if c != "\n")
+_AnchorWorkItem = tuple[tuple[tuple[Any, Any], ...], bool, bool]
 
 
 @dataclass(frozen=True)
@@ -87,22 +88,37 @@ class RegexGenerator(Generator):
 
 
 def _validate_anchors(seq: Iterable[tuple[Any, Any]]) -> None:
-    work = [(tuple(seq), True, True)]
+    work: list[_AnchorWorkItem] = [(tuple(seq), True, True)]
     while work:
         nodes, at_start, at_end = work.pop()
         for index, (op, arg) in enumerate(nodes):
             node_at_start = at_start and index == 0
             node_at_end = at_end and index == len(nodes) - 1
-            if op is rx.AT:
-                if (arg == "^" and node_at_start) or (arg == "$" and node_at_end):
-                    continue
-                raise ValueError(f"regex 'pattern' has unsupported positional anchor {arg!r}")
-            if op is rx.SUBPATTERN:
-                work.append((tuple(arg[3]), node_at_start, node_at_end))
-            elif op is rx.BRANCH:
-                work.extend((tuple(branch), node_at_start, node_at_end) for branch in arg[1])
-            elif op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
-                work.append((tuple(arg[2]), False, False))
+            _validate_anchor_position(op, arg, node_at_start, node_at_end)
+            _append_nested_anchor_work(work, op, arg, node_at_start, node_at_end)
+
+
+def _validate_anchor_position(op: Any, arg: Any, at_start: bool, at_end: bool) -> None:
+    if op is not rx.AT:
+        return
+    if (arg == "^" and at_start) or (arg == "$" and at_end):
+        return
+    raise ValueError(f"regex 'pattern' has unsupported positional anchor {arg!r}")
+
+
+def _append_nested_anchor_work(
+    work: list[_AnchorWorkItem],
+    op: Any,
+    arg: Any,
+    at_start: bool,
+    at_end: bool,
+) -> None:
+    if op is rx.SUBPATTERN:
+        work.append((tuple(arg[3]), at_start, at_end))
+    elif op is rx.BRANCH:
+        work.extend((tuple(branch), at_start, at_end) for branch in arg[1])
+    elif op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
+        work.append((tuple(arg[2]), False, False))
 
 
 def _prepare_nodes(seq: Iterable[tuple[Any, Any]]) -> tuple[tuple[Any, Any], ...]:

@@ -34,13 +34,15 @@ def test_paragraphs_count() -> None:
 
 
 def test_rejects_unknown_unit() -> None:
+    generator = TextGenerator()
     with pytest.raises(ValueError):
-        TextGenerator().prepare({"unit": "verses"})
+        generator.prepare({"unit": "verses"})
 
 
 def test_rejects_zero_count() -> None:
+    generator = TextGenerator()
     with pytest.raises(ValueError):
-        TextGenerator().prepare({"count": 0})
+        generator.prepare({"count": 0})
 
 
 def test_single_line_output() -> None:

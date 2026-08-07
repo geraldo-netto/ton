@@ -237,9 +237,13 @@ def test_public_output_sink_rolls_back_failed_write(tmp_path: Path) -> None:
     output = tmp_path / "rows.txt"
     output.write_text("old\n", encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="failed"), api.open_output_path(str(output)) as stream:
-        stream.write("partial\n")
-        raise RuntimeError("failed")
+    def write_then_fail() -> None:
+        with api.open_output_path(str(output)) as stream:
+            stream.write("partial\n")
+            raise RuntimeError("failed")
+
+    with pytest.raises(RuntimeError, match="failed"):
+        write_then_fail()
 
     assert output.read_text(encoding="utf-8") == "old\n"
     assert list(tmp_path.glob(".rows.txt.*.tmp")) == []
@@ -442,12 +446,13 @@ def test_output_stage_cleanup_rejects_invalid_age(stale_after: object, tmp_path:
 def test_public_output_sink_no_clobber_publish_is_atomic(tmp_path: Path) -> None:
     output = tmp_path / "rows.txt"
 
-    with (
-        pytest.raises(FileExistsError),
-        api.open_output_path(str(output), no_clobber=True) as stream,
-    ):
-        stream.write("generated\n")
-        output.write_text("racing writer\n", encoding="utf-8")
+    def race_publish() -> None:
+        with api.open_output_path(str(output), no_clobber=True) as stream:
+            stream.write("generated\n")
+            output.write_text("racing writer\n", encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        race_publish()
 
     assert output.read_text(encoding="utf-8") == "racing writer\n"
     assert list(tmp_path.glob(".rows.txt.*.tmp")) == []

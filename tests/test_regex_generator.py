@@ -41,13 +41,15 @@ def test_generated_value_matches_pattern(pattern: str) -> None:
 
 
 def test_rejects_empty_pattern() -> None:
+    generator = RegexGenerator()
     with pytest.raises(ValueError):
-        RegexGenerator().prepare({"pattern": ""})
+        generator.prepare({"pattern": ""})
 
 
 def test_rejects_invalid_regex() -> None:
+    generator = RegexGenerator()
     with pytest.raises(ValueError):
-        RegexGenerator().prepare({"pattern": "[unclosed"})
+        generator.prepare({"pattern": "[unclosed"})
 
 
 @pytest.mark.parametrize("pattern", [r"^foo$", r"(^foo$)", r"(^foo|^bar)$", r"^(foo$|bar$)"])
@@ -73,8 +75,9 @@ def test_edge_anchors_match_generated_values(pattern: str) -> None:
     ],
 )
 def test_rejects_unsupported_anchor_positions(pattern: str) -> None:
+    generator = RegexGenerator()
     with pytest.raises(ValueError, match="unsupported positional anchor"):
-        RegexGenerator().prepare({"pattern": pattern})
+        generator.prepare({"pattern": pattern})
 
 
 def test_unbounded_repeat_terminates() -> None:
@@ -123,8 +126,9 @@ def test_control_and_literal_escapes() -> None:
 
 @pytest.mark.parametrize("pattern", [r"(a)\1", r"\x41", r"\u0041", r"\07"])
 def test_unsupported_escape_forms_are_rejected(pattern: str) -> None:
+    generator = RegexGenerator()
     with pytest.raises(ValueError, match="unsupported .*escape"):
-        RegexGenerator().prepare({"pattern": pattern})
+        generator.prepare({"pattern": pattern})
 
 
 @pytest.mark.parametrize(
@@ -142,14 +146,16 @@ def test_unsupported_escape_forms_are_rejected(pattern: str) -> None:
     ],
 )
 def test_vendored_parser_rejects_bad_patterns(pattern: str) -> None:
+    generator = RegexGenerator()
     with pytest.raises(ValueError):
-        RegexGenerator().prepare({"pattern": pattern})
+        generator.prepare({"pattern": pattern})
 
 
 @pytest.mark.parametrize("pattern", ["[]", "[^ -~]"])
 def test_rejects_invalid_character_classes_at_prepare(pattern: str) -> None:
+    generator = RegexGenerator()
     with pytest.raises(ValueError, match="character class"):
-        RegexGenerator().prepare({"pattern": pattern})
+        generator.prepare({"pattern": pattern})
 
 
 def test_deep_group_nesting_uses_iterative_pipeline() -> None:

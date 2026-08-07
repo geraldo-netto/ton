@@ -570,8 +570,11 @@ def test_regex_emit_not_literal_top_level_dispatch() -> None:
 
 def test_regex_rejects_unsupported_construct() -> None:
     mod = _regex_internals()
+    nodes = [("not-a-real-op", None)]
+    rng = Random(0)
+    output: list[str] = []
     with pytest.raises(ValueError, match="unsupported construct"):
-        mod._emit_into([("not-a-real-op", None)], Random(0), [])
+        mod._emit_into(nodes, rng, output)
 
 
 def test_regex_rejects_unsupported_class_element() -> None:

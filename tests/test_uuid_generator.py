@@ -52,5 +52,6 @@ def test_uuid1_is_synthetic_and_seed_deterministic() -> None:
 
 
 def test_uuid_rejects_unsupported_version() -> None:
+    generator = UUIDGenerator()
     with pytest.raises(ValueError):
-        UUIDGenerator().prepare({"version": 7})
+        generator.prepare({"version": 7})

@@ -98,8 +98,10 @@ def test_one_of_rejects_paired_child() -> None:
 
 
 def test_one_of_direct_prepare_rejected() -> None:
+    generator = OneOfGenerator()
+    spec = {"choices": [_string_spec("x")]}
     with pytest.raises(ValueError, match="composite"):
-        OneOfGenerator().prepare({"choices": [_string_spec("x")]})
+        generator.prepare(spec)
 
 
 def test_one_of_can_nest_inside_weighted() -> None:
@@ -233,13 +235,13 @@ def test_sequence_of_rejects_paired_child() -> None:
 
 
 def test_sequence_of_direct_prepare_rejected() -> None:
+    generator = SequenceOfGenerator()
+    spec = {
+        "count": 1,
+        "spec": _string_spec("x"),
+    }
     with pytest.raises(ValueError, match="composite"):
-        SequenceOfGenerator().prepare(
-            {
-                "count": 1,
-                "spec": _string_spec("x"),
-            }
-        )
+        generator.prepare(spec)
 
 
 def test_sequence_of_can_nest_other_composites() -> None:

@@ -104,5 +104,6 @@ def test_row_width_guards_composite_and_unknown_width_values() -> None:
             return "wide"
 
     unknown = {"rows": 1, "maxRowWidth": 3, "format": "$v$", "types": {"v": {"type": "unknown"}}}
+    engine = Engine(unknown, registry={"unknown": UnknownWidth()})
     with pytest.raises(TemplateError, match="maxRowWidth"):
-        list(Engine(unknown, registry={"unknown": UnknownWidth()}))
+        list(engine)

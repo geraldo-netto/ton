@@ -42,8 +42,9 @@ def test_single_address_cidrs_format_without_a_draw() -> None:
 
 
 def test_ipv4_rejects_ipv6_cidr() -> None:
+    generator = IPv4Generator()
     with pytest.raises(ValueError):
-        IPv4Generator().prepare({"cidr": "::/0"})
+        generator.prepare({"cidr": "::/0"})
 
 
 def test_ipv6_respects_cidr() -> None:
@@ -75,13 +76,15 @@ def test_mac_oui_prefix_enforced() -> None:
 
 
 def test_mac_rejects_bad_oui() -> None:
+    generator = MACGenerator()
     with pytest.raises(ValueError):
-        MACGenerator().prepare({"oui": "not-hex"})
+        generator.prepare({"oui": "not-hex"})
 
 
 def test_mac_rejects_multichar_separator() -> None:
+    generator = MACGenerator()
     with pytest.raises(ValueError):
-        MACGenerator().prepare({"separator": "::"})
+        generator.prepare({"separator": "::"})
 
 
 @pytest.mark.parametrize(

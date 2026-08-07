@@ -185,23 +185,26 @@ def test_encoding_defaults_to_utf8() -> None:
 def test_encoding_rejects_unknown_codec(tmp_path: Path) -> None:
     payload = _valid_payload()
     payload["encoding"] = "not-a-codec"
+    config_path = str(_write(tmp_path, payload))
     with pytest.raises(ConfigError, match="not a known codec"):
-        api.load_config(str(_write(tmp_path, payload)))
+        api.load_config(config_path)
 
 
 @pytest.mark.parametrize("encoding", ["base64", "hex", "rot13"])
 def test_encoding_rejects_non_text_codec(tmp_path: Path, encoding: str) -> None:
     payload = _valid_payload()
     payload["encoding"] = encoding
+    config_path = str(_write(tmp_path, payload))
     with pytest.raises(ConfigError, match="text codec"):
-        api.load_config(str(_write(tmp_path, payload)))
+        api.load_config(config_path)
 
 
 def test_encoding_rejects_non_string(tmp_path: Path) -> None:
     payload = _valid_payload()
     payload["encoding"] = 42
+    config_path = str(_write(tmp_path, payload))
     with pytest.raises(ConfigError, match="'encoding' must be a string"):
-        api.load_config(str(_write(tmp_path, payload)))
+        api.load_config(config_path)
 
 
 def test_validate_config_prepares_composite_field() -> None:

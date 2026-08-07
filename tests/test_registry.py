@@ -297,9 +297,10 @@ def test_catalog_point_getters_clone_only_requested_prototype() -> None:
 @pytest.mark.parametrize("getter", ["get_data_type", "get_transform"])
 def test_catalog_point_getters_report_normalized_missing_reference(getter: str) -> None:
     catalog = build_extension_catalog()
+    lookup = getattr(catalog, getter)
 
     with pytest.raises(KeyError) as raised:
-        getattr(catalog, getter)("missing")
+        lookup("missing")
 
     assert raised.value.args == ("core.missing",)
 
@@ -327,9 +328,10 @@ def test_catalog_serializes_registration_and_snapshot_reads() -> None:
 
 def test_extension_catalog_rejects_builtin_replacement() -> None:
     catalog = build_extension_catalog()
+    generator = default_registry()["string"]
 
     with pytest.raises(RegistryError, match="reserved"):
-        catalog.register_data_type("core", "string", default_registry()["string"])
+        catalog.register_data_type("core", "string", generator)
 
 
 def test_extension_catalog_rejects_new_core_registration() -> None:
@@ -340,14 +342,17 @@ def test_extension_catalog_rejects_new_core_registration() -> None:
             return "custom"
 
     catalog = ExtensionCatalog(generators={})
+    generator = CustomGenerator()
 
     with pytest.raises(RegistryError, match="reserved"):
-        catalog.register_data_type("core", "custom_core", CustomGenerator())
+        catalog.register_data_type("core", "custom_core", generator)
 
 
 def test_extension_catalog_rejects_invalid_validator() -> None:
+    catalog = build_extension_catalog()
+    invalid_validator = object()
     with pytest.raises(TypeError, match="Validator protocol"):
-        build_extension_catalog().register_validator("plugin", "bad", object())
+        catalog.register_validator("plugin", "bad", invalid_validator)
 
 
 def test_extension_catalog_rejects_invalid_generator_and_transform() -> None:
@@ -365,9 +370,10 @@ def test_extension_catalog_rejects_ambiguous_registration() -> None:
 
     catalog = build_extension_catalog()
     catalog.register_transform("plugin", "trim", CustomTransform())
+    duplicate = CustomTransform()
 
     with pytest.raises(RegistryError, match="already exists"):
-        catalog.register_transform("plugin", "trim", CustomTransform())
+        catalog.register_transform("plugin", "trim", duplicate)
 
 
 def test_normalize_reference_defaults_to_core_namespace() -> None:

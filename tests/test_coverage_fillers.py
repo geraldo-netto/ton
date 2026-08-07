@@ -191,16 +191,18 @@ def test_mac_oui_non_string_rejected() -> None:
     """`oui` value must be a string."""
     from ton.generators.network import MACGenerator
 
+    generator = MACGenerator()
     with pytest.raises(ValueError):
-        MACGenerator().prepare({"oui": 12345})
+        generator.prepare({"oui": 12345})
 
 
 def test_mac_oui_non_hex_rejected() -> None:
     """`oui` value with non-hex characters is rejected."""
     from ton.generators.network import MACGenerator
 
+    generator = MACGenerator()
     with pytest.raises(ValueError):
-        MACGenerator().prepare({"oui": "zzzzzz"})
+        generator.prepare({"oui": "zzzzzz"})
 
 
 # ---------------------------------------------------------------------------
@@ -239,8 +241,9 @@ def test_validate_types_rejects_non_dict() -> None:
 def test_weighted_rejects_non_list_values() -> None:
     from ton.generators.weighted import WeightedGenerator
 
+    generator = WeightedGenerator()
     with pytest.raises(ValueError, match="must be a list"):
-        WeightedGenerator().prepare({"values": "abc", "weights": [1, 2, 3]})
+        generator.prepare({"values": "abc", "weights": [1, 2, 3]})
 
 
 # ---------------------------------------------------------------------------

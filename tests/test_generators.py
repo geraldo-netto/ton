@@ -41,9 +41,10 @@ def test_boolean_returns_one_of_two_literals() -> None:
 def test_boolean_reports_required_literal(missing: str) -> None:
     spec = {"whenTrue": "Y", "whenFalse": "N"}
     del spec[missing]
+    generator = BooleanGenerator()
 
     with pytest.raises(ValueError, match=rf"boolean '{missing}' is required"):
-        BooleanGenerator().prepare(spec)
+        generator.prepare(spec)
 
 
 def test_integer_within_bounds_and_padded() -> None:
@@ -78,38 +79,45 @@ def test_string_picks_from_pool() -> None:
 
 
 def test_string_rejects_empty_values() -> None:
+    generator = StringGenerator()
     with pytest.raises(ValueError):
-        StringGenerator().prepare({"values": []})
+        generator.prepare({"values": []})
 
 
 def test_char_rejects_missing_values() -> None:
+    generator = CharGenerator()
     with pytest.raises(ValueError):
-        CharGenerator().prepare({"maxChar": 2})
+        generator.prepare({"maxChar": 2})
 
 
 def test_integer_rejects_inverted_bounds() -> None:
+    generator = IntegerGenerator()
     with pytest.raises(ValueError, match="maxValue"):
-        IntegerGenerator().prepare({"minValue": 10, "maxValue": 1})
+        generator.prepare({"minValue": 10, "maxValue": 1})
 
 
 def test_decimal_rejects_inverted_bounds() -> None:
+    generator = DecimalGenerator()
     with pytest.raises(ValueError, match="maxValue"):
-        DecimalGenerator().prepare({"minValue": 1.0, "maxValue": 0.0, "decimals": 2})
+        generator.prepare({"minValue": 1.0, "maxValue": 0.0, "decimals": 2})
 
 
 def test_decimal_rejects_missing_bounds_with_friendly_error() -> None:
+    generator = DecimalGenerator()
     with pytest.raises(ValueError, match="decimal 'minValue' is required"):
-        DecimalGenerator().prepare({"maxValue": 1.0, "decimals": 2})
+        generator.prepare({"maxValue": 1.0, "decimals": 2})
 
 
 def test_decimal_rejects_non_numeric_bounds_with_friendly_error() -> None:
+    generator = DecimalGenerator()
     with pytest.raises(ValueError, match="decimal 'maxValue' must be a number"):
-        DecimalGenerator().prepare({"minValue": 0.0, "maxValue": "nope", "decimals": 2})
+        generator.prepare({"minValue": 0.0, "maxValue": "nope", "decimals": 2})
 
 
 def test_decimal_rejects_range_without_representable_rounded_value() -> None:
+    generator = DecimalGenerator()
     with pytest.raises(ValueError, match="representable"):
-        DecimalGenerator().prepare({"minValue": 0.1, "maxValue": 0.9, "decimals": 0})
+        generator.prepare({"minValue": 0.1, "maxValue": 0.9, "decimals": 0})
 
 
 def test_decimal_step_bounds_do_not_shift_from_binary_float_error() -> None:
@@ -174,14 +182,16 @@ def test_decimal_formats_large_fixed_bounds_without_float_artifacts() -> None:
 
 
 def test_decimal_rejects_negative_decimals() -> None:
+    generator = DecimalGenerator()
     with pytest.raises(ValueError, match="decimals"):
-        DecimalGenerator().prepare({"minValue": 0.0, "maxValue": 1.0, "decimals": -1})
+        generator.prepare({"minValue": 0.0, "maxValue": 1.0, "decimals": -1})
 
 
 @pytest.mark.parametrize("bad", [0, -1, -100])
 def test_char_rejects_non_positive_max_char(bad: int) -> None:
+    generator = CharGenerator()
     with pytest.raises(ValueError, match="maxChar"):
-        CharGenerator().prepare({"values": ["A"], "maxChar": bad})
+        generator.prepare({"values": ["A"], "maxChar": bad})
 
 
 def test_integer_pad_width_covers_negative_min() -> None:
@@ -230,8 +240,9 @@ def test_decimal_rounded_output_stays_inside_bounds() -> None:
 
 
 def test_ntlm_rejects_empty_values() -> None:
+    generator = HashGenerator()
     with pytest.raises(ValueError):
-        HashGenerator().prepare({"algorithm": "ntlm", "values": []})
+        generator.prepare({"algorithm": "ntlm", "values": []})
 
 
 @pytest.mark.parametrize(
@@ -266,8 +277,9 @@ def test_hash_generator_defaults_to_sha256() -> None:
 
 
 def test_hash_generator_rejects_unknown_algorithm() -> None:
+    generator = HashGenerator()
     with pytest.raises(ValueError, match="algorithm"):
-        HashGenerator().prepare({"algorithm": "scrypt", "values": ["secret"]})
+        generator.prepare({"algorithm": "scrypt", "values": ["secret"]})
 
 
 def test_hash_generator_bcrypt_is_deterministic() -> None:
@@ -341,19 +353,22 @@ def test_hash_generator_bcrypt_cache_defaults_off(monkeypatch) -> None:
 
 
 def test_hash_generator_rejects_cache_for_inexpensive_digest() -> None:
+    generator = HashGenerator()
     with pytest.raises(ValueError, match="only for the bcrypt"):
-        HashGenerator().prepare({"algorithm": "sha256", "values": ["secret"], "cache": True})
+        generator.prepare({"algorithm": "sha256", "values": ["secret"], "cache": True})
 
 
 def test_hash_generator_rejects_bad_bcrypt_rounds() -> None:
+    generator = HashGenerator()
     with pytest.raises(ValueError, match="rounds"):
-        HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 3, "values": ["secret"]})
+        generator.prepare({"algorithm": "bcrypt", "rounds": 3, "values": ["secret"]})
 
 
 @pytest.mark.parametrize("value", ["x" * 73, "é" * 37])
 def test_hash_generator_rejects_bcrypt_plaintext_over_72_bytes(value: str) -> None:
+    generator = HashGenerator()
     with pytest.raises(ValueError, match="at most 72 UTF-8 bytes"):
-        HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 4, "values": [value]})
+        generator.prepare({"algorithm": "bcrypt", "rounds": 4, "values": [value]})
 
 
 def test_hash_generator_accepts_full_bcrypt_cost_range() -> None:
@@ -362,8 +377,9 @@ def test_hash_generator_accepts_full_bcrypt_cost_range() -> None:
 
 
 def test_hash_generator_rejects_unrepresentable_bcrypt_rounds() -> None:
+    generator = HashGenerator()
     with pytest.raises(ValueError, match="between 4 and 31"):
-        HashGenerator().prepare(
+        generator.prepare(
             {
                 "algorithm": "bcrypt",
                 "rounds": 32,
@@ -381,8 +397,9 @@ def test_hash_generator_reports_missing_bcrypt_dependency(monkeypatch) -> None:
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", _blocked_import)
+    generator = HashGenerator()
     with pytest.raises(ValueError, match=r"ton\[bcrypt\]"):
-        HashGenerator().prepare({"algorithm": "bcrypt", "rounds": 4, "values": ["secret"]})
+        generator.prepare({"algorithm": "bcrypt", "rounds": 4, "values": ["secret"]})
 
 
 def test_hash_generator_bcrypt_base64_handles_two_byte_tail() -> None:
@@ -454,28 +471,30 @@ def test_date_formats_naive_timezone_as_empty() -> None:
 
 def test_date_rejects_inverted_bounds() -> None:
     spec = {"minValue": "2024-12-31", "maxValue": "2024-01-01"}
+    generator = DateGenerator()
     with pytest.raises(ValueError):
-        DateGenerator().prepare(spec)
+        generator.prepare(spec)
 
 
 def test_date_rejects_non_portable_format_directive() -> None:
     spec = {"minValue": "2000-01-01", "maxValue": "2000-12-31", "format": "%-d/%m"}
+    generator = DateGenerator()
     with pytest.raises(ValueError, match="non-portable directive"):
-        DateGenerator().prepare(spec)
+        generator.prepare(spec)
 
 
 @pytest.mark.parametrize("directive", ["%s", "%Q", "%"])
 def test_date_rejects_unsupported_directives(directive: str) -> None:
+    generator = DateGenerator()
     with pytest.raises(ValueError, match="non-portable"):
-        DateGenerator().prepare(
-            {"minValue": "2000-01-01", "maxValue": "2000-12-31", "format": directive}
-        )
+        generator.prepare({"minValue": "2000-01-01", "maxValue": "2000-12-31", "format": directive})
 
 
 def test_date_rejects_non_string_format() -> None:
     spec = {"minValue": "2000-01-01", "maxValue": "2000-12-31", "format": 123}
+    generator = DateGenerator()
     with pytest.raises(ValueError, match="must be a string"):
-        DateGenerator().prepare(spec)
+        generator.prepare(spec)
 
 
 def test_date_allows_literal_percent_before_flag() -> None:

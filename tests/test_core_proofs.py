@@ -111,5 +111,6 @@ def test_phone_proof_rejects_non_digit_after_matching_prefix() -> None:
 
 @pytest.mark.parametrize("value", [True, "Infinity"])
 def test_decimal_rejects_non_finite_or_boolean_bound(value: object) -> None:
+    generator = DecimalGenerator()
     with pytest.raises(ValueError, match="must be a .*number"):
-        DecimalGenerator().prepare({"minValue": value, "maxValue": 1, "decimals": 2})
+        generator.prepare({"minValue": value, "maxValue": 1, "decimals": 2})

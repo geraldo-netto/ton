@@ -52,10 +52,12 @@ def test_seed_determinism() -> None:
 
 
 def test_rejects_zero_length() -> None:
+    generator = BytesGenerator()
     with pytest.raises(ValueError):
-        BytesGenerator().prepare({"length": 0})
+        generator.prepare({"length": 0})
 
 
 def test_rejects_unknown_encoding() -> None:
+    generator = BytesGenerator()
     with pytest.raises(ValueError):
-        BytesGenerator().prepare({"encoding": "rot13"})
+        generator.prepare({"encoding": "rot13"})

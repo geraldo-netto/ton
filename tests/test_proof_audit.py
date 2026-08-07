@@ -146,8 +146,12 @@ def test_strict_proof_redaction_masks_echoing_reason(
         redact_proof_failures=True,
     )
 
-    with caplog.at_level(logging.WARNING, logger="ton"), pytest.raises(ProofError) as raised:
-        next(iter(engine))
+    def generate_with_logging() -> None:
+        with caplog.at_level(logging.WARNING, logger="ton"):
+            next(iter(engine))
+
+    with pytest.raises(ProofError) as raised:
+        generate_with_logging()
 
     failure_log = next(
         item for item in caplog.records if getattr(item, "event", "") == "proof_check_failed"
@@ -162,8 +166,10 @@ def test_proof_audit_writer_maps_stream_errors() -> None:
             del value
             raise OSError("disk full")
 
+    writer = ProofAuditWriter(BrokenStream())
+    failure = _failure()
     with pytest.raises(ProofAuditWriteError, match="disk full"):
-        ProofAuditWriter(BrokenStream())(_failure())
+        writer(failure)
 
 
 def test_proof_audit_writer_emits_repeated_spec_once_by_stable_reference() -> None:
@@ -317,8 +323,9 @@ def test_proof_checker_preserves_existing_sink_error() -> None:
         seed=None,
         failure_sink=reject_failure,
     )
+    failure = _failure()
 
     with pytest.raises(ProofFailureSinkError) as exc:
-        checker._record_audit(_failure())
+        checker._record_audit(failure)
 
     assert exc.value is sink_error

@@ -145,8 +145,9 @@ def test_pipeline_failures_identify_transform_validator_and_proof_stages() -> No
             }
         },
     }
+    transform_engine = Engine(transform_config, transforms={"broken_transform": BrokenTransform()})
     with pytest.raises(TransformExecutionError, match="Transform broken_transform.*transform boom"):
-        list(Engine(transform_config, transforms={"broken_transform": BrokenTransform()}))
+        list(transform_engine)
 
     class BrokenValidator:
         type_name = "broken_validator"
@@ -165,8 +166,9 @@ def test_pipeline_failures_identify_transform_validator_and_proof_stages() -> No
             }
         },
     }
+    validator_engine = Engine(validator_config, validators={"broken_validator": BrokenValidator()})
     with pytest.raises(ValidatorExecutionError, match="Validator broken_validator.*validator boom"):
-        list(Engine(validator_config, validators={"broken_validator": BrokenValidator()}))
+        list(validator_engine)
 
     class BrokenProof(Generator):
         type_name = "broken_proof"
@@ -182,8 +184,9 @@ def test_pipeline_failures_identify_transform_validator_and_proof_stages() -> No
         "format": "$v$",
         "types": {"v": {"type": "broken_proof"}},
     }
+    proof_engine = Engine(proof_config, registry={"broken_proof": BrokenProof()}, proof_mode="all")
     with pytest.raises(ProofEvaluationError, match="Source proof broken_proof.*proof boom"):
-        list(Engine(proof_config, registry={"broken_proof": BrokenProof()}, proof_mode="all"))
+        list(proof_engine)
 
     class BrokenTransformProof(BaseTransform):
         type_name = "broken_transform_proof"
@@ -202,17 +205,16 @@ def test_pipeline_failures_identify_transform_validator_and_proof_stages() -> No
             }
         },
     }
+    transform_proof_engine = Engine(
+        transform_proof_config,
+        transforms={"broken_transform_proof": BrokenTransformProof()},
+        proof_mode="all",
+    )
     with pytest.raises(
         ProofEvaluationError,
         match="Transform proof broken_transform_proof.*transform proof boom",
     ):
-        list(
-            Engine(
-                transform_proof_config,
-                transforms={"broken_transform_proof": BrokenTransformProof()},
-                proof_mode="all",
-            )
-        )
+        list(transform_proof_engine)
 
 
 def test_engine_runtime_state_uses_compiled_plan(basic_config: dict) -> None:
@@ -463,8 +465,9 @@ def test_engine_rejects_transform_that_cannot_accept_paired_input() -> None:
         },
     }
 
+    transform = UnpairedTransform()
     with pytest.raises(TemplateError, match="does not accept paired"):
-        Engine(config, transforms={"plugin.unpaired": UnpairedTransform()})
+        Engine(config, transforms={"plugin.unpaired": transform})
 
 
 @pytest.mark.parametrize("chain", [["plugin.drop"], ["plugin.drop", "identity"]])
@@ -490,10 +493,9 @@ def test_engine_rejects_id_reference_after_transform_drops_pairing(chain: list[s
         },
     }
 
+    transforms = {"plugin.drop": DropPairTransform(), "identity": IdentityTransform()}
     with pytest.raises(TemplateError, match=r"cannot use \[id\].*does not preserve pairing"):
-        Engine(
-            config, transforms={"plugin.drop": DropPairTransform(), "identity": IdentityTransform()}
-        )
+        Engine(config, transforms=transforms)
 
 
 def test_engine_collects_source_proof_failure() -> None:

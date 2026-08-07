@@ -26,8 +26,9 @@ def test_name_given_only_is_single_word() -> None:
 
 
 def test_name_rejects_unknown_style() -> None:
+    generator = NameGenerator()
     with pytest.raises(ValueError):
-        NameGenerator().prepare({"style": "nickname"})
+        generator.prepare({"style": "nickname"})
 
 
 def test_email_uses_lowercase_local_and_known_domain() -> None:
@@ -41,8 +42,9 @@ def test_email_uses_lowercase_local_and_known_domain() -> None:
 
 
 def test_email_rejects_empty_domains() -> None:
+    generator = EmailGenerator()
     with pytest.raises(ValueError):
-        EmailGenerator().prepare({"domains": []})
+        generator.prepare({"domains": []})
 
 
 def test_email_proof_reuses_precomputed_name_sets(monkeypatch) -> None:
@@ -65,5 +67,6 @@ def test_phone_format_replaces_only_hash() -> None:
 
 
 def test_phone_requires_at_least_one_hash() -> None:
+    generator = PhoneGenerator()
     with pytest.raises(ValueError):
-        PhoneGenerator().prepare({"format": "no-digits"})
+        generator.prepare({"format": "no-digits"})

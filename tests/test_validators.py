@@ -57,8 +57,10 @@ def test_engine_validator_failure_raises() -> None:
 
 def test_engine_unknown_validator_reference_rejected() -> None:
     catalog = _catalog_with(_EvenLength())
+    config = _config(["ab"], ["plugin.missing"])
+    validators = catalog.validators()
     with pytest.raises(TemplateError, match="Unknown validator"):
-        Engine(_config(["ab"], ["plugin.missing"]), validators=catalog.validators())
+        Engine(config, validators=validators)
 
 
 def test_validators_run_on_paired_values() -> None:
@@ -88,8 +90,9 @@ def test_api_generate_accepts_validators() -> None:
 
 def test_validate_config_rejects_unknown_validator() -> None:
     payload = _config(["ab"], ["plugin.missing"])
+    catalog = _catalog_with(_EvenLength())
     with pytest.raises(api.ConfigError, match="Unknown validator"):
-        api.validate_config(payload, catalog=_catalog_with(_EvenLength()))
+        api.validate_config(payload, catalog=catalog)
 
 
 def test_validate_config_accepts_known_validator() -> None:
@@ -100,14 +103,16 @@ def test_validate_config_accepts_known_validator() -> None:
 def test_validate_config_validators_must_be_list() -> None:
     payload = _config(["ab"], [])
     payload["types"]["v"]["validators"] = "plugin.check"
+    catalog = _catalog_with(_EvenLength())
     with pytest.raises(api.ConfigError, match="'validators' must be a list"):
-        api.validate_config(payload, catalog=_catalog_with(_EvenLength()))
+        api.validate_config(payload, catalog=catalog)
 
 
 def test_validate_config_validator_refs_must_be_strings() -> None:
     payload = _config(["ab"], [123])  # type: ignore[list-item]
+    catalog = _catalog_with(_EvenLength())
     with pytest.raises(api.ConfigError, match="validator refs must be strings"):
-        api.validate_config(payload, catalog=_catalog_with(_EvenLength()))
+        api.validate_config(payload, catalog=catalog)
 
 
 def test_list_namespaces_prints_validators(capsys: pytest.CaptureFixture[str]) -> None:

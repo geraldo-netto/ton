@@ -39,20 +39,23 @@ def test_weighted_record_form() -> None:
     ],
 )
 def test_weighted_record_form_rejects_bad_entries(values: list[object]) -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError, match="objects containing 'value'"):
-        WeightedGenerator().prepare({"values": values})
+        generator.prepare({"values": values})
 
 
 def test_weighted_record_form_rejects_unknown_key_with_suggestion() -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError, match=r"weighted\.values\[0\]\.weigth.*Did you mean 'weight'"):
-        WeightedGenerator().prepare(
+        generator.prepare(
             {"values": [{"value": "x", "weigth": 2}]},
         )
 
 
 def test_weighted_record_form_suggests_misspelled_value_key() -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError, match=r"weighted\.values\[0\]\.valeu.*Did you mean 'value'"):
-        WeightedGenerator().prepare(
+        generator.prepare(
             {"values": [{"valeu": "x", "weight": 2}]},
         )
 
@@ -65,39 +68,46 @@ def test_weighted_record_form_suggests_misspelled_value_key() -> None:
     ],
 )
 def test_weighted_rejects_mixed_legacy_value_shapes(values: list[object]) -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError, match="all objects or all scalar values"):
-        WeightedGenerator().prepare({"values": values})
+        generator.prepare({"values": values})
 
 
 def test_weighted_rejects_empty_values() -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError):
-        WeightedGenerator().prepare({"values": [], "weights": []})
+        generator.prepare({"values": [], "weights": []})
 
 
 def test_weighted_rejects_mismatched_weights() -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError):
-        WeightedGenerator().prepare({"values": ["A", "B"], "weights": [1]})
+        generator.prepare({"values": ["A", "B"], "weights": [1]})
 
 
 def test_weighted_rejects_negative_weight() -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError):
-        WeightedGenerator().prepare({"values": ["A"], "weights": [-1]})
+        generator.prepare({"values": ["A"], "weights": [-1]})
 
 
 def test_weighted_rejects_zero_total() -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError):
-        WeightedGenerator().prepare({"values": ["A", "B"], "weights": [0, 0]})
+        generator.prepare({"values": ["A", "B"], "weights": [0, 0]})
 
 
 @pytest.mark.parametrize("weight", [float("nan"), float("inf"), float("-inf")])
 def test_weighted_rejects_non_finite_weights(weight: float) -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError, match="finite"):
-        WeightedGenerator().prepare({"values": ["A", "B"], "weights": [weight, 1]})
+        generator.prepare({"values": ["A", "B"], "weights": [weight, 1]})
 
 
 def test_weighted_rejects_non_finite_total() -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError, match="total must be finite"):
-        WeightedGenerator().prepare({"values": ["A", "B"], "weights": [1e308, 1e308]})
+        generator.prepare({"values": ["A", "B"], "weights": [1e308, 1e308]})
 
 
 @pytest.mark.parametrize(
@@ -108,8 +118,9 @@ def test_weighted_rejects_non_finite_total() -> None:
     ],
 )
 def test_weighted_legacy_rejects_boolean_weights(spec: dict[str, object], path: str) -> None:
+    generator = WeightedGenerator()
     with pytest.raises(ValueError, match=path):
-        WeightedGenerator().prepare(spec)
+        generator.prepare(spec)
 
 
 # ---------------------------------------------------------------------------
@@ -214,14 +225,14 @@ def test_weighted_composite_can_nest_inside_weighted() -> None:
 def test_weighted_composite_rejects_direct_prepare_call() -> None:
     """``WeightedGenerator.prepare`` cannot resolve nested specs without
     the engine's registry; calling it on a composite spec is an error."""
+    generator = WeightedGenerator()
+    spec = {
+        "choices": [
+            {"weight": 1, "spec": {"type": "string", "values": ["x"]}},
+        ],
+    }
     with pytest.raises(ValueError, match="composite"):
-        WeightedGenerator().prepare(
-            {
-                "choices": [
-                    {"weight": 1, "spec": {"type": "string", "values": ["x"]}},
-                ],
-            }
-        )
+        generator.prepare(spec)
 
 
 def test_weighted_composite_rejects_unknown_nested_type() -> None:
@@ -305,6 +316,7 @@ def test_weighted_composite_rejects_non_numeric_weight() -> None:
 
 def test_weighted_composite_rejects_boolean_weight_with_path() -> None:
     gen = WeightedGenerator()
+    registry = default_registry()
 
     with pytest.raises(ValueError, match=r"choices\[0\]\.weight"):
         gen.prepare_composite(
@@ -313,12 +325,13 @@ def test_weighted_composite_rejects_boolean_weight_with_path() -> None:
                     {"weight": True, "spec": {"type": "string", "values": ["x"]}},
                 ]
             },
-            default_registry(),
+            registry,
         )
 
 
 def test_weighted_composite_rejects_unknown_wrapper_key_with_suggestion() -> None:
     gen = WeightedGenerator()
+    registry = default_registry()
 
     with pytest.raises(ValueError, match=r"weighted\.choices\[0\]\.weigth.*Did you mean 'weight'"):
         gen.prepare_composite(
@@ -327,7 +340,7 @@ def test_weighted_composite_rejects_unknown_wrapper_key_with_suggestion() -> Non
                     {"weigth": 1, "spec": {"type": "string", "values": ["x"]}},
                 ]
             },
-            default_registry(),
+            registry,
         )
 
 

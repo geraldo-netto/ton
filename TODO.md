@@ -98,7 +98,6 @@ Targeted SonarCloud review: 2026-08-07 (all 133 open findings for `geraldo-netto
 
 | id | status | effort | description |
 |----|--------|--------|-------------|
-| SONAR-DEP-001 | open | M | `.github/workflows/ci.yml:28-92` and `pyproject.toml` — resolve five `githubactions:S8541`, nine `githubactions:S8544`, and one `text:S8565` finding by committing a universal lockfile and switching CI from unpinned pip resolution/source-build-capable installs to a hash-pinned setup-uv action plus frozen uv syncs. |
 
 ## platform
 

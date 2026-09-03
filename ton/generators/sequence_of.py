@@ -31,7 +31,6 @@ from .base import (
     Generator,
     PreparationContext,
     coerce_int,
-    prepare_child_spec,
 )
 
 
@@ -59,20 +58,23 @@ class SequenceOfGenerator(Generator):
     ) -> SequenceOfSpec:
         if context is None:
             raise self._composite_path_error()
-        return self.prepare_composite(spec, context.registry)
+        return self._prepare(spec, context)
 
     def prepare_composite(
         self,
         spec: Mapping[str, Any],
         registry: Mapping[str, Generator],
     ) -> SequenceOfSpec:
+        return self._prepare(spec, PreparationContext(registry))
+
+    def _prepare(self, spec: Mapping[str, Any], context: PreparationContext) -> SequenceOfSpec:
         count = coerce_int(spec, "count", type_name="sequence_of")
         if count < 1:
             raise ValueError("sequence_of 'count' must be >= 1")
         separator = spec.get("separator", "")
         if not isinstance(separator, str):
             raise ValueError("sequence_of 'separator' must be a string")
-        child = prepare_child_spec("sequence_of", "'spec'", spec.get("spec"), registry)
+        child = context.prepare_child("sequence_of", "'spec'", spec.get("spec"))
         return SequenceOfSpec(count=count, separator=separator, child=child)
 
     def generate(self, prepared: SequenceOfSpec, rng: Random) -> str:

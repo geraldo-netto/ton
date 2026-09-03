@@ -28,7 +28,7 @@ from typing import Any, ClassVar
 
 from .._proof import ProofResult
 from .._transforms import TransformResult
-from .base import Generator, PreparationContext, prepare_child_spec
+from .base import Generator, PreparationContext
 
 
 @dataclass(frozen=True)
@@ -59,19 +59,21 @@ class OneOfGenerator(Generator):
     ) -> OneOfSpec:
         if context is None:
             raise self._composite_path_error()
-        return self.prepare_composite(spec, context.registry)
+        return self._prepare(spec, context)
 
     def prepare_composite(
         self,
         spec: Mapping[str, Any],
         registry: Mapping[str, Generator],
     ) -> OneOfSpec:
+        return self._prepare(spec, PreparationContext(registry))
+
+    def _prepare(self, spec: Mapping[str, Any], context: PreparationContext) -> OneOfSpec:
         raw = spec.get("choices")
         if not isinstance(raw, list) or not raw:
             raise ValueError("oneOf 'choices' must be a non-empty list")
         children = tuple(
-            prepare_child_spec("oneOf", f"'choices[{i}]'", entry, registry)
-            for i, entry in enumerate(raw)
+            context.prepare_child("oneOf", f"'choices[{i}]'", entry) for i, entry in enumerate(raw)
         )
         return OneOfSpec(children=children)
 
@@ -82,6 +84,9 @@ class OneOfGenerator(Generator):
     def prove(self, prepared: OneOfSpec, result: TransformResult) -> ProofResult:
         # The value came from one child, so it fails only if no child
         # accepts it; permissive-default children never false-fail (REL-001).
-        if any(gen.prove(prep, result).ok for gen, prep in prepared.children):
+        proofs = tuple(gen.prove(prep, result) for gen, prep in prepared.children)
+        if any(proof.ok for proof in proofs):
             return ProofResult(ok=True)
-        return ProofResult(ok=False, reason="no oneOf choice accepts the value")
+        detail = next((proof.reason for proof in proofs if proof.reason), "")
+        reason = "no oneOf choice accepts the value"
+        return ProofResult(ok=False, reason=f"{reason}: {detail}" if detail else reason)

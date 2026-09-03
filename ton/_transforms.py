@@ -118,6 +118,10 @@ class BaseTransform:
         del registry
         return self.prepare(spec)
 
+    def prepare_with_context(self, spec: Mapping[str, Any], context: Any) -> Any:
+        """Prepare a composite transform with nested-pipeline services."""
+        return self.prepare_composite(spec, context.registry)
+
     def apply(
         self,
         prepared: Any,

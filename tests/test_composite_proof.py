@@ -5,9 +5,13 @@ from __future__ import annotations
 from random import Random
 from typing import Any
 
+import pytest
+
+from ton._engine import Engine, ProofError
 from ton._proof import ProofResult
-from ton._transforms import TransformResult
+from ton._transforms import BaseTransform, TransformProof, TransformResult
 from ton.generators import Generator
+from ton.generators.base import ChildPipelineGenerator, ChildPipelineSpec
 from ton.generators.one_of import OneOfGenerator
 from ton.generators.sequence_of import SequenceOfGenerator
 from ton.generators.weighted import WeightedGenerator
@@ -36,6 +40,14 @@ class _PermissiveGenerator(Generator):
         return "anything"
 
 
+class _RejectTransform(BaseTransform):
+    type_name = "reject_transform"
+
+    def prove(self, prepared, before, after):
+        del prepared, before, after
+        return TransformProof(ok=False, reason="nested transform rejects")
+
+
 def _registry() -> dict[str, Generator]:
     from ton._registry import default_registry
 
@@ -61,6 +73,62 @@ def test_one_of_prove_rejects_when_no_child_accepts() -> None:
     proof = gen.prove(prepared, TransformResult("x"))
     assert not proof.ok
     assert "no oneOf choice" in proof.reason
+
+
+def test_nested_transform_proof_uses_exact_generation_trace() -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "oneOf",
+                "choices": [
+                    {
+                        "type": "string",
+                        "values": ["x"],
+                        "transforms": [{"type": "reject_transform"}],
+                    }
+                ],
+            }
+        },
+    }
+
+    engine = Engine(
+        config,
+        transforms={"reject_transform": _RejectTransform()},
+        proof_mode="all",
+    )
+    with pytest.raises(ProofError, match="nested transform rejects"):
+        list(engine)
+
+
+def test_nested_transform_proof_reports_source_failure() -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "oneOf",
+                "choices": [
+                    {
+                        "type": "reject",
+                        "transforms": [{"type": "identity"}],
+                    }
+                ],
+            }
+        },
+    }
+
+    engine = Engine(config, registry=_registry(), proof_mode="all")
+    with pytest.raises(ProofError, match="always rejects"):
+        list(engine)
+
+
+def test_nested_pipeline_proof_is_permissive_without_generation_trace() -> None:
+    pipeline = ChildPipelineGenerator()
+    prepared = ChildPipelineSpec(_RejectGenerator(), {}, (), True)
+
+    assert pipeline.prove(prepared, TransformResult("external")).ok
 
 
 def test_weighted_composite_prove_accepts_and_rejects() -> None:

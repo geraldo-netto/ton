@@ -22,6 +22,12 @@ from ._template import Token, parse, split_segments
 from ._transforms import Transform, fold_paired_capabilities
 from ._validation import Validator
 from .generators import Generator
+from .generators.base import (
+    ChildPipelineGenerator,
+    ChildPipelineSpec,
+    PreparationContext,
+    prepare_child_spec,
+)
 
 
 @dataclass(frozen=True)
@@ -144,10 +150,8 @@ class EngineCompiler:
                 )
 
     def _build_prepared(self) -> dict[str, PreparedField]:
-        from .generators.base import PreparationContext
-
         prepared: dict[str, PreparedField] = {}
-        context = PreparationContext(self.registry)
+        context = PreparationContext(self.registry, self._prepare_child)
         for type_key in self.field_keys:
             spec = self.types[type_key]
             generator = self.registry[runtime_type_name(spec["type"])]
@@ -183,6 +187,32 @@ class EngineCompiler:
                 ) from exc
         return prepared
 
+    def _prepare_child(
+        self,
+        context: PreparationContext,
+        parent_type: str,
+        location: str,
+        nested_spec: Any,
+    ) -> tuple[Generator, Any]:
+        child, source_prepared = prepare_child_spec(
+            parent_type,
+            location,
+            nested_spec,
+            self.registry,
+            context,
+        )
+        transforms, _is_paired, uses_source = self._prepare_transforms(
+            f"{parent_type}.{location}", nested_spec, child, context
+        )
+        if not transforms:
+            return child, source_prepared
+        return ChildPipelineGenerator(), ChildPipelineSpec(
+            generator=child,
+            source_prepared=source_prepared,
+            transforms=transforms,
+            uses_source=uses_source,
+        )
+
     def _validate_id_references(self, prepared: Mapping[str, PreparedField]) -> None:
         for token in self.tokens:
             if token.wants_id and not prepared[token.type_key].is_paired:
@@ -209,9 +239,13 @@ class EngineCompiler:
                 self._validate_generator_keys(f"{path}.{location}", nested_spec, child)
 
     def _prepare_transforms(
-        self, type_key: str, spec: Mapping[str, Any], generator: Generator
+        self,
+        type_key: str,
+        spec: Mapping[str, Any],
+        generator: Generator,
+        context: PreparationContext | None = None,
     ) -> tuple[tuple[PreparedTransform, ...], bool, bool]:
-        transform_specs = spec.get("transforms", [])
+        transform_specs = self._transform_specs(type_key, spec)
         resolved = [
             (transform_spec, self._resolve_transform(type_key, transform_spec["type"]))
             for transform_spec in transform_specs
@@ -250,7 +284,7 @@ class EngineCompiler:
             prepared.append(
                 PreparedTransform(
                     transform,
-                    transform.prepare_composite(transform_spec, self.registry),
+                    self._prepare_transform(transform, transform_spec, context),
                 )
             )
             _logger.info(
@@ -267,6 +301,33 @@ class EngineCompiler:
             )
             is_paired = is_paired and transform.capabilities.preserves_pairing
         return tuple(prepared), capability.preserves_pairing, uses_source
+
+    @staticmethod
+    def _transform_specs(
+        type_key: str,
+        spec: Mapping[str, Any],
+    ) -> list[Mapping[str, Any]]:
+        raw = spec.get("transforms", [])
+        if not isinstance(raw, list):
+            raise TemplateError(f"Transforms for variable {type_key!r} must be a list")
+        for index, transform in enumerate(raw):
+            if not isinstance(transform, Mapping) or not isinstance(transform.get("type"), str):
+                raise TemplateError(
+                    f"Transform {index} for variable {type_key!r} must be an object "
+                    "with a string 'type' field"
+                )
+        return raw
+
+    def _prepare_transform(
+        self,
+        transform: Transform,
+        spec: Mapping[str, Any],
+        context: PreparationContext | None,
+    ) -> Any:
+        prepare_with_context = getattr(transform, "prepare_with_context", None)
+        if context is not None and callable(prepare_with_context):
+            return prepare_with_context(spec, context)
+        return transform.prepare_composite(spec, self.registry)
 
     def _resolve_transform(self, type_key: str, reference: str) -> Transform:
         normalized = normalize_reference(reference)

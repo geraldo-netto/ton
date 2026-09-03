@@ -28,14 +28,19 @@ engine is constructed, plus the per-row ``generate`` call:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from inspect import signature
 from random import Random
 from typing import Any, ClassVar
 
-from .._proof import ProofResult
+from .._proof import PreparedTransform, ProofResult, TransformStep
 from .._transforms import TransformResult
+
+ChildPreparer = Callable[
+    ["PreparationContext", str, str, Any],
+    tuple["Generator", Any],
+]
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,7 @@ class PreparationContext:
     """Registry-aware services available while preparing a generator spec."""
 
     registry: Mapping[str, Generator]
+    child_preparer: ChildPreparer | None = None
 
     def prepare_child(
         self,
@@ -50,7 +56,9 @@ class PreparationContext:
         location: str,
         nested_spec: Any,
     ) -> tuple[Generator, Any]:
-        return prepare_child_spec(parent_type, location, nested_spec, self.registry)
+        if self.child_preparer is not None:
+            return self.child_preparer(self, parent_type, location, nested_spec)
+        return prepare_child_spec(parent_type, location, nested_spec, self.registry, self)
 
     def prepare_generator(self, generator: Generator, spec: Mapping[str, Any]) -> Any:
         """Prepare through the context while retaining legacy plugin compatibility."""
@@ -171,6 +179,75 @@ class Generator(ABC):
         automatically participate in the proof-check protocol.
         """
         del prepared, result
+        return ProofResult(ok=True)
+
+
+class _GeneratedChildValue(str):
+    """String carrying the exact nested transform trace until proofing."""
+
+    pipeline: ChildPipelineSpec
+    source: TransformResult
+    steps: tuple[TransformStep, ...]
+
+    def __new__(
+        cls,
+        value: str,
+        pipeline: ChildPipelineSpec,
+        source: TransformResult,
+        steps: tuple[TransformStep, ...],
+    ) -> _GeneratedChildValue:
+        instance = super().__new__(cls, value)
+        instance.pipeline = pipeline
+        instance.source = source
+        instance.steps = steps
+        return instance
+
+
+@dataclass(frozen=True)
+class ChildPipelineSpec:
+    """Prepared source and transform stages for one composite child."""
+
+    generator: Generator
+    source_prepared: Any
+    transforms: tuple[PreparedTransform, ...]
+    uses_source: bool
+
+
+class ChildPipelineGenerator(Generator):
+    """Adapt a nested field pipeline to the existing generator protocol."""
+
+    type_name = "child_pipeline"
+
+    def generate(self, prepared: ChildPipelineSpec, rng: Random) -> str:
+        source = TransformResult(
+            prepared.generator.generate(prepared.source_prepared, rng)
+            if prepared.uses_source
+            else ""
+        )
+        result = source
+        steps: list[TransformStep] = []
+        for transform in prepared.transforms:
+            before = result
+            result = transform.transform.apply(transform.prepared, before, rng)
+            steps.append(TransformStep(transform, before, result))
+        return _GeneratedChildValue(result.value, prepared, source, tuple(steps))
+
+    def prove(self, prepared: ChildPipelineSpec, result: TransformResult) -> ProofResult:
+        value = result.value
+        if not isinstance(value, _GeneratedChildValue) or value.pipeline is not prepared:
+            return ProofResult(ok=True)
+        if prepared.uses_source:
+            source_proof = prepared.generator.prove(prepared.source_prepared, value.source)
+            if not source_proof.ok:
+                return source_proof
+        for step in value.steps:
+            proof = step.prepared.transform.prove(
+                step.prepared.prepared,
+                step.before,
+                step.after,
+            )
+            if not proof.ok:
+                return ProofResult(ok=False, reason=proof.reason)
         return ProofResult(ok=True)
 
 
@@ -339,6 +416,7 @@ def prepare_child_spec(
     location: str,
     nested_spec: Any,
     registry: Mapping[str, Generator],
+    context: PreparationContext | None = None,
 ) -> tuple[Generator, Any]:
     """Resolve a nested type spec through ``registry`` for composite parents.
 
@@ -365,5 +443,5 @@ def prepare_child_spec(
             "paired generators cannot be nested inside a composite generator "
             "(the [id] half would be unreachable)"
         )
-    context = PreparationContext(registry)
-    return child, context.prepare_generator(child, nested_spec)
+    preparation = context or PreparationContext(registry)
+    return child, preparation.prepare_generator(child, nested_spec)

@@ -9,6 +9,7 @@ from typing import Any, ClassVar
 from .._distribution import WeightedChoiceSet, prepare_distribution
 from .._transforms import BaseTransform, TransformCapabilities, TransformProof, TransformResult
 from ..generators import Generator
+from ..generators.base import PreparationContext
 
 
 class DistributionTransform(BaseTransform):
@@ -29,6 +30,19 @@ class DistributionTransform(BaseTransform):
             registry,
             label="distribution",
             min_choices=2,
+        )
+
+    def prepare_with_context(
+        self,
+        spec: Mapping[str, Any],
+        context: PreparationContext,
+    ) -> WeightedChoiceSet:
+        return prepare_distribution(
+            spec,
+            context.registry,
+            label="distribution",
+            min_choices=2,
+            context=context,
         )
 
     def apply(

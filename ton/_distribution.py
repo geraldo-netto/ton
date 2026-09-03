@@ -7,11 +7,14 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from math import isfinite
 from random import Random
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from ._speckeys import require_known_keys
 
 _CHOICE_KEYS = frozenset(("weight", "spec"))
+
+if TYPE_CHECKING:
+    from .generators.base import PreparationContext
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,7 @@ def prepare_distribution(
     *,
     label: str,
     min_choices: int,
+    context: PreparationContext | None = None,
 ) -> WeightedChoiceSet:
     from .generators.base import PreparationContext
 
@@ -45,8 +49,9 @@ def prepare_distribution(
         raise ValueError(_choices_error(label, min_choices))
     weights: list[float] = []
     children: list[tuple[Any, Any]] = []
+    preparation = context or PreparationContext(registry)
     for index, choice in enumerate(raw_choices):
-        weight, child = _prepare_choice(index, choice, PreparationContext(registry), label)
+        weight, child = _prepare_choice(index, choice, preparation, label)
         weights.append(weight)
         children.append(child)
     validate_weights(weights, label)

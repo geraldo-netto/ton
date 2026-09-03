@@ -103,7 +103,7 @@ class WeightedGenerator(Generator):
         if "choices" in spec:
             if context is None:
                 raise self._composite_path_error()
-            return self.prepare_composite(spec, context.registry)
+            return self._prepare_composite(spec, context)
         return self._prepare_legacy(spec)
 
     def prepare_composite(
@@ -111,14 +111,22 @@ class WeightedGenerator(Generator):
         spec: Mapping[str, Any],
         registry: Mapping[str, Generator],
     ) -> WeightedSpec:
+        return self._prepare_composite(spec, PreparationContext(registry))
+
+    def _prepare_composite(
+        self,
+        spec: Mapping[str, Any],
+        context: PreparationContext,
+    ) -> WeightedSpec:
         raw_choices = spec.get("choices")
         if raw_choices is None:
             return self._prepare_legacy(spec)
         distribution = prepare_distribution(
             _distribution_spec(spec),
-            registry,
+            context.registry,
             label="weighted",
             min_choices=1,
+            context=context,
         )
         return WeightedSpec(
             weights=distribution.weights,

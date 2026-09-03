@@ -127,6 +127,80 @@ def test_one_of_can_nest_inside_weighted() -> None:
     assert all(r in {"inner-A", "inner-B"} for r in rows)
 
 
+def test_one_of_applies_nested_transform_pipeline() -> None:
+    config = {
+        "rows": 10,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "oneOf",
+                "choices": [
+                    {
+                        "type": "string",
+                        "values": ["source"],
+                        "transforms": [
+                            {
+                                "type": "distribution",
+                                "choices": [
+                                    {"spec": _string_spec("A")},
+                                    {"spec": _string_spec("B")},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        },
+    }
+
+    assert set(api.generate(config, seed=0, proof_mode="all")) <= {"A", "B"}
+
+
+def test_one_of_rejects_unknown_nested_transform() -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "oneOf",
+                "choices": [
+                    {
+                        "type": "string",
+                        "values": ["source"],
+                        "transforms": [{"type": "missing"}],
+                    }
+                ],
+            }
+        },
+    }
+
+    with pytest.raises(api.ConfigError, match="Unknown transform 'missing'"):
+        api.validate_config(config)
+
+
+@pytest.mark.parametrize("transforms", ["identity", [{}]])
+def test_one_of_rejects_malformed_nested_transforms(transforms: Any) -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "oneOf",
+                "choices": [
+                    {
+                        "type": "string",
+                        "values": ["source"],
+                        "transforms": transforms,
+                    }
+                ],
+            }
+        },
+    }
+
+    with pytest.raises(api.ConfigError, match="must be a list|with a string 'type'"):
+        api.validate_config(config)
+
+
 # ---------------------------------------------------------------------------
 # sequence_of
 # ---------------------------------------------------------------------------
@@ -309,6 +383,7 @@ def test_generator_nested_type_hook_defaults_empty_and_is_extensible() -> None:
         "string",
         "integer",
     )
+    assert Generator._nested_type_names([None, {"type": "string"}]) == ("string",)
 
 
 @pytest.mark.parametrize(

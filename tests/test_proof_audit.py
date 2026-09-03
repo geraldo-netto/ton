@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from ton import _proofaudit as proofaudit
 from ton import _proofcheck as proofcheck
 from ton._engine import Engine, ProofError
 from ton._proof import REDACTED, PreparedField, ProofFailure, ProofResult
@@ -183,6 +184,26 @@ def test_proof_audit_writer_emits_repeated_spec_once_by_stable_reference() -> No
     assert first["spec"] == _failure().spec
     assert second["spec"] is None
     assert first["spec_ref"] == second["spec_ref"]
+
+
+def test_proof_audit_writer_caches_repeated_spec_fingerprint(monkeypatch) -> None:
+    calls = 0
+    real_reference = proofaudit._spec_reference
+
+    def counting_reference(spec: object) -> str:
+        nonlocal calls
+        calls += 1
+        return real_reference(spec)
+
+    monkeypatch.setattr(proofaudit, "_spec_reference", counting_reference)
+    stream = io.StringIO()
+    writer = ProofAuditWriter(stream)
+    failure = _failure()
+
+    writer(failure)
+    writer(failure)
+
+    assert calls == 1
 
 
 def test_proof_checker_streams_details_beyond_retention_sample(monkeypatch) -> None:

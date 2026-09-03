@@ -37,9 +37,10 @@ class ProofAuditWriter:
     def __init__(self, stream: TextIO) -> None:
         self._stream = stream
         self._emitted_specs: set[str] = set()
+        self._spec_references: dict[str, tuple[object, str]] = {}
 
     def __call__(self, failure: ProofFailure) -> None:
-        spec_ref = _spec_reference(failure.spec) if failure.spec is not None else None
+        spec_ref = self._reference_for(failure.type_key, failure.spec)
         emit_spec = spec_ref is not None and spec_ref not in self._emitted_specs
         payload = {
             "schema": PROOF_AUDIT_SCHEMA,
@@ -61,6 +62,16 @@ class ProofAuditWriter:
             raise ProofAuditWriteError(str(exc)) from exc
         if spec_ref is not None:
             self._emitted_specs.add(spec_ref)
+
+    def _reference_for(self, type_key: str, spec: object | None) -> str | None:
+        if spec is None:
+            return None
+        cached = self._spec_references.get(type_key)
+        if cached is not None and cached[0] is spec:
+            return cached[1]
+        reference = _spec_reference(spec)
+        self._spec_references[type_key] = (spec, reference)
+        return reference
 
 
 def _spec_reference(spec: object) -> str:

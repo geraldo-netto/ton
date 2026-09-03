@@ -7,6 +7,7 @@ from random import Random
 import pytest
 
 from ton import api
+from ton._transforms import TransformResult
 from ton.generators.sequence import SequenceGenerator
 
 
@@ -48,3 +49,23 @@ def test_sequence_through_engine() -> None:
     }
     rows = list(api.generate(config))
     assert rows == ["row=10", "row=11", "row=12", "row=13", "row=14"]
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [("10", True), ("14", True), ("11", False), ("-999", False)]
+)
+def test_sequence_proof_checks_configured_progression(value: str, expected: bool) -> None:
+    generator = SequenceGenerator()
+    prepared = generator.prepare({"start": 10, "step": 2})
+
+    assert generator.prove(prepared, TransformResult(value)).ok is expected
+
+
+def test_sequence_proof_checks_descending_progression_and_padding() -> None:
+    generator = SequenceGenerator()
+    prepared = generator.prepare({"start": 5, "step": -2, "padWidth": 3})
+
+    assert generator.prove(prepared, TransformResult("005")).ok
+    assert generator.prove(prepared, TransformResult("-01")).ok
+    assert not generator.prove(prepared, TransformResult("002")).ok
+    assert not generator.prove(prepared, TransformResult("5")).ok

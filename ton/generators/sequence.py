@@ -41,6 +41,8 @@ from .base import Generator, coerce_int, pad_with_zero, proof_result
 @dataclass(frozen=True)
 class SequenceSpec:
     counter: Iterator[int]
+    start: int
+    step: int
     pad_width: int
 
 
@@ -59,6 +61,8 @@ class SequenceGenerator(Generator):
             raise ValueError("sequence 'padWidth' must be >= 0")
         return SequenceSpec(
             counter=count(start, step),
+            start=start,
+            step=step,
             pad_width=pad_width,
         )
 
@@ -71,8 +75,11 @@ class SequenceGenerator(Generator):
 
     def prove(self, prepared: SequenceSpec, result: TransformResult) -> ProofResult:
         try:
-            int(result.value)
+            value = int(result.value)
         except ValueError:
             return proof_result(False, "sequence value is not an integer")
-        valid = not prepared.pad_width or len(result.value) >= prepared.pad_width
-        return proof_result(valid, "sequence value violates its padding contract")
+        if result.value != str(value).zfill(prepared.pad_width):
+            return proof_result(False, "sequence value violates its padding contract")
+        delta = value - prepared.start
+        valid = delta % prepared.step == 0 and delta // prepared.step >= 0
+        return proof_result(valid, "sequence value is outside its configured progression")

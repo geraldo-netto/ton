@@ -96,7 +96,7 @@ _CONTROL_ESCAPES = {
     "a": "\a",
     "0": "\0",
 }
-_BRACE_RE = re.compile(r"\{(\d+)(,(\d*))?\}")
+_BRACE_RE = re.compile(r"\{(\d*)(,(\d*))?\}")
 Node = tuple[Any, Any]
 
 
@@ -194,7 +194,11 @@ class _Parser:
         match = _BRACE_RE.match(self.text, self.pos)
         if match is None:
             return None  # a bare '{' is a literal, handled as an atom
-        lo = int(match.group(1))
+        if not match.group(1) and match.group(2) is None:
+            return None
+        if not match.group(1) and match.group(3) == "":
+            return None
+        lo = int(match.group(1) or 0)
         if match.group(2) is None:
             hi: Any = lo
         elif match.group(3) == "":

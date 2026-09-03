@@ -113,6 +113,13 @@ def test_vendored_parser_matches_reference(pattern: str) -> None:
 def test_bare_brace_is_literal() -> None:
     # '{' not forming a valid quantifier is a literal char.
     assert _draw("a{") == "a{"
+    assert _draw("a{}") == "a{}"
+    assert _draw("a{,}") == "a{,}"
+
+
+def test_open_lower_bound_quantifier_matches_python_semantics() -> None:
+    for seed in range(20):
+        assert re.fullmatch(r"a{,2}", _draw("a{,2}", seed))
 
 
 def test_class_backspace_escape() -> None:
@@ -148,6 +155,13 @@ def test_unsupported_escape_forms_are_rejected(pattern: str) -> None:
 def test_vendored_parser_rejects_bad_patterns(pattern: str) -> None:
     generator = RegexGenerator()
     with pytest.raises(ValueError):
+        generator.prepare({"pattern": pattern})
+
+
+@pytest.mark.parametrize("pattern", [r"[^]", r"[\d-a]"])
+def test_rejects_patterns_invalid_to_python_regex(pattern: str) -> None:
+    generator = RegexGenerator()
+    with pytest.raises(ValueError, match="not a valid regex"):
         generator.prepare({"pattern": pattern})
 
 

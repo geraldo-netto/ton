@@ -68,7 +68,14 @@ class RegexGenerator(Generator):
         except RegexParseError as exc:
             raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
         _validate_anchors(parsed)
-        return RegexSpec(pattern=pattern, parsed=_prepare_nodes(parsed))
+        prepared = _prepare_nodes(parsed)
+        try:
+            re.compile(pattern)
+        except RecursionError:
+            pass  # The iterative vendored parser already validated deep nesting.
+        except re.error as exc:
+            raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
+        return RegexSpec(pattern=pattern, parsed=prepared)
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:
         parts: list[str] = []

@@ -40,6 +40,14 @@ def test_missing_file_raises_filenotfound(tmp_path: Path) -> None:
         load(tmp_path / "nope.json")
 
 
+def test_non_utf8_config_raises_config_error(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_bytes(b"\xff")
+
+    with pytest.raises(ConfigError, match="valid UTF-8"):
+        load(path)
+
+
 @pytest.mark.parametrize(
     "mutator",
     [

@@ -51,8 +51,11 @@ def load(path: str | Path) -> dict[str, Any]:
     if not config_path.is_file():
         raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    with config_path.open(encoding="utf-8") as fh:
-        data = json.load(fh)
+    try:
+        with config_path.open(encoding="utf-8") as fh:
+            data = json.load(fh)
+    except UnicodeDecodeError as exc:
+        raise ConfigError(f"Config file must be valid UTF-8: {exc}") from exc
 
     validate_structure(data)
     return cast(dict[str, Any], data)

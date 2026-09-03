@@ -289,6 +289,22 @@ def test_cli_unexpected_error_returns_3(
     assert "Traceback" not in captured.err
 
 
+def test_cli_non_utf8_config_returns_invalid_config(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config = tmp_path / "config.json"
+    config.write_bytes(b"\xff")
+
+    exit_code = main([str(config)])
+
+    captured = capsys.readouterr()
+    assert exit_code == 2
+    assert "invalid config" in captured.err
+    assert "valid UTF-8" in captured.err
+    assert "unexpected error" not in captured.err
+
+
 def test_cli_keyboard_interrupt_returns_130(
     monkeypatch, write_config, capsys: pytest.CaptureFixture[str]
 ) -> None:

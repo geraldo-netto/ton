@@ -411,6 +411,8 @@ class Engine:
     def _generate_source(self, type_key: str, field: PreparedField) -> str:
         try:
             return cast(str, field.generator.generate(field.source_prepared, self._rng))
+        except ValidationError:
+            raise
         except Exception as exc:
             self._raise_pipeline_error(
                 GeneratorExecutionError,

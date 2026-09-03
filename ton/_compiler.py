@@ -204,13 +204,15 @@ class EngineCompiler:
         transforms, _is_paired, uses_source = self._prepare_transforms(
             f"{parent_type}.{location}", nested_spec, child, context
         )
-        if not transforms:
+        validators = self._resolve_validators(f"{parent_type}.{location}", nested_spec)
+        if not transforms and not validators:
             return child, source_prepared
         return ChildPipelineGenerator(), ChildPipelineSpec(
             generator=child,
             source_prepared=source_prepared,
             transforms=transforms,
             uses_source=uses_source,
+            validators=validators,
         )
 
     def _validate_id_references(self, prepared: Mapping[str, PreparedField]) -> None:
@@ -341,7 +343,12 @@ class EngineCompiler:
 
     def _resolve_validators(self, type_key: str, spec: Mapping[str, Any]) -> tuple[Validator, ...]:
         resolved: list[Validator] = []
-        for reference in spec.get("validators", []):
+        references = spec.get("validators", [])
+        if not isinstance(references, list):
+            raise TemplateError(f"Validators for variable {type_key!r} must be a list")
+        if any(not isinstance(reference, str) for reference in references):
+            raise TemplateError(f"Validator references for variable {type_key!r} must be strings")
+        for reference in references:
             normalized = normalize_reference(reference)
             validator = self.validators.get(normalized) or self.validators.get(reference)
             if validator is None:

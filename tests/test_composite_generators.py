@@ -15,6 +15,7 @@ import pytest
 from ton import api
 from ton._engine import Engine, TemplateError
 from ton._logging import LogEvent
+from ton._validation import ValidationError
 from ton.generators.base import Generator, PreparationContext, prepare_child_spec
 from ton.generators.one_of import OneOfGenerator
 from ton.generators.sequence_of import SequenceOfGenerator
@@ -198,6 +199,73 @@ def test_one_of_rejects_malformed_nested_transforms(transforms: Any) -> None:
     }
 
     with pytest.raises(api.ConfigError, match="must be a list|with a string 'type'"):
+        api.validate_config(config)
+
+
+def test_one_of_runs_nested_validators() -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "oneOf",
+                "choices": [
+                    {
+                        "type": "string",
+                        "values": [""],
+                        "validators": ["non_empty"],
+                    }
+                ],
+            }
+        },
+    }
+
+    with pytest.raises(ValidationError, match="non_empty"):
+        list(api.generate(config))
+
+
+@pytest.mark.parametrize("validators", ["non_empty", [123]])
+def test_one_of_rejects_malformed_nested_validators(validators: Any) -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "oneOf",
+                "choices": [
+                    {
+                        "type": "string",
+                        "values": ["source"],
+                        "validators": validators,
+                    }
+                ],
+            }
+        },
+    }
+
+    with pytest.raises(api.ConfigError, match="Validators|Validator references"):
+        api.validate_config(config)
+
+
+def test_one_of_rejects_unknown_nested_validator() -> None:
+    config = {
+        "rows": 1,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "oneOf",
+                "choices": [
+                    {
+                        "type": "string",
+                        "values": ["source"],
+                        "validators": ["missing"],
+                    }
+                ],
+            }
+        },
+    }
+
+    with pytest.raises(api.ConfigError, match="Unknown validator 'missing'"):
         api.validate_config(config)
 
 

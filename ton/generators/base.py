@@ -36,6 +36,7 @@ from typing import Any, ClassVar
 
 from .._proof import PreparedTransform, ProofResult, TransformStep
 from .._transforms import TransformResult
+from .._validation import ValidationError
 
 ChildPreparer = Callable[
     ["PreparationContext", str, str, Any],
@@ -211,6 +212,7 @@ class ChildPipelineSpec:
     source_prepared: Any
     transforms: tuple[PreparedTransform, ...]
     uses_source: bool
+    validators: tuple[Any, ...] = ()
 
 
 class ChildPipelineGenerator(Generator):
@@ -230,6 +232,9 @@ class ChildPipelineGenerator(Generator):
             before = result
             result = transform.transform.apply(transform.prepared, before, rng)
             steps.append(TransformStep(transform, before, result))
+        for validator in prepared.validators:
+            if not validator.validate(result.value):
+                raise ValidationError(f"Nested value failed validator {validator.type_name!r}")
         return _GeneratedChildValue(result.value, prepared, source, tuple(steps))
 
     def prove(self, prepared: ChildPipelineSpec, result: TransformResult) -> ProofResult:

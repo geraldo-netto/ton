@@ -31,7 +31,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from random import Random
-from typing import Any
+from typing import Any, cast
 
 from .._proof import ProofResult
 from .._transforms import TransformResult
@@ -52,6 +52,36 @@ _AnchorWorkItem = tuple[tuple[tuple[Any, Any], ...], bool, bool]
 class RegexSpec:
     pattern: str
     parsed: tuple[tuple[Any, Any], ...]
+    matcher: _MatcherPlan
+
+
+@dataclass(frozen=True)
+class _MatchNode:
+    op: Any
+    arg: Any
+
+
+@dataclass(frozen=True)
+class _MatcherPlan:
+    sequences: tuple[tuple[_MatchNode, ...], ...]
+
+
+@dataclass(frozen=True)
+class _SequenceTask:
+    sequence: int
+    index: int = 0
+
+
+@dataclass(frozen=True)
+class _RepeatTask:
+    sequence: int
+    minimum: int
+    maximum: int | None
+    count: int = 0
+
+
+_MatchTask = _SequenceTask | _RepeatTask
+_MatchState = tuple[tuple[_MatchTask, ...], int]
 
 
 class RegexGenerator(Generator):
@@ -75,7 +105,7 @@ class RegexGenerator(Generator):
             pass  # The iterative vendored parser already validated deep nesting.
         except re.error as exc:
             raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
-        return RegexSpec(pattern=pattern, parsed=prepared)
+        return RegexSpec(pattern=pattern, parsed=prepared, matcher=_build_matcher(prepared))
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:
         parts: list[str] = []
@@ -84,9 +114,134 @@ class RegexGenerator(Generator):
 
     def prove(self, prepared: RegexSpec, result: TransformResult) -> ProofResult:
         return proof_result(
-            re.fullmatch(prepared.pattern, result.value) is not None,
+            _matches(prepared.matcher, result.value),
             "value does not match regex 'pattern'",
         )
+
+
+def _build_matcher(root: tuple[tuple[Any, Any], ...]) -> _MatcherPlan:
+    sources: list[Iterable[tuple[Any, Any]]] = [root]
+    sequence_ids = {id(root): 0}
+    compiled: list[tuple[_MatchNode, ...] | None] = [None]
+
+    def register(source: Iterable[tuple[Any, Any]]) -> int:
+        identity = id(source)
+        if identity not in sequence_ids:
+            sequence_ids[identity] = len(sources)
+            sources.append(source)
+            compiled.append(None)
+        return sequence_ids[identity]
+
+    for sequence_id, source in enumerate(sources):
+        compiled[sequence_id] = tuple(_compile_match_node(node, register) for node in source)
+    return _MatcherPlan(tuple(sequence or () for sequence in compiled))
+
+
+def _compile_match_node(
+    node: tuple[Any, Any],
+    register: Any,
+) -> _MatchNode:
+    op, arg = node
+    if op is rx.SUBPATTERN:
+        return _MatchNode(op, register(arg[3]))
+    if op is rx.BRANCH:
+        return _MatchNode(op, tuple(register(branch) for branch in arg[1]))
+    if op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
+        maximum = None if arg[1] is rx.MAXREPEAT else arg[1]
+        return _MatchNode(op, (arg[0], maximum, register(arg[2])))
+    return _MatchNode(op, arg)
+
+
+def _matches(plan: _MatcherPlan, value: str) -> bool:
+    pending: list[_MatchState] = [((_SequenceTask(0),), 0)]
+    seen: set[_MatchState] = set()
+    while pending:
+        tasks, position = pending.pop()
+        state = (tasks, position)
+        if state in seen:
+            continue
+        seen.add(state)
+        if not tasks:
+            if position == len(value):
+                return True
+            continue
+        pending.extend(_advance_match(plan, value, tasks, position))
+    return False
+
+
+def _advance_match(
+    plan: _MatcherPlan,
+    value: str,
+    tasks: tuple[_MatchTask, ...],
+    position: int,
+) -> tuple[_MatchState, ...]:
+    task, rest = tasks[0], tasks[1:]
+    if isinstance(task, _RepeatTask):
+        return _advance_repeat(task, rest, position)
+    sequence = plan.sequences[task.sequence]
+    if task.index == len(sequence):
+        return ((rest, position),)
+    continuation = (_SequenceTask(task.sequence, task.index + 1), *rest)
+    return _advance_node(plan, value, sequence[task.index], continuation, position)
+
+
+def _advance_repeat(
+    task: _RepeatTask,
+    rest: tuple[_MatchTask, ...],
+    position: int,
+) -> tuple[_MatchState, ...]:
+    states: list[_MatchState] = []
+    if task.count >= task.minimum:
+        states.append((rest, position))
+    if task.maximum is None or task.count < task.maximum:
+        next_count = min(task.count + 1, task.minimum) if task.maximum is None else task.count + 1
+        states.append(
+            (
+                (
+                    _SequenceTask(task.sequence),
+                    _RepeatTask(task.sequence, task.minimum, task.maximum, next_count),
+                    *rest,
+                ),
+                position,
+            )
+        )
+    return tuple(states)
+
+
+def _advance_node(
+    plan: _MatcherPlan,
+    value: str,
+    node: _MatchNode,
+    rest: tuple[_MatchTask, ...],
+    position: int,
+) -> tuple[_MatchState, ...]:
+    if node.op is rx.SUBPATTERN:
+        return (((_SequenceTask(node.arg), *rest), position),)
+    if node.op is rx.BRANCH:
+        return tuple(((_SequenceTask(branch), *rest), position) for branch in node.arg)
+    if node.op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
+        minimum, maximum, sequence = node.arg
+        return (((_RepeatTask(sequence, minimum, maximum), *rest), position),)
+    if node.op is rx.AT:
+        return ((rest, position),)
+    if position < len(value) and _atom_matches(node, value[position]):
+        return ((rest, position + 1),)
+    return ()
+
+
+def _atom_matches(node: _MatchNode, char: str) -> bool:
+    if node.op is rx.LITERAL:
+        return char == chr(node.arg)
+    if node.op is rx.ANY:
+        return char != "\n"
+    if node.op in (rx.IN, rx.NOT_LITERAL):
+        return char in node.arg
+    if node.op is rx.CATEGORY:
+        return char in _category_pool(node.arg)
+    if node.op is rx.RANGE:
+        lower, upper = cast(tuple[int, int], node.arg)
+        return lower <= ord(char) <= upper
+    return False
 
 
 # ---------------------------------------------------------------------------

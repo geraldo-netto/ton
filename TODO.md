@@ -4,7 +4,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| SEC-007 | open | medium | l | Replace `RegexGenerator.prove()`'s user-pattern `re.fullmatch()` with a ReDoS-resilient matcher over the prepared AST. Failing suffixes against patterns such as `(a+)+$` still trigger exponential backtracking; cover nested repeats and overlapping alternations without imposing pattern, repeat, row-width, or input-length caps. |
 | SEC-022 | open | medium | m | Sanitize or reject every entry-point-derived value before logging it. Unicode-confusable entry-point identifiers pass `_validate_identifier()` and are emitted raw by `plugin_registered`, while distribution names and versions reach entry-point log messages and structured fields without `_sanitize_for_log()`, contradicting the documented printable-ASCII logging contract. |
 | REL-035 | open | medium | l | Make `DateGenerator.prove()` enforce the configured interval and calendar relationships, not only per-directive text shapes. An out-of-range value such as `2099-12-31` passes a `2024-01-01..2024-01-02` `%Y-%m-%d` proof, so proof modes cannot detect bounded-date generation faults. |
 | REL-036 | open | medium | m | Make `SequenceGenerator.prove()` verify the configured start/step progression as well as integer syntax and padding. The prepared spec discards start/step metadata, so arbitrary values such as `-999` pass proof for a sequence starting at 10 with step 2. |

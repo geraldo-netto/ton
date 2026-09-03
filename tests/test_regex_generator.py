@@ -8,6 +8,8 @@ from random import Random
 import pytest
 
 from ton._transforms import TransformResult
+from ton.generators import _regex_parse as rx
+from ton.generators import regex as regex_module
 from ton.generators.regex import RegexGenerator
 
 
@@ -213,3 +215,42 @@ def test_prepared_regex_pools_preserve_seeded_choices(pattern: str, pool: tuple[
 
     for seed in range(20):
         assert generator.generate(prepared, Random(seed)) == Random(seed).choice(pool)
+
+
+def test_proof_does_not_call_python_backtracking_matcher(monkeypatch) -> None:
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": r"(a+)+$"})
+    monkeypatch.setattr(re, "fullmatch", lambda *args: pytest.fail("used re.fullmatch"))
+
+    result = generator.prove(prepared, TransformResult("a" * 1_000 + "!"))
+
+    assert not result.ok
+
+
+@pytest.mark.parametrize(
+    ("pattern", "accepted", "rejected"),
+    [
+        (r"(ab|a)+", "abaab", "abx"),
+        (r"[^x]{2,4}", "abc", "ax"),
+        (r"a{,2}b", "aab", "aaab"),
+        (r"^\d+$", "123", "12x"),
+        (r"(?:a?)*", "aaa", "b"),
+    ],
+)
+def test_ast_proof_matcher_accepts_and_rejects(
+    pattern: str,
+    accepted: str,
+    rejected: str,
+) -> None:
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": pattern})
+
+    assert generator.prove(prepared, TransformResult(accepted)).ok
+    assert not generator.prove(prepared, TransformResult(rejected)).ok
+
+
+def test_ast_matcher_atom_dispatch_covers_defensive_nodes() -> None:
+    assert regex_module._atom_matches(regex_module._MatchNode(rx.ANY, None), "x")
+    assert not regex_module._atom_matches(regex_module._MatchNode(rx.ANY, None), "\n")
+    assert regex_module._atom_matches(regex_module._MatchNode(rx.RANGE, (ord("a"), ord("c"))), "b")
+    assert not regex_module._atom_matches(regex_module._MatchNode(rx.AT, "^"), "a")

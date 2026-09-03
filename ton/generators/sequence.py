@@ -11,9 +11,9 @@ Spec fields::
 
 State lives on the prepared spec (one ``itertools.count`` per engine
 instance). When the engine is replicated across worker processes via
-:func:`ton.concurrency.fork_engine`, each worker starts its own
-counter -- callers that need globally-unique ids across workers
-should set ``start`` to ``worker_id * chunk_size``.
+:func:`ton.concurrency.fork_engine`, TON automatically offsets each
+worker's configured ``start`` by its exact preceding-row count and
+``step``. Do not apply an additional manual worker offset.
 
 Thread-safety (CONC-003)
 -----------------------------

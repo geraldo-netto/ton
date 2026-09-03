@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parent.parent
 README = (ROOT / "README.md").read_text(encoding="utf-8")
 CI = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 PRE_COMMIT = (ROOT / ".githooks" / "pre-commit").read_text(encoding="utf-8")
+SEQUENCE_MODULE = (ROOT / "ton" / "generators" / "sequence.py").read_text(encoding="utf-8")
 
 
 def test_library_streaming_example_writes_each_row_once() -> None:
@@ -29,6 +30,11 @@ def test_documented_quality_commands_match_ci_and_pre_commit_gate() -> None:
         assert command in CI
         assert command in PRE_COMMIT
     assert "mypy ton tests" not in README
+
+
+def test_sequence_worker_guidance_uses_automatic_offsets() -> None:
+    assert "automatically offsets" in SEQUENCE_MODULE
+    assert "worker_id * chunk_size" not in SEQUENCE_MODULE
 
 
 def test_closed_review_ids_are_not_left_as_todo_annotations() -> None:

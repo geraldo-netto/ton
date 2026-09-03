@@ -107,6 +107,14 @@ class BaseTransform:
     config_keys: ClassVar[frozenset[str] | None] = None
     requires_source: ClassVar[bool] = True
 
+    def nested_specs(
+        self,
+        spec: Mapping[str, Any],
+    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        """Declare generator-bearing config locations for lazy discovery."""
+        del spec
+        return ()
+
     def prepare(self, spec: Mapping[str, Any]) -> Any:
         return spec
 

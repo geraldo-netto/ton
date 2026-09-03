@@ -9,7 +9,7 @@ from typing import Any, ClassVar
 
 import pytest
 
-from ton._compiler import CompiledPlan
+from ton._compiler import CompiledPlan, EngineCompiler
 from ton._config import ConfigError
 from ton._engine import (
     Engine,
@@ -428,6 +428,52 @@ def test_lazy_registry_does_not_treat_transform_type_as_generator(monkeypatch) -
 
     assert list(Engine(config)) == ["x"]
     assert requested == [{"string"}, {"string"}]
+
+
+def test_lazy_registry_discovers_distribution_choice_types() -> None:
+    config = {
+        "rows": 20,
+        "format": "$v$",
+        "types": {
+            "v": {
+                "type": "string",
+                "values": ["not drawn"],
+                "transforms": [
+                    {
+                        "type": "distribution",
+                        "choices": [
+                            {"weight": 1, "spec": {"type": "string", "values": ["s"]}},
+                            {
+                                "weight": 1,
+                                "spec": {
+                                    "type": "integer",
+                                    "minValue": 1,
+                                    "maxValue": 1,
+                                },
+                            },
+                        ],
+                    }
+                ],
+            }
+        },
+    }
+
+    assert set(Engine.from_config(config, seed=0)) == {"s", "1"}
+
+
+@pytest.mark.parametrize(
+    "transforms",
+    ["distribution", [None], [{}]],
+)
+def test_transform_child_discovery_ignores_malformed_specs(transforms: Any) -> None:
+    config = {
+        "rows": 0,
+        "format": "$v$",
+        "types": {"v": {"type": "string", "values": ["x"]}},
+    }
+    compiler = EngineCompiler(config, None, None, None)
+
+    assert compiler._transform_child_specs({"transforms": transforms}) == ()
 
 
 def test_engine_preserves_paired_value_through_identity_transform() -> None:

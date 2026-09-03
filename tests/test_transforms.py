@@ -86,6 +86,17 @@ def test_distribution_transform_chooses_prepared_candidate() -> None:
     assert result == TransformResult("always")
 
 
+def test_distribution_transform_declares_nested_specs() -> None:
+    transform = DistributionTransform()
+    first = {"type": "string", "values": ["a"]}
+    second = {"type": "integer", "minValue": 1, "maxValue": 2}
+
+    assert transform.nested_specs(
+        {"choices": [{"spec": first}, {"weight": 2, "spec": second}]}
+    ) == (("choices[0].spec", first), ("choices[1].spec", second))
+    assert transform.nested_specs({"choices": "invalid"}) == ()
+
+
 def test_distribution_transform_requires_two_choices() -> None:
     transform = DistributionTransform()
 

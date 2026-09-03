@@ -20,6 +20,19 @@ class DistributionTransform(BaseTransform):
     config_keys: ClassVar[frozenset[str] | None] = frozenset(("choices",))
     requires_source: ClassVar[bool] = False
 
+    def nested_specs(
+        self,
+        spec: Mapping[str, Any],
+    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        choices = spec.get("choices")
+        if not isinstance(choices, list):
+            return ()
+        return tuple(
+            (f"choices[{index}].spec", choice["spec"])
+            for index, choice in enumerate(choices)
+            if isinstance(choice, Mapping) and isinstance(choice.get("spec"), Mapping)
+        )
+
     def prepare_composite(
         self,
         spec: Mapping[str, Any],

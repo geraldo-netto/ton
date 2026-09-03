@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
@@ -76,7 +76,6 @@ class EngineCompiler:
             if prepare_all_fields
             else tuple(dict.fromkeys(token.type_key for token in self.tokens))
         )
-        self.registry = self._resolve_registry(registry)
         built_in_transforms = default_transforms()
         built_in_validators = default_validators()
         self.transforms = dict(
@@ -95,6 +94,7 @@ class EngineCompiler:
                 **{f"core.{name}": value for name, value in built_in_validators.items()},
             }
         )
+        self.registry = self._resolve_registry(registry)
 
     def compile(self) -> CompiledPlan:
         self._validate()
@@ -121,19 +121,50 @@ class EngineCompiler:
         if registry is not None:
             return dict(registry)
         root_specs: list[Mapping[str, Any]] = []
-        root_types: set[str] = set()
         for type_key in self.field_keys:
             spec = self.types.get(type_key)
             if isinstance(spec, Mapping) and "type" in spec:
                 root_specs.append(spec)
-                root_types.add(runtime_type_name(spec["type"]))
-        roots = make_registry(root_types)
-        needed = set(root_types)
-        for spec in root_specs:
-            generator = roots.get(runtime_type_name(spec["type"]))
+        return make_registry(self._discover_generator_types(root_specs))
+
+    def _discover_generator_types(
+        self,
+        root_specs: list[Mapping[str, Any]],
+    ) -> set[str]:
+        needed: set[str] = set()
+        pending = list(root_specs)
+        while pending:
+            spec = pending.pop()
+            type_name = runtime_type_name(spec.get("type"))
+            needed.add(type_name)
+            generator = make_registry((type_name,)).get(type_name)
             if generator is not None:
-                needed.update(runtime_type_name(name) for name in generator.nested_types(spec))
-        return make_registry(needed)
+                pending.extend(child for _location, child in generator.nested_specs(spec))
+            pending.extend(self._transform_child_specs(spec))
+        return needed
+
+    def _transform_child_specs(
+        self,
+        field_spec: Mapping[str, Any],
+    ) -> tuple[Mapping[str, Any], ...]:
+        children: list[Mapping[str, Any]] = []
+        transforms = field_spec.get("transforms", [])
+        if not isinstance(transforms, list):
+            return ()
+        for transform_spec in transforms:
+            if not isinstance(transform_spec, Mapping):
+                continue
+            reference = transform_spec.get("type")
+            if not isinstance(reference, str):
+                continue
+            transform = self.transforms.get(normalize_reference(reference)) or self.transforms.get(
+                reference
+            )
+            nested_specs = getattr(transform, "nested_specs", None)
+            if callable(nested_specs):
+                declared = cast(Any, nested_specs)(transform_spec)
+                children.extend(child for _location, child in declared)
+        return tuple(children)
 
     def _validate(self) -> None:
         for type_key in self.field_keys:

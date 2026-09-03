@@ -513,6 +513,71 @@ def test_date_prepare_parses_bounds_once() -> None:
         DateGenerator().generate(prepared, rng)
 
 
+def test_date_proof_rejects_out_of_range_and_invalid_calendar_values() -> None:
+    generator = DateGenerator()
+    prepared = generator.prepare(
+        {
+            "minValue": "2024-01-01",
+            "maxValue": "2024-01-02",
+            "format": "%Y-%m-%d",
+        }
+    )
+
+    assert not generator.prove(prepared, TransformResult("2099-12-31")).ok
+    assert not generator.prove(prepared, TransformResult("2024-02-30")).ok
+
+
+def test_date_proof_rejects_inconsistent_weekday() -> None:
+    generator = DateGenerator()
+    prepared = generator.prepare(
+        {
+            "minValue": "2024-01-01",
+            "maxValue": "2024-01-01",
+            "format": "%Y-%m-%d %A",
+        }
+    )
+
+    proof = generator.prove(prepared, TransformResult("2024-01-01 Tuesday"))
+
+    assert not proof.ok
+    assert "inconsistent" in proof.reason
+
+
+@pytest.mark.parametrize(
+    ("fmt", "value"),
+    [
+        ("%Y-%m-%d %H:%M:%S.%f", "2024-01-01 13:05:06.123456"),
+        ("%Y-%m-%d %H:%M", "2024-01-01 13:05"),
+        ("%Y-%m-%d %H", "2024-01-01 13"),
+        ("%x", "01/01/24"),
+    ],
+)
+def test_date_proof_handles_each_output_resolution(fmt: str, value: str) -> None:
+    generator = DateGenerator()
+    prepared = generator.prepare(
+        {
+            "minValue": "2024-01-01T13:05:06.123456",
+            "maxValue": "2024-01-01T13:05:06.123456",
+            "format": fmt,
+        }
+    )
+
+    assert generator.prove(prepared, TransformResult(value)).ok
+
+
+def test_date_proof_aligns_omitted_timezone_with_aware_bounds() -> None:
+    generator = DateGenerator()
+    prepared = generator.prepare(
+        {
+            "minValue": "2024-01-01T00:00:00+05:30",
+            "maxValue": "2024-01-01T00:00:00+05:30",
+            "format": "%Y-%m-%d",
+        }
+    )
+
+    assert generator.prove(prepared, TransformResult("2024-01-01")).ok
+
+
 def test_ntlm_pair_consistency() -> None:
     gen = HashGenerator()
     prepared = gen.prepare({"algorithm": "ntlm", "values": ["secret"]})

@@ -97,10 +97,12 @@ class DateSpec:
     """Prepared spec: ISO bounds parsed once, ready for fast row draws."""
 
     lo: datetime
+    hi: datetime
     span_seconds: int
     fmt: str
     format_tokens: tuple[FormatToken, ...]
     value_pattern: re.Pattern[str]
+    proof_format: str | None
 
 
 class DateGenerator(Generator):
@@ -114,10 +116,12 @@ class DateGenerator(Generator):
         format_tokens = _tokenize_format(fmt)
         return DateSpec(
             lo=lo,
+            hi=hi,
             span_seconds=duration_seconds(lo, hi),
             fmt=fmt,
             format_tokens=format_tokens,
             value_pattern=_compile_pattern(format_tokens),
+            proof_format=_proof_parseable_format(lo, fmt, format_tokens),
         )
 
     def generate(self, prepared: DateSpec, rng: Random) -> str:
@@ -128,6 +132,19 @@ class DateGenerator(Generator):
     def prove(self, prepared: DateSpec, result: TransformResult) -> ProofResult:
         if prepared.value_pattern.fullmatch(result.value) is None:
             return proof_result(False, "value does not match the date format")
+        if prepared.proof_format is None:
+            return proof_result(True, "")
+        try:
+            moment = datetime.strptime(result.value, prepared.proof_format)
+        except ValueError:
+            return proof_result(False, "value is not a valid calendar date")
+        moment = _align_proof_timezone(moment, prepared.lo)
+        if _render(moment, prepared.format_tokens) != result.value:
+            return proof_result(False, "value has inconsistent date components")
+        if _has_complete_date(prepared.format_tokens):
+            interval_end = moment + _proof_resolution(prepared.format_tokens)
+            if interval_end < prepared.lo or moment > prepared.hi:
+                return proof_result(False, "value is outside the configured date interval")
         return proof_result(True, "")
 
 
@@ -163,6 +180,53 @@ def _compile_pattern(tokens: tuple[FormatToken, ...]) -> re.Pattern[str]:
 def _format_token(moment: datetime, token: FormatToken) -> str:
     is_directive, text = token
     return _format_directive(moment, text) if is_directive else text
+
+
+def _render(moment: datetime, tokens: tuple[FormatToken, ...]) -> str:
+    return "".join(_format_token(moment, token) for token in tokens)
+
+
+def _proof_parseable_format(
+    sample_moment: datetime,
+    fmt: str,
+    tokens: tuple[FormatToken, ...],
+) -> str | None:
+    sample = _render(sample_moment, tokens)
+    try:
+        parsed = datetime.strptime(sample, fmt)
+    except (re.error, ValueError):
+        return None
+    parsed = _align_proof_timezone(parsed, sample_moment)
+    return fmt if _render(parsed, tokens) == sample else None
+
+
+def _align_proof_timezone(moment: datetime, bound: datetime) -> datetime:
+    if moment.tzinfo is None and bound.tzinfo is not None:
+        return moment.replace(tzinfo=bound.tzinfo)
+    return moment
+
+
+def _proof_resolution(tokens: tuple[FormatToken, ...]) -> timedelta:
+    directives = {text for is_directive, text in tokens if is_directive}
+    if "f" in directives:
+        return timedelta(0)
+    if directives & {"S", "X", "c"}:
+        return timedelta(microseconds=999_999)
+    if "M" in directives:
+        return timedelta(seconds=59, microseconds=999_999)
+    if directives & {"H", "I", "p"}:
+        return timedelta(minutes=59, seconds=59, microseconds=999_999)
+    return timedelta(days=1, microseconds=-1)
+
+
+def _has_complete_date(tokens: tuple[FormatToken, ...]) -> bool:
+    directives = {text for is_directive, text in tokens if is_directive}
+    if directives & {"c", "x"}:
+        return True
+    has_year = bool(directives & {"Y", "y"})
+    return has_year and (
+        "j" in directives or ("d" in directives and bool(directives & {"m", "b", "B"}))
+    )
 
 
 def _format_directive(moment: datetime, directive: str) -> str:

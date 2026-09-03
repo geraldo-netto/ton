@@ -269,7 +269,6 @@ class ProofChecker:
                 "type_key": failure.type_key,
                 "stage": failure.stage,
                 "reference": failure.reference,
-                "reason": failure.reason,
             },
         )
 

@@ -745,7 +745,7 @@ def test_cli_strict_redaction_does_not_require_proof_report(
     assert exit_code == 2
     assert REDACTED in error
     assert "bad value" not in error
-    assert failure_log.reason == REDACTED
+    assert not hasattr(failure_log, "reason")
 
 
 def test_cli_rejects_shared_data_and_proof_report_path(

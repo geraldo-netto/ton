@@ -129,7 +129,7 @@ def test_redaction_masks_echoing_reason_in_audit_report_and_log(
     )
     assert record["reason"] == REDACTED
     assert engine.proof_failures[0].reason == REDACTED
-    assert failure_log.reason == REDACTED
+    assert not hasattr(failure_log, "reason")
     assert "credential-secret" not in stream.getvalue()
 
 
@@ -158,7 +158,30 @@ def test_strict_proof_redaction_masks_echoing_reason(
         item for item in caplog.records if getattr(item, "event", "") == "proof_check_failed"
     )
     assert "credential-secret" not in str(raised.value)
-    assert failure_log.reason == REDACTED
+    assert not hasattr(failure_log, "reason")
+
+
+def test_clear_proof_log_omits_plugin_controlled_reason(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    engine = Engine.from_config(
+        {
+            "rows": 1,
+            "format": "$credential$",
+            "types": {"credential": {"type": "echoing_reason"}},
+        },
+        registry={"echoing_reason": _EchoingReasonGenerator()},
+        proof_mode="audit",
+    )
+
+    with caplog.at_level(logging.WARNING, logger="ton"):
+        list(engine)
+
+    failure_log = next(
+        item for item in caplog.records if getattr(item, "event", "") == "proof_check_failed"
+    )
+    assert "reason" not in vars(failure_log)
+    assert "credential-secret" not in repr(vars(failure_log))
 
 
 def test_proof_audit_writer_maps_stream_errors() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import subprocess
 import sys
 import threading
@@ -383,6 +384,15 @@ def test_normalize_reference_defaults_to_core_namespace() -> None:
         normalize_reference("bad-name")
     with pytest.raises(RegistryError, match="invalid registry reference"):
         normalize_reference("too.many.parts")
+    with pytest.raises(RegistryError, match="ASCII"):
+        normalize_reference("plug.раypal")
+
+
+def test_entry_point_selector_rejects_unicode_confusables() -> None:
+    with pytest.raises(RegistryError, match="invalid distribution"):
+        EntryPointSelector("ton.generators", "раypal", "acme.custom")
+    with pytest.raises(RegistryError, match="ASCII"):
+        EntryPointSelector("ton.generators", "acme", "acme.раypal")
 
 
 def test_catalog_entry_points_load_separate_plugin_kinds() -> None:
@@ -421,6 +431,44 @@ def test_catalog_entry_points_load_separate_plugin_kinds() -> None:
     assert "acme.custom" in catalog.list_data_types()
     assert "acme.trim" in catalog.list_transforms()
     assert "acme.custom" in catalog.list_validators()
+
+
+def test_entry_point_logs_and_provenance_sanitize_distribution_metadata(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class CustomGenerator(Generator):
+        type_name = "custom"
+
+        def generate(self, prepared: Any, rng: Random) -> str:
+            del prepared, rng
+            return "custom"
+
+    ep = mock.Mock()
+    ep.name = "acme.custom"
+    ep.value = "pkg:Custom\nforged"
+    ep.dist = SimpleNamespace(name="safe\nforged", version="1\rforged")
+    ep.load.return_value = CustomGenerator
+
+    def _entry_points(group: str) -> list[Any]:
+        return [ep] if group == "ton.generators" else []
+
+    with (
+        caplog.at_level(logging.INFO, logger="ton"),
+        mock.patch("ton._registry.entry_points", side_effect=_entry_points),
+    ):
+        catalog = catalog_with_entry_points()
+
+    loaded = next(
+        record for record in caplog.records if getattr(record, "event", "") == "entry_point_loaded"
+    )
+    metadata = (loaded.ep_name, loaded.value, loaded.dist_name, loaded.dist_version)
+    assert all(
+        value is None or (value.isascii() and "\n" not in value and "\r" not in value)
+        for value in metadata
+    )
+    plugin = catalog.get_data_type("acme.custom")
+    assert plugin._ton_plugin_package == "safe?forged"
+    assert plugin._ton_plugin_version == "1?forged"
 
 
 def test_catalog_entry_points_honor_allowlist() -> None:

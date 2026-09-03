@@ -48,6 +48,8 @@ _T = TypeVar("_T")
 #: Identity-based allowlist of built-in classes. A third-party subclass may
 #: reuse a core ``type_name`` but can never become a default implementation.
 _BUILTIN_GENERATOR_CLASSES: frozenset[type[Generator]] = frozenset(BUILTIN_GENERATOR_CLASSES)
+_ASCII_IDENTIFIER = re.compile(r"[A-Za-z0-9_]+\Z")
+_ASCII_DISTRIBUTION = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*\Z")
 
 
 class RegistryError(ValueError):
@@ -72,6 +74,7 @@ class EntryPointSelector:
         object.__setattr__(self, "distribution", _normalize_distribution_name(self.distribution))
         if not self.name or ":" in self.name:
             raise RegistryError("entry-point name must be non-empty and cannot contain ':'")
+        _validate_reference(self.name)
 
     @classmethod
     def parse(cls, value: str) -> EntryPointSelector:
@@ -422,7 +425,7 @@ def _entry_point_sort_key(ep: object) -> tuple[str, str, str]:
 
 def _normalize_distribution_name(value: str) -> str:
     normalized = re.sub(r"[-_.]+", "-", value).lower()
-    if not normalized or any(not part.isalnum() for part in normalized.split("-")):
+    if _ASCII_DISTRIBUTION.fullmatch(normalized) is None:
         raise RegistryError(f"invalid distribution name {value!r}")
     return normalized
 
@@ -491,8 +494,8 @@ def _validate_reference(reference: str) -> None:
 
 
 def _validate_identifier(label: str, value: str) -> None:
-    if not value or not value.replace("_", "").isalnum():
-        raise RegistryError(f"{label} must contain only letters, numbers, or '_'")
+    if _ASCII_IDENTIFIER.fullmatch(value) is None:
+        raise RegistryError(f"{label} must contain only ASCII letters, numbers, or '_'")
 
 
 def discover_generator_classes() -> list[type[Generator]]:
@@ -631,17 +634,19 @@ def registry_with_entry_points(
 
 
 def _log_plugin_registered(kind: str, namespace: str, name: str) -> None:
+    safe_namespace = _sanitize_for_log(namespace)
+    safe_name = _sanitize_for_log(name)
     _logger.info(
         "plugin_registered kind=%s namespace=%s name=%s",
         kind,
-        namespace,
-        name,
+        safe_namespace,
+        safe_name,
         extra={
             "event": LogEvent.PLUGIN_REGISTERED.value,
             "kind": kind,
-            "namespace": namespace,
-            "plugin_name": name,
-            "reference": f"{namespace}.{name}",
+            "namespace": safe_namespace,
+            "plugin_name": safe_name,
+            "reference": f"{safe_namespace}.{safe_name}",
         },
     )
 
@@ -649,7 +654,7 @@ def _log_plugin_registered(kind: str, namespace: str, name: str) -> None:
 def _log_entry_point_failed(ep: object, exc: Exception) -> None:
     safe_name = _sanitize_for_log(getattr(ep, "name", ""))
     safe_value = _sanitize_for_log(getattr(ep, "value", ""))
-    dist_name, dist_version = _entry_point_dist(ep)
+    dist_name, dist_version = _safe_entry_point_dist(ep)
     _logger.warning(
         "entry_point_failed name=%s value=%s error_type=%s",
         safe_name,
@@ -669,7 +674,7 @@ def _log_entry_point_failed(ep: object, exc: Exception) -> None:
 def _log_entry_point_loaded(ep: object) -> None:
     safe_name = _sanitize_for_log(getattr(ep, "name", ""))
     safe_value = _sanitize_for_log(getattr(ep, "value", ""))
-    dist_name, dist_version = _entry_point_dist(ep)
+    dist_name, dist_version = _safe_entry_point_dist(ep)
     _logger.info(
         "entry_point_loaded name=%s value=%s dist=%s version=%s",
         safe_name,
@@ -700,6 +705,14 @@ def _sanitize_for_log(value: object) -> str:
     return "".join(ch if 0x20 <= ord(ch) < 0x7F else "?" for ch in raw)
 
 
+def _safe_entry_point_dist(ep: object) -> tuple[str | None, str | None]:
+    name, version = _entry_point_dist(ep)
+    return (
+        _sanitize_for_log(name) if name is not None else None,
+        _sanitize_for_log(version) if version is not None else None,
+    )
+
+
 def _stamp_plugin_dist(plugin: Any, ep: object) -> None:
     """Record the providing distribution on the plugin instance (OBS-001).
 
@@ -708,7 +721,7 @@ def _stamp_plugin_dist(plugin: Any, ep: object) -> None:
     generators never carry them, so provenance reports ``None`` for core
     types.
     """
-    name, version = _entry_point_dist(ep)
+    name, version = _safe_entry_point_dist(ep)
     plugin._ton_plugin_package = name
     plugin._ton_plugin_version = version
 

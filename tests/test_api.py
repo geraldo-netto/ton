@@ -7,6 +7,7 @@ import os
 import stat
 from pathlib import Path
 from random import Random
+from types import MappingProxyType
 from typing import Any
 from unittest import mock
 
@@ -70,6 +71,21 @@ def test_generate_yields_iterator(basic_config: dict) -> None:
     rows = list(api.generate(basic_config, seed=0))
     assert len(rows) == 4
     assert all(row.isdigit() for row in rows)
+
+
+def test_generate_and_validate_accept_read_only_mappings() -> None:
+    transform = MappingProxyType({"type": "identity"})
+    spec = MappingProxyType({"type": "string", "values": ["ok"], "transforms": [transform]})
+    config = MappingProxyType(
+        {
+            "rows": 1,
+            "format": "$value$",
+            "types": MappingProxyType({"value": spec}),
+        }
+    )
+
+    api.validate_config(config)
+    assert list(api.generate(config)) == ["ok"]
 
 
 def test_public_api_surface_matches_supported_checklist() -> None:

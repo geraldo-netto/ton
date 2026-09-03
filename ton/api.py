@@ -148,7 +148,7 @@ def output_encoding(config: Mapping[str, Any]) -> str:
 
 
 def validate_config(
-    config: dict[str, Any],
+    config: Mapping[str, Any],
     *,
     catalog: ExtensionCatalog | None = None,
 ) -> None:

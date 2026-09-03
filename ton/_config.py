@@ -58,7 +58,7 @@ def load(path: str | Path) -> dict[str, Any]:
     return cast(dict[str, Any], data)
 
 
-def validate_with_catalog(data: dict[str, Any], catalog: ExtensionCatalog) -> None:
+def validate_with_catalog(data: Mapping[str, Any], catalog: ExtensionCatalog) -> None:
     """Validate type and transform references against ``catalog``.
 
     Also runs each field's ``Generator.prepare`` so per-spec errors
@@ -104,7 +104,7 @@ def validate_structure(data: Any) -> None:
     _validate_row_width(data)
 
 
-def _validate_row_width(data: dict[str, Any]) -> None:
+def _validate_row_width(data: Mapping[str, Any]) -> None:
     if "maxRowWidth" not in data:
         return
     value = data["maxRowWidth"]
@@ -117,7 +117,7 @@ def row_width_limit(data: Mapping[str, Any]) -> int | None:
     return int(value) if value is not None else None
 
 
-def _validate_encoding(data: dict[str, Any]) -> None:
+def _validate_encoding(data: Mapping[str, Any]) -> None:
     """Validate the optional top-level ``encoding`` output codec (CFG-001)."""
     if "encoding" not in data:
         return
@@ -139,7 +139,7 @@ def output_encoding(data: Mapping[str, Any]) -> str:
 
 
 def _validate_root(data: Any) -> None:
-    if not isinstance(data, dict):
+    if not isinstance(data, Mapping):
         raise ConfigError("Config root must be a JSON object.")
     missing = [key for key in _REQUIRED_TOP_LEVEL if key not in data]
     if missing:
@@ -161,7 +161,7 @@ def _validate_format(template: Any) -> None:
 
 
 def _validate_types(types: Any) -> None:
-    if not isinstance(types, dict) or not types:
+    if not isinstance(types, Mapping) or not types:
         raise ConfigError("'types' must be a non-empty object.")
     for name, spec in types.items():
         _validate_type_spec(name, spec)
@@ -174,12 +174,12 @@ def _validate_type_spec(name: str, spec: Any) -> None:
     _validate_validator_refs(name, validated.get("validators", []))
 
 
-def _require_type_spec(name: str, spec: Any) -> dict[str, Any]:
-    if not isinstance(spec, dict) or "type" not in spec:
+def _require_type_spec(name: str, spec: Any) -> Mapping[str, Any]:
+    if not isinstance(spec, Mapping) or "type" not in spec:
         raise ConfigError(f"Type spec {name!r} must be an object with a 'type' field.")
     if not isinstance(spec["type"], str) or not spec["type"]:
         raise ConfigError(f"Type spec {name!r} 'type' must be a non-empty string.")
-    return cast(dict[str, Any], spec)
+    return cast(Mapping[str, Any], spec)
 
 
 def _validate_common_field_key_typos(name: str, spec: Mapping[str, Any]) -> None:
@@ -195,7 +195,7 @@ def _validate_transform_specs(name: str, transforms: Any) -> None:
     if not isinstance(transforms, list):
         raise ConfigError(f"Type spec {name!r} 'transforms' must be a list.")
     for index, transform in enumerate(transforms):
-        if not isinstance(transform, dict) or "type" not in transform:
+        if not isinstance(transform, Mapping) or "type" not in transform:
             raise ConfigError(
                 f"Type spec {name!r} transform {index} must be an object with a 'type' field."
             )
@@ -212,7 +212,7 @@ def _validate_validator_refs(name: str, validators: Any) -> None:
         raise ConfigError(f"Type spec {name!r} validator refs must be strings.")
 
 
-def _validate_template_references(template: str, types: dict[str, Any]) -> None:
+def _validate_template_references(template: str, types: Mapping[str, Any]) -> None:
     """Delegate to :func:`ton.template.validate_against` (DEC-002)."""
     try:
         validate_against(template, types.keys())

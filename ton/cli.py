@@ -288,8 +288,7 @@ def _validate_config(args: argparse.Namespace) -> int:
     Uses :func:`ton.api.validate_config` rather than constructing an
     Engine so unknown type/transform references are reported with the
     available-name lists and plugin-namespace diagnostics, keeping CLI
-    ``--validate`` aligned with the library validation path (TODO
-    CLI-002, CFG-003).
+    ``--validate`` aligned with the library validation path.
     """
 
     def validate() -> None:

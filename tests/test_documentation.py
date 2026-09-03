@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,13 +39,13 @@ def test_sequence_worker_guidance_uses_automatic_offsets() -> None:
 
 
 def test_closed_review_ids_are_not_left_as_todo_annotations() -> None:
-    marker = "TO" + "DO "
+    marker = re.compile(r"\bTO" + r"DO\s+[A-Z]+-\d+\b")
     python_files = tuple((ROOT / "ton").rglob("*.py")) + tuple((ROOT / "tests").rglob("*.py"))
 
     stale = [
         str(path.relative_to(ROOT))
         for path in python_files
-        if marker in path.read_text(encoding="utf-8")
+        if marker.search(path.read_text(encoding="utf-8"))
     ]
 
     assert stale == []

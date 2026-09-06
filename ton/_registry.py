@@ -99,7 +99,7 @@ class ExtensionCatalog:
         validators: Mapping[str, Any] | None = None,
     ) -> None:
         self._generators: dict[str, dict[str, Generator]] = {
-            CORE_NAMESPACE: dict(generators or default_registry())
+            CORE_NAMESPACE: dict(default_registry() if generators is None else generators)
         }
         self._transforms: dict[str, dict[str, Transform]] = {CORE_NAMESPACE: dict(transforms or {})}
         self._validators: dict[str, dict[str, Any]] = {CORE_NAMESPACE: dict(validators or {})}

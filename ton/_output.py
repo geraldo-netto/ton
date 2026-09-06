@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import stat
 import tempfile
@@ -203,18 +204,28 @@ def cleanup_staged_outputs(
 
 
 def _stage_prefix(basename: str) -> str:
-    return f".{basename}.ton-{os.getpid()}-{time.time_ns()}-"
+    return f"{_stage_file_prefix(basename)}ton-{os.getpid()}-{time.time_ns()}-"
+
+
+def _stage_file_prefix(basename: str) -> str:
+    """Identify the destination without expanding its filesystem component length."""
+    encoded = os.fsencode(os.path.normcase(basename))
+    return f".ton-{hashlib.sha256(encoded).hexdigest()}-"
 
 
 def _staged_candidates(path: str) -> list[_StagedCandidate]:
     directory = os.path.dirname(os.path.abspath(path)) or "."
     basename = os.path.basename(path)
-    file_prefix = f".{basename}."
+    # Continue recognizing stages written before hashed destination names.
+    file_prefixes = (_stage_file_prefix(basename), f".{basename}.")
     now_ns = time.time_ns()
     candidates: list[_StagedCandidate] = []
     with os.scandir(directory) as entries:
         for entry in entries:
-            if not entry.name.startswith(file_prefix) or not entry.name.endswith(".tmp"):
+            file_prefix = next(
+                (prefix for prefix in file_prefixes if entry.name.startswith(prefix)), None
+            )
+            if file_prefix is None or not entry.name.endswith(".tmp"):
                 continue
             try:
                 # Windows DirEntry metadata may omit the stable file identity

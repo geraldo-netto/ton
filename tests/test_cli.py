@@ -172,7 +172,7 @@ def test_cli_non_encodable_literal_cleans_atomic_output(
 
     assert main([str(config), "-o", str(output)]) == 1
     assert not output.exists()
-    assert list(tmp_path.glob(".out.txt.*.tmp")) == []
+    assert list(tmp_path.glob(".*.tmp")) == []
     assert "unexpected error" not in capsys.readouterr().err
 
 
@@ -1025,7 +1025,7 @@ def test_cli_atomic_output_keeps_existing_file_on_failure(
     with caplog.at_level(logging.WARNING, logger="ton"):
         assert main([str(config), "-o", str(out_file)]) == 3
     assert out_file.read_text(encoding="utf-8") == "old\n"
-    assert list(tmp_path.glob(".out.txt.*.tmp")) == []
+    assert list(tmp_path.glob(".*.tmp")) == []
     assert not any(getattr(record, "event", "") == "output_overwrite" for record in caplog.records)
 
 
@@ -1048,7 +1048,7 @@ def test_atomic_output_reports_post_publish_fsync_failure(monkeypatch, tmp_path:
     assert raised.value.destination_changed is True
     assert raised.value.path == str(output)
     assert output.read_text() == "new\n"
-    assert list(tmp_path.glob(".published.txt.*.tmp")) == []
+    assert list(tmp_path.glob(".*.tmp")) == []
 
 
 def test_output_recovery_errors_preserve_literal_windows_paths() -> None:

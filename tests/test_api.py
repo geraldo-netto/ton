@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import stat
+from contextlib import nullcontext
 from pathlib import Path
 from random import Random
 from types import MappingProxyType
@@ -262,7 +264,53 @@ def test_public_output_sink_rolls_back_failed_write(tmp_path: Path) -> None:
         write_then_fail()
 
     assert output.read_text(encoding="utf-8") == "old\n"
-    assert list(tmp_path.glob(".rows.txt.*.tmp")) == []
+    assert list(tmp_path.glob(".*.tmp")) == []
+
+
+@pytest.mark.parametrize("basename", ["x" * 240, "é" * 120])
+@pytest.mark.parametrize("fail", [False, True])
+def test_long_output_names_preserve_publication_and_recovery(
+    tmp_path: Path, basename: str, fail: bool
+) -> None:
+    output = tmp_path / basename
+    try:
+        output.write_text("old\n", encoding="utf-8")
+    except OSError as exc:
+        if exc.errno != errno.ENAMETOOLONG and getattr(exc, "winerror", None) != 206:
+            raise
+        pytest.skip("destination itself is not supported by this filesystem")
+
+    outcome = pytest.raises(RuntimeError, match="interrupted") if fail else nullcontext()
+    with outcome, api.open_output_path(str(output)) as stream:
+        stream.write("new\n")
+        stages = api.inspect_staged_outputs(str(output))
+        assert len(stages) == 1
+        assert stages[0].managed and stages[0].owner_running
+        assert api.inspect_staged_outputs(str(tmp_path / "other-output")) == ()
+        assert api.cleanup_staged_outputs(str(output), stale_after_seconds=0) == ()
+        if fail:
+            raise RuntimeError("interrupted")
+
+    assert output.read_text(encoding="utf-8") == ("old\n" if fail else "new\n")
+    assert api.inspect_staged_outputs(str(output)) == ()
+    assert list(tmp_path.glob(".*.tmp")) == []
+
+
+def test_hashed_stage_cleanup_is_scoped_to_its_destination(monkeypatch, tmp_path: Path) -> None:
+    from ton import _output
+
+    output = tmp_path / ("x" * 240)
+    other_output = tmp_path / ("x" * 239 + "y")
+    with mock.patch("ton._output.os.getpid", return_value=999999):
+        stage = tmp_path / (_output._stage_prefix(output.name) + "random.tmp")
+        other_stage = tmp_path / (_output._stage_prefix(other_output.name) + "random.tmp")
+    stage.write_text("abandoned\n", encoding="utf-8")
+    other_stage.write_text("other destination\n", encoding="utf-8")
+    monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
+
+    assert api.cleanup_staged_outputs(str(output), stale_after_seconds=0) == (str(stage),)
+    assert not stage.exists()
+    assert other_stage.read_text(encoding="utf-8") == "other destination\n"
 
 
 def test_output_stage_inspection_preserves_live_writer(tmp_path: Path) -> None:
@@ -471,7 +519,7 @@ def test_public_output_sink_no_clobber_publish_is_atomic(tmp_path: Path) -> None
         race_publish()
 
     assert output.read_text(encoding="utf-8") == "racing writer\n"
-    assert list(tmp_path.glob(".rows.txt.*.tmp")) == []
+    assert list(tmp_path.glob(".*.tmp")) == []
 
 
 def test_public_output_sink_no_clobber_publishes_new_file(tmp_path: Path) -> None:

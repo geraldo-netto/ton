@@ -590,7 +590,9 @@ def test_engine_collects_transform_proof_failure() -> None:
             }
         },
     }
-    engine = Engine(config, transforms={"plugin.failproof": FailingProofTransform()})
+    engine = Engine(
+        config, transforms={"plugin.failproof": FailingProofTransform()}, proof_mode="all"
+    )
     field = engine._plan.prepared["v"]
     source = TransformResult("x")
     _, steps = engine._apply_transforms_with_trace("v", field, source)

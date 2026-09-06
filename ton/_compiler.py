@@ -41,6 +41,7 @@ class CompiledPlan:
     has_paired: bool
     literals: tuple[str, ...]
     resolved_tokens: tuple[ResolvedToken, ...]
+    has_child_pipelines: bool = False
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,7 @@ class EngineCompiler:
         self.template = str(config["format"])
         self.types: Mapping[str, Mapping[str, Any]] = config["types"]
         self.rows = int(config["rows"])
+        self.has_child_pipelines = False
         self.tokens = tuple(parse(self.template))
         self.field_keys = (
             tuple(self.types)
@@ -113,6 +115,7 @@ class EngineCompiler:
             has_paired=any(prepared[token.type_key].source_is_paired for token in self.tokens),
             literals=tuple(literals),
             resolved_tokens=resolved_tokens,
+            has_child_pipelines=self.has_child_pipelines,
         )
 
     def _resolve_registry(
@@ -238,6 +241,7 @@ class EngineCompiler:
         validators = self._resolve_validators(f"{parent_type}.{location}", nested_spec)
         if not transforms and not validators:
             return child, source_prepared
+        self.has_child_pipelines = True
         return ChildPipelineGenerator(), ChildPipelineSpec(
             generator=child,
             source_prepared=source_prepared,

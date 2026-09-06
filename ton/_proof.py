@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from functools import cached_property
 from typing import Any
@@ -11,6 +12,10 @@ from ._transforms import TransformResult
 
 #: Placeholder substituted for sensitive proof-failure fields (DG-002).
 REDACTED = "<redacted>"
+
+# Scoped to one Engine row, including calls through legacy generator signatures.
+# Standalone child draws retain traces so callers can prove them afterward.
+_trace_enabled: ContextVar[bool] = ContextVar("ton_proof_trace_enabled", default=True)
 
 
 @dataclass(frozen=True)

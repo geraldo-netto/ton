@@ -23,6 +23,7 @@ from ._proof import (
     ProofFailure,
     ProvenanceRecord,
     TransformStep,
+    _trace_enabled,
 )
 from ._proofcheck import ProofChecker, ProofFailureSink, ProofHookError
 from ._transforms import Transform, TransformResult
@@ -346,8 +347,13 @@ class Engine:
             milestone = self._milestone_rows
             self._rows_emitted = 0
             self._proof.reset()
+            render = (
+                self._render_row_with_proof_context
+                if self._plan.has_child_pipelines
+                else self._render_row
+            )
             for _ in range(self._plan.rows):
-                row = self._render_row()
+                row = render()
                 self._rows_emitted += 1
                 if milestone and self._rows_emitted % milestone == 0:
                     _logger.info(
@@ -372,6 +378,14 @@ class Engine:
             self._proof.log_summary()
         finally:
             self._iteration_lock.release()
+
+    def _render_row_with_proof_context(self) -> str:
+        token = _trace_enabled.set(self._proof.should_check(self._rows_emitted))
+        try:
+            return self._render_row()
+        finally:
+            # Reset before yielding: callers may interleave or nest Engines.
+            _trace_enabled.reset(token)
 
     def _render_row(self) -> str:
         paired_cache: dict[str, tuple[str, str]] | None = {} if self._plan.has_paired else None
@@ -501,7 +515,9 @@ class Engine:
         field: PreparedField,
         result: TransformResult,
     ) -> tuple[TransformResult, tuple[TransformStep, ...]]:
-        steps: list[TransformStep] = []
+        steps: list[TransformStep] | None = (
+            [] if self._proof.should_check(self._rows_emitted) else None
+        )
         for prepared in field.transforms:
             before = result
             try:
@@ -514,8 +530,9 @@ class Engine:
                     type_key,
                     exc,
                 )
-            steps.append(TransformStep(prepared=prepared, before=before, after=result))
-        return result, tuple(steps)
+            if steps is not None:
+                steps.append(TransformStep(prepared=prepared, before=before, after=result))
+        return result, tuple(steps) if steps is not None else ()
 
     def _raise_pipeline_error(
         self,

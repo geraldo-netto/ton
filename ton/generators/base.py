@@ -34,7 +34,7 @@ from inspect import signature
 from random import Random
 from typing import Any, ClassVar
 
-from .._proof import PreparedTransform, ProofResult, TransformStep
+from .._proof import PreparedTransform, ProofResult, TransformStep, _trace_enabled
 from .._transforms import TransformResult
 from .._validation import ValidationError
 
@@ -227,14 +227,17 @@ class ChildPipelineGenerator(Generator):
             else ""
         )
         result = source
-        steps: list[TransformStep] = []
+        steps: list[TransformStep] | None = [] if _trace_enabled.get() else None
         for transform in prepared.transforms:
             before = result
             result = transform.transform.apply(transform.prepared, before, rng)
-            steps.append(TransformStep(transform, before, result))
+            if steps is not None:
+                steps.append(TransformStep(transform, before, result))
         for validator in prepared.validators:
             if not validator.validate(result.value):
                 raise ValidationError(f"Nested value failed validator {validator.type_name!r}")
+        if steps is None:
+            return result.value
         return _GeneratedChildValue(result.value, prepared, source, tuple(steps))
 
     def prove(self, prepared: ChildPipelineSpec, result: TransformResult) -> ProofResult:

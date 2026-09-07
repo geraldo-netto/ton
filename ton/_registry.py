@@ -600,39 +600,6 @@ def default_registry() -> dict[str, Generator]:
     return make_registry()
 
 
-def registry_with_entry_points(
-    *,
-    allowed_selectors: Collection[EntryPointSelector] | None = None,
-) -> dict[str, Generator]:
-    """Return the built-in registry merged with entry-point generators.
-
-    Third-party packages can register additional generators by declaring::
-
-        [project.entry-points."ton.generators"]
-        widget = "my_pkg.generators:WidgetGenerator"
-
-    Entry-point generators cannot shadow built-ins (PLUG-002): an
-    unqualified entry-point name lands in the ``plugin`` namespace
-    (``plugin.widget``) and is also promoted to the bare key ``widget``
-    only when no built-in already claims it. Core registrations are never
-    replaced. When ``allowed_selectors`` is provided, only exact
-    group/distribution/name identities are loaded; all others are ignored
-    without importing their target.
-    """
-    catalog = catalog_with_entry_points(allowed_selectors=allowed_selectors)
-    # Copy the cached flattened view before mutating it: catalog.generators()
-    # returns the shared cache (PERF-003), so promoting plugin names to bare
-    # keys must not scribble on it.
-    registry = dict(catalog.generators())
-    for qualified, generator in list(registry.items()):
-        if "." not in qualified:
-            continue
-        namespace, name = qualified.split(".", 1)
-        if namespace != CORE_NAMESPACE and name not in registry:
-            registry[name] = generator
-    return registry
-
-
 def _log_plugin_registered(kind: str, namespace: str, name: str) -> None:
     safe_namespace = _sanitize_for_log(namespace)
     safe_name = _sanitize_for_log(name)

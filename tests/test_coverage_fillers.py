@@ -11,8 +11,6 @@ import subprocess
 import sys
 from pathlib import Path
 from random import Random
-from typing import Any
-from unittest import mock
 
 import pytest
 
@@ -95,33 +93,6 @@ def test_walk_subclasses_dedups_diamond_inheritance() -> None:
     # class exactly once regardless of how many paths reach it.
     seen = list(_walk_subclasses(Generator))
     assert len(seen) == len(set(seen))
-
-
-def test_registry_with_entry_points_merges_in_third_party() -> None:
-    """Synthesize a fake entry-point and verify the merged registry."""
-    from ton._registry import registry_with_entry_points
-    from ton.generators import Generator
-
-    class FakePlugin(Generator):
-        type_name = "fake_plugin"
-
-        def generate(self, prepared: Any, rng: Random) -> str:
-            return "synthetic"
-
-    fake_ep = mock.Mock()
-    fake_ep.name = "fake_plugin"
-    fake_ep.load.return_value = FakePlugin
-
-    with mock.patch("ton._registry.entry_points", return_value=[fake_ep]):
-        merged = registry_with_entry_points()
-
-    assert "fake_plugin" in merged
-    assert isinstance(merged["fake_plugin"], FakePlugin)
-
-
-# ---------------------------------------------------------------------------
-# CLI _report branch when elapsed time rounds to 0.0
-# ---------------------------------------------------------------------------
 
 
 def test_cli_report_handles_zero_elapsed(capsys: pytest.CaptureFixture[str]) -> None:
@@ -262,15 +233,6 @@ def test_api_generate_from_file_with_seed(write_config) -> None:
     path = write_config()
     rows = list(api.generate_from_file(str(path), seed=1))
     assert len(rows) == 4
-
-
-def test_api_build_registry_with_entry_points_default() -> None:
-    """Cover the include_entry_points=True branch of build_registry."""
-    from ton import api
-
-    with pytest.warns(DeprecationWarning):
-        registry = api.build_registry()  # default True
-    assert "integer" in registry
 
 
 def test_cli_stream_flushes_batch_when_buffer_full(

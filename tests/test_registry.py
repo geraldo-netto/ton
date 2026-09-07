@@ -14,8 +14,9 @@ from unittest import mock
 
 import pytest
 
+import ton._registry as _registry_module
+from ton import api
 from ton._registry import (
-    ENTRY_POINT_GROUP,
     EntryPointSelector,
     ExtensionCatalog,
     RegistryError,
@@ -25,7 +26,6 @@ from ton._registry import (
     default_registry,
     discover_generator_classes,
     normalize_reference,
-    registry_with_entry_points,
     resolve_reference,
     runtime_type_name,
 )
@@ -135,59 +135,6 @@ def test_clear_cache_rebuilds_defaults() -> None:
     assert first_keys >= EXPECTED_TYPES
 
 
-def test_registry_with_entry_points_includes_builtins() -> None:
-    # Without any third-party entry points installed this is identical
-    # to default_registry().
-    assert set(registry_with_entry_points()) >= EXPECTED_TYPES
-
-
-def test_registry_with_entry_points_honors_allowlist() -> None:
-    class CustomGenerator(Generator):
-        type_name = "custom"
-
-        def generate(self, prepared: Any, rng: Random) -> str:
-            return "custom"
-
-    allowed = mock.Mock()
-    allowed.name = "allowed"
-    allowed.value = "pkg:Allowed"
-    allowed.load.return_value = CustomGenerator
-    allowed.dist = SimpleNamespace(name="trusted-pkg", version="1")
-    skipped = mock.Mock()
-    skipped.name = "skipped"
-    skipped.value = "pkg:Skipped"
-    skipped.dist = SimpleNamespace(name="trusted-pkg", version="1")
-
-    with mock.patch("ton._registry.entry_points", return_value=[allowed, skipped]):
-        registry = registry_with_entry_points(
-            allowed_selectors={EntryPointSelector(ENTRY_POINT_GROUP, "trusted-pkg", "allowed")}
-        )
-
-    assert registry["allowed"].generate({}, Random(0)) == "custom"
-    assert registry["plugin.allowed"].generate({}, Random(0)) == "custom"
-    skipped.load.assert_not_called()
-
-
-def test_registry_with_entry_points_does_not_shadow_builtin() -> None:
-    class CustomGenerator(Generator):
-        type_name = "string"
-
-        def generate(self, prepared: Any, rng: Random) -> str:
-            return "custom"
-
-    ep = mock.Mock()
-    ep.name = "string"
-    ep.value = "pkg:String"
-    ep.load.return_value = CustomGenerator
-
-    with mock.patch("ton._registry.entry_points", return_value=[ep]):
-        registry = registry_with_entry_points()
-
-    prepared = registry["string"].prepare({"values": ["builtin"]})
-    assert registry["string"].generate(prepared, Random(0)) == "builtin"
-    assert registry["plugin.string"].generate({}, Random(0)) == "custom"
-
-
 def test_registry_skips_entry_point_that_returns_non_generator() -> None:
     bad = mock.Mock()
     bad.name = "bad"
@@ -195,7 +142,7 @@ def test_registry_skips_entry_point_that_returns_non_generator() -> None:
     bad.load.return_value = lambda: object()
 
     with mock.patch("ton._registry.entry_points", return_value=[bad]):
-        registry = registry_with_entry_points()
+        registry = catalog_with_entry_points().generators()
 
     assert "bad" not in registry
 
@@ -757,3 +704,9 @@ def test_catalog_entry_point_without_namespace_uses_plugin_namespace() -> None:
         catalog = catalog_with_entry_points()
 
     assert "plugin.trim" in catalog.list_transforms()
+
+
+def test_entry_point_loading_has_one_public_entry() -> None:
+    """build_extension_catalog is the only plugin-loading API (PLUG-006)."""
+    assert not hasattr(api, "build_registry")
+    assert not hasattr(_registry_module, "registry_with_entry_points")

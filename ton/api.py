@@ -11,8 +11,6 @@ The supported surface, re-exported here, is:
 * :func:`generate` / :func:`generate_from_file` -- iterators of rows
 * :func:`build_extension_catalog` -- the canonical plugin-loading API:
   namespaced data types, transforms, and validators (PLUG-004)
-* :func:`build_registry` -- *deprecated* generator-only registry; kept
-  as a thin compatibility shim over the catalog
 * :data:`ConfigError`, :data:`TemplateError`,
   :data:`UndeclaredVariableError` -- the exception types
 * :class:`Engine` -- the iterator class, for callers that want to
@@ -40,7 +38,6 @@ Typical use::
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
 
@@ -75,9 +72,7 @@ from ._registry import (
     ExtensionCatalog,
     RegistryError,
     catalog_with_entry_points,
-    default_registry,
     normalize_reference,
-    registry_with_entry_points,
 )
 from ._registry import (
     build_extension_catalog as _build_extension_catalog,
@@ -117,7 +112,6 @@ __all__ = [
     "ValidatorExecutionError",
     "ExtensionCatalog",
     "build_extension_catalog",
-    "build_registry",
     "cleanup_staged_outputs",
     "configure_stderr",
     "chunk_rows",
@@ -163,40 +157,6 @@ def validate_config(
     route through here.
     """
     _config.validate_with_catalog(config, catalog or build_extension_catalog())
-
-
-def build_registry(
-    include_entry_points: bool = False,
-    *,
-    allowed_entry_points: Iterable[str | EntryPointSelector] | None = None,
-) -> dict[str, Generator]:
-    """Return a fresh generator-only registry of generator instances.
-
-    .. deprecated::
-        :func:`build_extension_catalog` is the canonical plugin-loading
-        API (PLUG-004). It loads generators, transforms, and
-        validators under one namespaced surface, whereas this helper only
-        loads generators and promotes plugin names to bare keys with
-        different shadowing rules. Prefer
-        ``build_extension_catalog(...).generators()``.
-
-    When ``include_entry_points`` is True, generators advertised by
-    other packages via the ``ton.generators`` entry-point group are
-    merged in on top of the built-ins. Entry points execute package
-    code while loading, so this path is opt-in.
-    """
-    warnings.warn(
-        "api.build_registry is deprecated; use api.build_extension_catalog(...) "
-        "which loads generators, transforms, and validators as the canonical "
-        "plugin API.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    if include_entry_points:
-        return registry_with_entry_points(
-            allowed_selectors=_normalize_entry_point_selectors(allowed_entry_points)
-        )
-    return default_registry()
 
 
 def build_extension_catalog(

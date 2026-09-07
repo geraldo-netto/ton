@@ -374,7 +374,7 @@ def test_registry_skips_broken_entry_point(
     import logging as logging_mod
 
     from ton._logging import LogEvent as _LE
-    from ton._registry import registry_with_entry_points
+    from ton._registry import catalog_with_entry_points
 
     bad = mock.Mock()
     bad.name = "bad_plugin"
@@ -385,7 +385,7 @@ def test_registry_skips_broken_entry_point(
         mock.patch("ton._registry.entry_points", return_value=[bad]),
         caplog.at_level(logging_mod.WARNING, logger="ton"),
     ):
-        registry = registry_with_entry_points()
+        registry = catalog_with_entry_points().generators()
     assert "bad_plugin" not in registry
     events = [
         r for r in caplog.records if getattr(r, "event", None) == _LE.ENTRY_POINT_FAILED.value
@@ -442,7 +442,7 @@ def test_entry_point_load_logs_sanitized_name(
     import logging as logging_mod
 
     from ton._logging import LogEvent as _LE
-    from ton._registry import registry_with_entry_points
+    from ton._registry import catalog_with_entry_points
     from ton.generators import Generator as _Gen
 
     class _Fake(_Gen):
@@ -460,7 +460,7 @@ def test_entry_point_load_logs_sanitized_name(
         mock.patch("ton._registry.entry_points", return_value=[ep]),
         caplog.at_level(logging_mod.INFO, logger="ton"),
     ):
-        registry_with_entry_points()
+        catalog_with_entry_points()
     record = next(
         r for r in caplog.records if getattr(r, "event", None) == _LE.ENTRY_POINT_LOADED.value
     )

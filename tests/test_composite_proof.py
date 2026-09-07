@@ -167,15 +167,6 @@ def test_weighted_composite_prove_accepts_and_rejects() -> None:
     assert not gen.prove(bad_spec, TransformResult("x")).ok
 
 
-def test_weighted_legacy_prove_membership() -> None:
-    gen = WeightedGenerator()
-    prepared = gen.prepare({"values": ["red", "green"], "weights": [1, 1]})
-    assert gen.prove(prepared, TransformResult("red")).ok
-    rejected = gen.prove(prepared, TransformResult("blue"))
-    assert not rejected.ok
-    assert "weighted 'values'" in rejected.reason
-
-
 def test_distribution_transform_prove_accepts_and_rejects() -> None:
     transform = DistributionTransform()
     ok_spec = transform.prepare(

@@ -1,29 +1,8 @@
 """Weighted-choice value generator.
 
-Picks one of several alternatives. Weights are optional in every shape;
-when omitted the generator falls back to uniform sampling (1/N per
-entry). Three spec shapes are accepted; pick whichever reads best:
-
-* **Parallel arrays** -- legacy form, string-only::
-
-      {
-        "type":    "weighted",
-        "values":  ["Intel", "AMD", "ARM"],
-        "weights": [90, 8, 2]
-      }
-
-* **Record form** -- legacy, also string-only::
-
-      {
-        "type":   "weighted",
-        "values": [
-          {"value": "Intel", "weight": 90},
-          {"value": "AMD",   "weight": 8},
-          {"value": "ARM",   "weight": 2}
-        ]
-      }
-
-* **Composite form** -- weight any generator type::
+Picks one of several alternatives with probability proportional to its
+weight. ``weight`` is optional and defaults to 1.0, so a choices list
+without weights samples uniformly (1/N per entry)::
 
       {
         "type":    "weighted",
@@ -37,10 +16,11 @@ entry). Three spec shapes are accepted; pick whichever reads best:
         ]
       }
 
-  Nested ``spec`` is itself a full type spec. The engine resolves it
-  against the same registry used for top-level types so any registered
-  generator (built-in or third-party, including another ``weighted``)
-  can be composed.
+Nested ``spec`` is itself a full type spec. The engine resolves it
+against the same registry used for top-level types so any registered
+generator (built-in or third-party, including another ``weighted``)
+can be composed. Use ``{"type": "string", "values": [...]}`` children to
+weight plain strings.
 """
 
 from __future__ import annotations
@@ -52,28 +32,18 @@ from typing import Any
 
 from .._distribution import (
     WeightedChoiceSet,
-    coerce_weight,
-    cumulative_weights,
     prepare_distribution,
-    validate_weights,
-    weighted_index,
 )
 from .._proof import ProofResult
-from .._speckeys import require_known_keys
 from .._transforms import TransformResult
 from .base import Generator, PreparationContext
-
-_RECORD_KEYS = frozenset(("value", "weight"))
 
 
 @dataclass(frozen=True)
 class WeightedSpec:
     weights: tuple[float, ...]
     cum_weights: tuple[float, ...]
-    #: Populated for the legacy ``values`` form.
-    values: tuple[str, ...] | None = None
-    #: Populated for the composite ``choices`` form.
-    distribution: WeightedChoiceSet | None = None
+    distribution: WeightedChoiceSet
 
 
 class WeightedGenerator(Generator):
@@ -96,19 +66,8 @@ class WeightedGenerator(Generator):
         spec: Mapping[str, Any],
         context: PreparationContext | None = None,
     ) -> WeightedSpec:
-        # Composite specs need the engine's registry to resolve children;
-        # legacy string-only specs are prepared without one.
-        if "choices" in spec:
-            if context is None:
-                raise self._composite_path_error()
-            return self._prepare_composite(spec, context)
-        return self._prepare_legacy(spec)
-
-    def _prepare_composite(
-        self,
-        spec: Mapping[str, Any],
-        context: PreparationContext,
-    ) -> WeightedSpec:
+        if context is None:
+            raise self._composite_path_error()
         distribution = prepare_distribution(
             _distribution_spec(spec),
             context.registry,
@@ -123,88 +82,15 @@ class WeightedGenerator(Generator):
         )
 
     def generate(self, prepared: WeightedSpec, rng: Random) -> str:
-        if prepared.distribution is not None:
-            return prepared.distribution.choose(rng)
-        # Legacy string-only form.
-        return prepared.values[weighted_index(prepared.cum_weights, rng)]  # type: ignore[index]
+        return prepared.distribution.choose(rng)
 
     def prove(self, prepared: WeightedSpec, result: TransformResult) -> ProofResult:
-        # Composite form recurses into the drawn child; the legacy string
-        # form checks membership in the value pool (REL-001).
-        if prepared.distribution is not None:
-            if prepared.distribution.accepts(result):
-                return ProofResult(ok=True)
-            detail = prepared.distribution.rejection(result)
-            reason = "no weighted choice accepts the value"
-            return ProofResult(ok=False, reason=f"{reason}: {detail}" if detail else reason)
-        if result.value in (prepared.values or ()):
+        # Recurse into the child that was drawn (REL-001, REL-022).
+        if prepared.distribution.accepts(result):
             return ProofResult(ok=True)
-        return ProofResult(ok=False, reason="value is not in weighted 'values'")
-
-    def _prepare_legacy(self, spec: Mapping[str, Any]) -> WeightedSpec:
-        values, weights = _coerce(spec)
-        if not values:
-            raise ValueError("weighted 'values' must be non-empty")
-        validate_weights(weights, "weighted")
-        return WeightedSpec(values=values, weights=weights, cum_weights=cumulative_weights(weights))
-
-
-def _coerce(spec: Mapping[str, Any]) -> tuple[tuple[str, ...], tuple[float, ...]]:
-    raw_values = spec.get("values")
-    if not isinstance(raw_values, list):
-        raise ValueError("weighted 'values' must be a list")
-    record_entries = tuple(isinstance(value, Mapping) for value in raw_values)
-    if any(record_entries) and not all(record_entries):
-        raise ValueError("weighted 'values' must be all objects or all scalar values")
-    if record_entries and all(record_entries):
-        return _coerce_record(raw_values)
-    return _coerce_parallel(spec, raw_values)
-
-
-def _coerce_record(raw_values: list[Any]) -> tuple[tuple[str, ...], tuple[float, ...]]:
-    # Record form: [{value, weight}, ...]. ``weight`` defaults to 1.0 so a
-    # list of bare ``{"value": ...}`` records still works -- the generator
-    # falls back to uniform weighting.
-    values: list[str] = []
-    weights: list[float] = []
-    for index, item in enumerate(raw_values):
-        require_known_keys(f"weighted.values[{index}]", item, _RECORD_KEYS)
-        if "value" not in item:
-            raise ValueError(
-                "weighted record values must be objects containing 'value' "
-                f"(bad entry at index {index})"
-            )
-        values.append(str(item["value"]))
-        weights.append(
-            coerce_weight(item["weight"], f"weighted 'values[{index}].weight'")
-            if "weight" in item
-            else 1.0
-        )
-    return tuple(values), tuple(weights)
-
-
-def _coerce_parallel(
-    spec: Mapping[str, Any],
-    raw_values: list[Any],
-) -> tuple[tuple[str, ...], tuple[float, ...]]:
-    # Parallel-array form. Missing ``weights`` defaults to uniform so
-    # ``{"values": [...]}`` is equivalent to picking with equal probability
-    # (1/N per entry).
-    if "weights" not in spec:
-        return (
-            tuple(str(v) for v in raw_values),
-            tuple(1.0 for _ in raw_values),
-        )
-    weights = spec["weights"]
-    if not isinstance(weights, list) or len(weights) != len(raw_values):
-        raise ValueError("weighted 'weights' must be a list the same length as 'values'")
-    return (
-        tuple(str(v) for v in raw_values),
-        tuple(
-            coerce_weight(weight, f"weighted 'weights[{index}]'")
-            for index, weight in enumerate(weights)
-        ),
-    )
+        detail = prepared.distribution.rejection(result)
+        reason = "no weighted choice accepts the value"
+        return ProofResult(ok=False, reason=f"{reason}: {detail}" if detail else reason)
 
 
 def _distribution_spec(spec: Mapping[str, Any]) -> dict[str, Any]:

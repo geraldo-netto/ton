@@ -1,0 +1,6 @@
+{"rows": 5000, "format": "$v$",
+ "types": {"v": {"type": "weighted",
+                  "choices": [
+                    {"weight": 70, "spec": {"type": "string", "values": ["A"]}},
+                    {"weight": 20, "spec": {"type": "string", "values": ["B"]}},
+                    {"weight": 10, "spec": {"type": "string", "values": ["C"]}}]}}}

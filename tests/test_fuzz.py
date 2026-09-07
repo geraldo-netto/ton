@@ -92,8 +92,10 @@ def _spec_weighted(rng: Random) -> dict[str, Any]:
     n = rng.randint(2, 6)
     return {
         "type": "weighted",
-        "values": [f"v{i}" for i in range(n)],
-        "weights": [rng.randint(1, 100) for _ in range(n)],
+        "choices": [
+            {"weight": rng.randint(1, 100), "spec": {"type": "string", "values": [f"v{i}"]}}
+            for i in range(n)
+        ],
     }
 
 

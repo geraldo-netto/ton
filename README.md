@@ -512,31 +512,9 @@ AMD
 
 #### `weighted`
 
-Pick one alternative with probability proportional to its weight. Three shapes are accepted. Weights are **optional in every shape** — omit them and the generator falls back to uniform sampling (1/N per entry).
+Pick one alternative with probability proportional to its weight. `weight` is **optional** — omit it and that entry samples uniformly (1/N per entry).
 
-**Parallel arrays** (string values, legacy):
-
-| field     | type           | description                                          |
-|-----------|----------------|------------------------------------------------------|
-| `values`  | string[]       | non-empty literal pool                               |
-| `weights` | number[]       | optional; same length as `values`, non-negative      |
-
-```json
-{"type": "weighted", "values": ["Intel", "AMD", "ARM"], "weights": [90, 8, 2]}
-```
-
-```
-Intel
-Intel
-Intel
-Intel
-```
-
-(Skew toward `Intel` matches the 90/8/2 weighting.)
-
-**Record form** — `values: [{"value": "...", "weight": N}, ...]` is the same thing with a less error-prone layout. Record entries accept only `value` and `weight`.
-
-**Composite form** — any registered generator can be weighted, not just literal strings:
+Any registered generator can be weighted, not just literal strings:
 
 | field     | type     | description                                                       |
 |-----------|----------|-------------------------------------------------------------------|

@@ -1,3 +1,7 @@
 {"rows": 4000, "format": "$v$",
  "types": {"v": {"type": "weighted",
-                  "values": ["A", "B", "C", "D"]}}}
+                  "choices": [
+                    {"spec": {"type": "string", "values": ["A"]}},
+                    {"spec": {"type": "string", "values": ["B"]}},
+                    {"spec": {"type": "string", "values": ["C"]}},
+                    {"spec": {"type": "string", "values": ["D"]}}]}}}

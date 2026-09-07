@@ -12,66 +12,15 @@ from ton.generators.base import PreparationContext
 from ton.generators.weighted import WeightedGenerator
 
 
-def test_weighted_parallel_arrays_distribution() -> None:
-    gen = WeightedGenerator()
-    prepared = gen.prepare({"values": ["A", "B"], "weights": [9, 1]})
-    assert prepared.cum_weights == (9.0, 10.0)
-    rng = Random(0)
-    counts = Counter(gen.generate(prepared, rng) for _ in range(2000))
-    # 90/10 split; allow generous slack.
-    assert counts["A"] > counts["B"] * 4
-
-
-def test_weighted_record_form() -> None:
-    gen = WeightedGenerator()
-    prepared = gen.prepare(
-        {
-            "values": [{"value": "x", "weight": 1}, {"value": "y", "weight": 0}],
-        }
-    )
-    rng = Random(0)
-    assert all(gen.generate(prepared, rng) == "x" for _ in range(50))
-
-
-@pytest.mark.parametrize(
-    "values",
-    [
-        [{"weight": 1}],
-    ],
-)
-def test_weighted_record_form_rejects_bad_entries(values: list[object]) -> None:
-    generator = WeightedGenerator()
-    with pytest.raises(ValueError, match="objects containing 'value'"):
-        generator.prepare({"values": values})
-
-
-def test_weighted_record_form_rejects_unknown_key_with_suggestion() -> None:
-    generator = WeightedGenerator()
-    with pytest.raises(ValueError, match=r"weighted\.values\[0\]\.weigth.*Did you mean 'weight'"):
-        generator.prepare(
-            {"values": [{"value": "x", "weigth": 2}]},
-        )
-
-
-def test_weighted_record_form_suggests_misspelled_value_key() -> None:
-    generator = WeightedGenerator()
-    with pytest.raises(ValueError, match=r"weighted\.values\[0\]\.valeu.*Did you mean 'value'"):
-        generator.prepare(
-            {"values": [{"valeu": "x", "weight": 2}]},
-        )
-
-
-@pytest.mark.parametrize(
-    "values",
-    [
-        [{"value": "x", "weight": 1}, "y"],
-        ["y", {"value": "x", "weight": 1}],
-    ],
-)
-def test_weighted_rejects_mixed_legacy_value_shapes(values: list[object]) -> None:
-    generator = WeightedGenerator()
-    with pytest.raises(ValueError, match="all objects or all scalar values"):
-        generator.prepare({"values": values})
+def _choices(*weights: object) -> dict[str, object]:
+    """Build a composite weighted spec carrying ``weights`` in order."""
+    return {
+        "type": "weighted",
+        "choices": [
+            {"weight": weight, "spec": {"type": "string", "values": [f"v{index}"]}}
+            for index, weight in enumerate(weights)
+        ],
+    }
 
 
 def test_weighted_rejects_empty_values() -> None:
@@ -102,26 +51,26 @@ def test_weighted_rejects_zero_total() -> None:
 def test_weighted_rejects_non_finite_weights(weight: float) -> None:
     generator = WeightedGenerator()
     with pytest.raises(ValueError, match="finite"):
-        generator.prepare({"values": ["A", "B"], "weights": [weight, 1]})
+        generator.prepare(_choices(weight, 1), PreparationContext(default_registry()))
 
 
 def test_weighted_rejects_non_finite_total() -> None:
     generator = WeightedGenerator()
     with pytest.raises(ValueError, match="total must be finite"):
-        generator.prepare({"values": ["A", "B"], "weights": [1e308, 1e308]})
+        generator.prepare(_choices(1e308, 1e308), PreparationContext(default_registry()))
 
 
 @pytest.mark.parametrize(
     ("spec", "path"),
     [
-        ({"values": ["A"], "weights": [True]}, r"weights\[0\]"),
-        ({"values": [{"value": "A", "weight": False}]}, r"values\[0\]\.weight"),
+        (_choices(True), r"choices\[0\]\.weight"),
+        (_choices(False), r"choices\[0\]\.weight"),
     ],
 )
-def test_weighted_legacy_rejects_boolean_weights(spec: dict[str, object], path: str) -> None:
+def test_weighted_rejects_boolean_weights(spec: dict[str, object], path: str) -> None:
     generator = WeightedGenerator()
     with pytest.raises(ValueError, match=path):
-        generator.prepare(spec)
+        generator.prepare(spec, PreparationContext(default_registry()))
 
 
 # ---------------------------------------------------------------------------
@@ -271,7 +220,6 @@ def test_weighted_composite_rejects_empty_choices() -> None:
 
 def test_weighted_composite_defaults_to_uniform_when_weight_omitted() -> None:
     """A choice without a ``weight`` field contributes 1.0 (uniform fallback)."""
-    from collections import Counter
 
     from ton import api
 
@@ -397,13 +345,3 @@ def test_weighted_composite_rejects_non_mapping_child_spec() -> None:
     }
     with pytest.raises(TemplateError, match="must be an object"):
         list(api.generate(config))
-
-
-def test_weighted_legacy_spec_prepares_without_a_registry() -> None:
-    generator = WeightedGenerator()
-
-    context = PreparationContext(default_registry())
-
-    prepared = generator.prepare({"values": ["x"], "weights": [1]}, context)
-
-    assert generator.generate(prepared, Random(0)) == "x"

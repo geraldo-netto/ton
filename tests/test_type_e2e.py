@@ -93,10 +93,10 @@ def _check_string(rows: list[str], config: dict[str, Any]) -> None:
     assert seen == allowed
 
 
-def _check_weighted_legacy_skewed(rows: list[str], config: dict[str, Any]) -> None:
-    spec = config["types"]["v"]
-    values: list[str] = spec["values"]
-    raw_weights: list[float] = [float(w) for w in spec["weights"]]
+def _check_weighted_skewed(rows: list[str], config: dict[str, Any]) -> None:
+    choices = config["types"]["v"]["choices"]
+    values = [choice["spec"]["values"][0] for choice in choices]
+    raw_weights = [float(choice["weight"]) for choice in choices]
     total = sum(raw_weights)
     expected = {v: w / total for v, w in zip(values, raw_weights, strict=True)}
     counts = Counter(rows)
@@ -109,9 +109,8 @@ def _check_weighted_legacy_skewed(rows: list[str], config: dict[str, Any]) -> No
 
 
 def _check_weighted_uniform_default(rows: list[str], config: dict[str, Any]) -> None:
-    """Missing ``weights`` defaults to uniform: 1/N per value."""
-    spec = config["types"]["v"]
-    values: list[str] = spec["values"]
+    """A choice without ``weight`` defaults to uniform: 1/N per entry."""
+    values = [choice["spec"]["values"][0] for choice in config["types"]["v"]["choices"]]
     counts = Counter(rows)
     n = len(rows)
     expected = 1 / len(values)
@@ -316,7 +315,7 @@ _CHECKERS: dict[str, Callable[[list[str], dict[str, Any]], None]] = {
     "decimal.json": _check_decimal,
     "char.json": _check_char,
     "string.json": _check_string,
-    "weighted_legacy_skewed.json": _check_weighted_legacy_skewed,
+    "weighted_skewed.json": _check_weighted_skewed,
     "weighted_uniform_default.json": _check_weighted_uniform_default,
     "weighted_composite.json": _check_weighted_composite,
     "oneOf.json": _check_oneOf,

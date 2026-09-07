@@ -238,19 +238,6 @@ def test_validate_types_rejects_non_dict() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_weighted_rejects_non_list_values() -> None:
-    from ton.generators.weighted import WeightedGenerator
-
-    generator = WeightedGenerator()
-    with pytest.raises(ValueError, match="must be a list"):
-        generator.prepare({"values": "abc", "weights": [1, 2, 3]})
-
-
-# ---------------------------------------------------------------------------
-# timestamp_unix already-tz-aware path
-# ---------------------------------------------------------------------------
-
-
 def test_timestamp_unix_handles_tz_aware_input() -> None:
     from ton.generators.timestamp_unix import TimestampUnixGenerator
 

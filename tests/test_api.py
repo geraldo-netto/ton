@@ -6,6 +6,7 @@ import errno
 import logging
 import os
 import stat
+from collections.abc import Mapping
 from contextlib import nullcontext
 from pathlib import Path
 from random import Random
@@ -34,16 +35,21 @@ EXPECTED_PUBLIC_API = {
     "PairedGenerator",
     "PartialOutputCommitError",
     "PipelineStageError",
+    "PreparationContext",
     "ProofError",
     "ProofEvaluationError",
     "ProofFailure",
     "ProofFailureSink",
+    "ProofResult",
     "ProvenanceRecord",
     "RegistryError",
     "StagedOutput",
     "TemplateError",
     "Transform",
+    "TransformCapabilities",
     "TransformExecutionError",
+    "TransformProof",
+    "TransformResult",
     "UndeclaredVariableError",
     "ValidationError",
     "Validator",
@@ -637,3 +643,84 @@ def test_output_stream_still_exposes_the_underlying_attributes(tmp_path: Path) -
         stream.writelines(["a\n", "b\n"])
 
     assert target.read_text(encoding="utf-8") == "a\nb\n"
+
+
+def test_a_plugin_can_be_written_against_the_facade_alone() -> None:
+    """Every contract type a plugin must name is exported by ton.api (PLUG-007)."""
+
+    class TagTransform:
+        """A transform implemented without importing any private module."""
+
+        type_name = "tag"
+        capabilities = api.TransformCapabilities(accepts_paired=True, preserves_pairing=True)
+        config_keys = frozenset({"suffix"})
+        requires_source = True
+
+        def nested_specs(self, spec: Mapping[str, Any]) -> tuple[Any, ...]:
+            del spec
+            return ()
+
+        def prepare(self, spec: Mapping[str, Any], context: api.PreparationContext) -> str:
+            del context
+            return str(spec.get("suffix", "!"))
+
+        def apply(
+            self, prepared: str, value: api.TransformResult, rng: Random
+        ) -> api.TransformResult:
+            del rng
+            return api.TransformResult(value.value + prepared, value.id_value)
+
+        def prove(
+            self, prepared: str, before: api.TransformResult, after: api.TransformResult
+        ) -> api.TransformProof:
+            if after.value == before.value + prepared:
+                return api.TransformProof(ok=True)
+            return api.TransformProof(ok=False, reason="suffix not applied")
+
+    class ShoutGenerator(api.Generator):
+        type_name = "shout"
+        config_keys = frozenset({"type", "word"})
+
+        def prepare(self, spec: Mapping[str, Any], context: Any = None) -> str:
+            del context
+            return str(spec["word"]).upper()
+
+        def generate(self, prepared: str, rng: Random) -> str:
+            del rng
+            return prepared
+
+        def prove(self, prepared: str, result: api.TransformResult) -> api.ProofResult:
+            return api.ProofResult(ok=result.value.startswith(prepared), reason="wrong word")
+
+    catalog = api.build_extension_catalog()
+    catalog.register_data_type("acme", "shout", ShoutGenerator())
+    catalog.register_transform("acme", "tag", TagTransform())
+    config = {
+        "rows": 2,
+        "format": "$x$",
+        "types": {"x": {"type": "acme.shout", "word": "hi", "transforms": [{"type": "acme.tag"}]}},
+    }
+
+    rows = list(
+        api.generate(
+            config,
+            seed=1,
+            registry=catalog.generators(),
+            transforms=catalog.transforms(),
+            proof_mode="all",
+        )
+    )
+
+    assert rows == ["HI!", "HI!"]
+
+
+def test_public_facade_exports_the_plugin_contract_types() -> None:
+    for name in (
+        "PreparationContext",
+        "ProofResult",
+        "TransformCapabilities",
+        "TransformProof",
+        "TransformResult",
+    ):
+        assert name in api.__all__
+        assert hasattr(api, name)

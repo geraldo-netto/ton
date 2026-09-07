@@ -336,6 +336,11 @@ for row in api.generate(config_dict,
 catalog across Engines does not share generator state. Generator attributes
 must therefore support `copy.deepcopy`.
 
+Plugins implement their protocols entirely against `ton.api`: alongside `Generator`
+and `PairedGenerator`, the facade exports the contract types a transform, validator,
+or proof hook has to name — `PreparationContext`, `TransformResult`, `TransformProof`,
+`TransformCapabilities`, and `ProofResult`. No private module import is required.
+
 A broken plugin discovered through broad `--entry-points` loading is isolated:
 failures are logged as `entry_point_failed` and skipped, so one bad package does
 not abort the catalog build. Duplicate providers for the same group and

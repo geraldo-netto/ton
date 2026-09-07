@@ -17,6 +17,11 @@ The supported surface, re-exported here, is:
   drive iteration themselves or inspect the engine
 * :class:`Generator`, :class:`PairedGenerator` -- the strategy types
   third-party generators subclass
+* :class:`PreparationContext`, :class:`ProofResult`,
+  :class:`TransformResult`, :class:`TransformProof`,
+  :class:`TransformCapabilities` -- the contract types a transform,
+  validator, or proof hook has to name to implement its protocol
+  (PLUG-007)
 
 Typical use::
 
@@ -65,7 +70,7 @@ from ._output import (
     inspect_staged_outputs,
     open_output_path,
 )
-from ._proof import ProofFailure, ProvenanceRecord
+from ._proof import ProofFailure, ProofResult, ProvenanceRecord
 from ._proofcheck import ProofFailureSink
 from ._registry import (
     EntryPointSelector,
@@ -78,10 +83,16 @@ from ._registry import (
     build_extension_catalog as _build_extension_catalog,
 )
 from ._template import UndeclaredVariableError
-from ._transforms import Transform
+from ._transforms import (
+    Transform,
+    TransformCapabilities,
+    TransformProof,
+    TransformResult,
+)
 from ._validation import ValidationError, Validator
 from .concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write_shard
 from .generators import Generator, PairedGenerator
+from .generators.base import PreparationContext
 
 __all__ = [
     "ConfigError",
@@ -104,7 +115,12 @@ __all__ = [
     "ProvenanceRecord",
     "RegistryError",
     "TemplateError",
+    "PreparationContext",
+    "ProofResult",
     "Transform",
+    "TransformCapabilities",
+    "TransformProof",
+    "TransformResult",
     "TransformExecutionError",
     "UndeclaredVariableError",
     "ValidationError",

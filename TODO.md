@@ -37,7 +37,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| PLUG-007 | open | medium | small | Plugin extensibility/decoupling: `ton.api` is documented as the supported facade but does not export `TransformResult`, `TransformProof`, `TransformCapabilities`, `ProofResult`, or `PreparationContext`. Confirmed all five are absent. Approved direction: export these contract types and document their roles. Acceptance: a plugin implemented entirely using facade imports can register, prepare, transform, and prove; align its signatures with REL-020/PLUG-008. No additional compatibility facade or alias layer. |
 
 ### CLI / option integrity
 

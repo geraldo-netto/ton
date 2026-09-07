@@ -362,3 +362,92 @@ def test_one_of_ignores_draw_tags_from_another_composite() -> None:
     # so it must fall back to the any-choice rule instead of trusting the tag.
     assert gen.prove(other, TransformResult(tagged)).ok
     assert not gen.prove(other, TransformResult("not-a-choice")).ok
+
+
+@pytest.mark.parametrize(
+    ("field", "extra_transforms"),
+    [
+        (
+            {
+                "type": "weighted",
+                "choices": [
+                    {
+                        "weight": 1,
+                        "spec": {
+                            "type": "string",
+                            "values": ["a"],
+                            "transforms": [{"type": "reject_transform"}],
+                        },
+                    },
+                    {
+                        "weight": 1,
+                        "spec": {
+                            "type": "string",
+                            "values": ["b"],
+                            "transforms": [{"type": "reject_transform"}],
+                        },
+                    },
+                ],
+            },
+            {},
+        ),
+        (
+            {
+                "type": "string",
+                "values": ["src"],
+                "transforms": [
+                    {
+                        "type": "distribution",
+                        "choices": [
+                            {
+                                "weight": 1,
+                                "spec": {
+                                    "type": "string",
+                                    "values": ["a"],
+                                    "transforms": [{"type": "reject_transform"}],
+                                },
+                            },
+                            {
+                                "weight": 1,
+                                "spec": {
+                                    "type": "string",
+                                    "values": ["b"],
+                                    "transforms": [{"type": "reject_transform"}],
+                                },
+                            },
+                        ],
+                    }
+                ],
+            },
+            {"distribution": DistributionTransform()},
+        ),
+    ],
+    ids=["weighted", "distribution"],
+)
+def test_weighted_choice_sets_prove_the_selected_child(field, extra_transforms) -> None:
+    """A permissive sibling must not mask the drawn child's failure (REL-022)."""
+    engine = Engine(
+        {"rows": 1, "format": "$x$", "types": {"x": field}},
+        transforms={"reject_transform": _RejectTransform(), **extra_transforms},
+        proof_mode="all",
+    )
+
+    with pytest.raises(ProofError, match="nested transform rejects"):
+        list(engine)
+
+
+def test_weighted_stays_permissive_for_values_it_did_not_draw() -> None:
+    """An external value is still proven against every choice (REL-022)."""
+    gen = WeightedGenerator()
+    prepared = gen.prepare(
+        {
+            "choices": [
+                {"weight": 1, "spec": {"type": "string", "values": ["a"]}},
+                {"weight": 1, "spec": {"type": "string", "values": ["b"]}},
+            ]
+        },
+        _context(),
+    )
+
+    assert gen.prove(prepared, TransformResult("b")).ok
+    assert not gen.prove(prepared, TransformResult("zzz")).ok

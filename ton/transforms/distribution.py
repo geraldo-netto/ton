@@ -65,4 +65,6 @@ class DistributionTransform(BaseTransform):
         del before
         if prepared.accepts(after):
             return TransformProof(ok=True)
-        return TransformProof(ok=False, reason="no distribution choice accepts the value")
+        detail = prepared.rejection(after)
+        reason = "no distribution choice accepts the value"
+        return TransformProof(ok=False, reason=f"{reason}: {detail}" if detail else reason)

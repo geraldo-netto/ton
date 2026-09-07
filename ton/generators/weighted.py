@@ -134,7 +134,9 @@ class WeightedGenerator(Generator):
         if prepared.distribution is not None:
             if prepared.distribution.accepts(result):
                 return ProofResult(ok=True)
-            return ProofResult(ok=False, reason="no weighted choice accepts the value")
+            detail = prepared.distribution.rejection(result)
+            reason = "no weighted choice accepts the value"
+            return ProofResult(ok=False, reason=f"{reason}: {detail}" if detail else reason)
         if result.value in (prepared.values or ()):
             return ProofResult(ok=True)
         return ProofResult(ok=False, reason="value is not in weighted 'values'")

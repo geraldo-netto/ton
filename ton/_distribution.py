@@ -17,6 +17,12 @@ if TYPE_CHECKING:
     from .generators.base import PreparationContext
 
 
+def _as_result(value: str) -> Any:
+    from ._transforms import TransformResult
+
+    return TransformResult(value)
+
+
 @dataclass(frozen=True)
 class WeightedChoiceSet:
     """Weights paired with prepared child generators."""
@@ -26,12 +32,37 @@ class WeightedChoiceSet:
     children: tuple[tuple[Any, Any], ...]
 
     def choose(self, rng: Random) -> str:
+        from .generators.base import drawn
+
         index = weighted_index(self.cum_weights, rng)
         generator, prepared = self.children[index]
-        return cast(str, generator.generate(prepared, rng))
+        return drawn(generator, prepared, cast(str, generator.generate(prepared, rng)))
 
     def accepts(self, result: Any) -> bool:
+        """Whether ``result`` satisfies the child that produced it.
+
+        Asking every child instead let a permissive sibling mask the selected
+        child's failed proof (REL-022); the any-child rule survives only for
+        values this choice set did not draw.
+        """
+        from .generators.base import proven_draws
+
+        draws = proven_draws(result, self.children)
+        if draws is not None:
+            return all(
+                draw.generator.prove(draw.prepared, _as_result(draw.value)).ok for draw in draws
+            )
         return any(generator.prove(prepared, result).ok for generator, prepared in self.children)
+
+    def rejection(self, result: Any) -> str:
+        """Return the selected child's failure reason, when it recorded one."""
+        from .generators.base import proven_draws
+
+        for draw in proven_draws(result, self.children) or ():
+            proof = draw.generator.prove(draw.prepared, _as_result(draw.value))
+            if not proof.ok and proof.reason:
+                return proof.reason
+        return ""
 
 
 def prepare_distribution(

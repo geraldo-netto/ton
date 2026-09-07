@@ -12,7 +12,7 @@ import pytest
 from ton import api
 from ton._config import ConfigError, load
 from ton._engine import Engine, TemplateError
-from ton._transforms import BaseTransform, TransformCapabilities
+from ton._transforms import BaseTransform, TransformCapabilities, TransformProof
 
 
 def _write(tmp_path: Path, payload: dict) -> Path:
@@ -589,3 +589,51 @@ def test_large_integer_parsing_preserves_intentional_validation_errors(tmp_path:
 
     with pytest.raises(ConfigError, match="non-negative integer"):
         load(path)
+
+
+def test_decimal_bounds_survive_loading_exactly(tmp_path: Path) -> None:
+    """Binary floats moved written bounds off the requested interval (CFG-007)."""
+    path = tmp_path / "exact.json"
+    path.write_text(
+        '{"rows": 2, "format": "$x$", "types": {"x": {"type": "decimal", '
+        '"minValue": 0.10000000000000001, "maxValue": 0.10000000000000001, '
+        '"decimals": 17}}}',
+        encoding="utf-8",
+    )
+
+    rows = list(api.generate(load(path), seed=1, proof_mode="all"))
+
+    assert rows == ["0.10000000000000001"] * 2
+
+
+def test_decimal_specs_serialize_exactly_into_proof_reports(tmp_path: Path) -> None:
+    """Exactness must survive audit serialization too (CFG-007)."""
+    import io
+
+    from ton._proofaudit import ProofAuditWriter
+
+    class _Reject(BaseTransform):
+        type_name = "reject_exact"
+        config_keys: ClassVar[frozenset[str] | None] = frozenset()
+
+        def prove(self, prepared, before, after):  # noqa: ANN001, ANN201
+            del prepared, before, after
+            return TransformProof(ok=False, reason="nope")
+
+    path = tmp_path / "spec.json"
+    path.write_text(
+        '{"rows": 1, "format": "$x$", "types": {"x": {"type": "decimal", '
+        '"minValue": 0.5, "maxValue": 0.5, "decimals": 1, '
+        '"transforms": [{"type": "reject_exact"}]}}}',
+        encoding="utf-8",
+    )
+    engine = Engine.from_config(
+        load(path), seed=1, proof_mode="audit", transforms={"reject_exact": _Reject()}
+    )
+    report = io.StringIO()
+    engine.set_proof_failure_sink(ProofAuditWriter(report))
+
+    list(engine)
+
+    spec = json.loads(report.getvalue().splitlines()[0])["spec"]
+    assert Decimal(spec["minValue"]) == Decimal("0.5")

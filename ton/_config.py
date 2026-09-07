@@ -13,6 +13,7 @@ import codecs
 import difflib
 import json
 from collections.abc import Mapping
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
 
@@ -57,7 +58,9 @@ def load(path: str | Path) -> dict[str, Any]:
             # ``str_to_int`` keeps arbitrarily large JSON integers loadable:
             # the stdlib parser inherits CPython's 4,300-digit conversion
             # ceiling and would fail before structural validation (CFG-006).
-            data = json.load(fh, parse_int=str_to_int)
+            # ``Decimal`` keeps written decimal bounds exact: binary floats
+            # silently moved them off the requested interval (CFG-007).
+            data = json.load(fh, parse_int=str_to_int, parse_float=Decimal)
     except UnicodeDecodeError as exc:
         raise ConfigError(f"Config file must be valid UTF-8: {exc}") from exc
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+from decimal import Decimal
 from random import Random
 from typing import Any
 
@@ -373,3 +374,12 @@ def test_proof_checker_preserves_existing_sink_error() -> None:
         checker._record_audit(failure)
 
     assert exc.value is sink_error
+
+
+def test_audit_serialization_still_rejects_unsupported_objects() -> None:
+    """Decimal support must not silently serialize anything else (CFG-007)."""
+    from ton._proofaudit import _json_default
+
+    assert _json_default(Decimal("0.5")) == "0.5"
+    with pytest.raises(TypeError, match="not JSON serializable"):
+        _json_default(object())

@@ -10,7 +10,6 @@ validation surfaces cannot drift (REL-011).
 from __future__ import annotations
 
 import codecs
-import difflib
 import json
 from collections.abc import Mapping
 from decimal import Decimal
@@ -21,7 +20,7 @@ from ._compiler import TemplateError, compile_plan
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._registry import ExtensionCatalog
-from ._speckeys import COMMON_FIELD_KEYS, unknown_key_message
+from ._speckeys import unknown_key_message
 from ._template import UndeclaredVariableError, validate_against
 from .generators.base import str_to_int
 
@@ -178,8 +177,10 @@ def _validate_types(types: Any) -> None:
 
 
 def _validate_type_spec(name: str, spec: Any) -> None:
+    # Unknown-key diagnostics belong to the compiler, which knows which keys
+    # each generator declares: guessing here rejected plugin-owned keys that
+    # merely resemble a common one, before ownership was resolved (CFG-005).
     validated = _require_type_spec(name, spec)
-    _validate_common_field_key_typos(name, validated)
     _validate_transform_specs(name, validated.get("transforms", []))
     _validate_validator_refs(name, validated.get("validators", []))
 
@@ -190,15 +191,6 @@ def _require_type_spec(name: str, spec: Any) -> Mapping[str, Any]:
     if not isinstance(spec["type"], str) or not spec["type"]:
         raise ConfigError(f"Type spec {name!r} 'type' must be a non-empty string.")
     return cast(Mapping[str, Any], spec)
-
-
-def _validate_common_field_key_typos(name: str, spec: Mapping[str, Any]) -> None:
-    for key in spec:
-        if key in COMMON_FIELD_KEYS:
-            continue
-        matches = difflib.get_close_matches(key, COMMON_FIELD_KEYS, n=1, cutoff=0.8)
-        if matches:
-            raise ConfigError(_unknown_key_message(f"types.{name}", key, COMMON_FIELD_KEYS))
 
 
 def _validate_transform_specs(name: str, transforms: Any) -> None:

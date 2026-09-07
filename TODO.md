@@ -47,7 +47,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| CFG-005 | open | medium | small | Configuration discoverability/plugin extensibility: `_validate_common_field_key_typos` rejects keys before resolving extension ownership. Confirmed: a generator declaring `config_keys={"values", "transform"}` is rejected for `transform`; the same happens with open keys (`config_keys=None`). Approved direction: apply typo diagnostics after resolving extension key ownership, using the existing extension-aware boundary. Acceptance: declared/open plugin keys work, while undeclared keys on closed extensions still fail with appropriate suggestions. Structural-only loading must not guess ownership before a catalog is available. |
 
 ### Data governance
 

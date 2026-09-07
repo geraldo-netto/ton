@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import Path
-from typing import ClassVar
+from random import Random
+from typing import Any, ClassVar
 
 import pytest
 
@@ -13,6 +15,7 @@ from ton import api
 from ton._config import ConfigError, load
 from ton._engine import Engine, TemplateError
 from ton._transforms import BaseTransform, TransformCapabilities, TransformProof
+from ton.generators import Generator
 
 
 def _write(tmp_path: Path, payload: dict) -> Path:
@@ -389,7 +392,8 @@ def test_validate_config_accepts_core_identity_transform() -> None:
 
 
 def test_unknown_key_policy_defines_root_and_common_field_keys() -> None:
-    from ton._config import COMMON_FIELD_KEYS, ROOT_KEYS, _unknown_key_message
+    from ton._config import ROOT_KEYS, _unknown_key_message
+    from ton._speckeys import COMMON_FIELD_KEYS
 
     actual_root_keys = ROOT_KEYS
     actual_common_keys = COMMON_FIELD_KEYS
@@ -465,8 +469,6 @@ def test_validate_config_rejects_weighted_choice_wrapper_typo() -> None:
 
 
 def test_plugin_generator_may_own_custom_keys() -> None:
-    from random import Random
-    from typing import Any
 
     from ton.generators import Generator
 
@@ -484,8 +486,6 @@ def test_plugin_generator_may_own_custom_keys() -> None:
 
 
 def test_plugin_metadata_type_key_is_not_a_nested_generator() -> None:
-    from random import Random
-    from typing import Any
 
     from ton.generators import Generator
 
@@ -666,3 +666,46 @@ def test_generate_and_validate_config_agree_on_available_types() -> None:
         return {name.strip() for name in listed.split(",") if "." not in name}
 
     assert _named(str(from_generate.value)) == _named(str(from_validate.value))
+
+
+def test_plugin_owned_keys_survive_a_resemblance_to_a_common_key() -> None:
+    """Typo hints must run after ownership is resolved (CFG-005)."""
+
+    class OptionGenerator(Generator):
+        type_name = "opt"
+        config_keys: ClassVar[frozenset[str] | None] = frozenset({"type", "transform"})
+
+        def prepare(self, spec: Mapping[str, Any], context: Any = None) -> str:
+            del context
+            return str(spec.get("transform", "none"))
+
+        def generate(self, prepared: str, rng: Random) -> str:
+            del rng
+            return prepared
+
+    class OpenNamespaceGenerator(OptionGenerator):
+        type_name = "opt_open"
+        config_keys: ClassVar[frozenset[str] | None] = None
+
+    registry = api.build_extension_catalog().generators()
+    registry["opt"] = OptionGenerator()
+    registry["opt_open"] = OpenNamespaceGenerator()
+
+    for type_name in ("opt", "opt_open"):
+        config = {
+            "rows": 1,
+            "format": "$x$",
+            "types": {"x": {"type": type_name, "transform": "declared"}},
+        }
+        assert list(api.generate(config, seed=1, registry=registry)) == ["declared"]
+
+
+def test_a_real_typo_on_a_builtin_is_still_reported_with_a_suggestion() -> None:
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {"x": {"type": "string", "values": ["a"], "transform": []}},
+    }
+
+    with pytest.raises(ConfigError, match="Did you mean 'transforms'"):
+        api.validate_config(config)

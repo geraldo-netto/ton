@@ -52,7 +52,7 @@ ton examples/hwmetrics.json -o hwmetrics.csv
 | flag                   | description                                                                          |
 |------------------------|--------------------------------------------------------------------------------------|
 | `--seed <int>`         | Seed the RNG for reproducible output.                                                |
-| `-o`, `--output PATH`  | Write rows to a file instead of stdout. Refuses non-regular targets (`/dev/*`, …).   |
+| `-o`, `--output PATH`  | Write rows to a file instead of stdout. Accepts a regular file or a FIFO; refuses other targets (`/dev/*`, …). |
 | `--no-clobber`         | Fail instead of overwriting an existing `--output` or `--proof-report` file.          |
 | `--resume-from N`      | Generate and discard the first `N` rows before writing output (paired with `--seed`). |
 | `--validate`           | Validate the config and exit without generating rows.                                |

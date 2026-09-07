@@ -23,7 +23,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, ClassVar
+from typing import Any
 
 from .._proof import ProofResult
 from .._transforms import TransformResult
@@ -45,7 +45,6 @@ class SequenceOfGenerator(Generator):
     """Concatenate ``count`` independent draws from a single child generator."""
 
     type_name = "sequence_of"
-    is_composite: ClassVar[bool] = True
 
     def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
         child = spec.get("spec")
@@ -58,16 +57,6 @@ class SequenceOfGenerator(Generator):
     ) -> SequenceOfSpec:
         if context is None:
             raise self._composite_path_error()
-        return self._prepare(spec, context)
-
-    def prepare_composite(
-        self,
-        spec: Mapping[str, Any],
-        registry: Mapping[str, Generator],
-    ) -> SequenceOfSpec:
-        return self._prepare(spec, PreparationContext(registry))
-
-    def _prepare(self, spec: Mapping[str, Any], context: PreparationContext) -> SequenceOfSpec:
         count = coerce_int(spec, "count", type_name="sequence_of")
         if count < 1:
             raise ValueError("sequence_of 'count' must be >= 1")

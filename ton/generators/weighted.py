@@ -48,7 +48,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, ClassVar
+from typing import Any
 
 from .._distribution import (
     WeightedChoiceSet,
@@ -80,7 +80,6 @@ class WeightedGenerator(Generator):
     """Pick one alternative with probability proportional to its weight."""
 
     type_name = "weighted"
-    is_composite: ClassVar[bool] = True
 
     def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
         choices = spec.get("choices")
@@ -97,30 +96,19 @@ class WeightedGenerator(Generator):
         spec: Mapping[str, Any],
         context: PreparationContext | None = None,
     ) -> WeightedSpec:
-        # Composite specs require ``prepare_composite`` so they can
-        # access the engine's registry; legacy specs are routed here
-        # directly so callers that bypass the engine still work.
+        # Composite specs need the engine's registry to resolve children;
+        # legacy string-only specs are prepared without one.
         if "choices" in spec:
             if context is None:
                 raise self._composite_path_error()
             return self._prepare_composite(spec, context)
         return self._prepare_legacy(spec)
 
-    def prepare_composite(
-        self,
-        spec: Mapping[str, Any],
-        registry: Mapping[str, Generator],
-    ) -> WeightedSpec:
-        return self._prepare_composite(spec, PreparationContext(registry))
-
     def _prepare_composite(
         self,
         spec: Mapping[str, Any],
         context: PreparationContext,
     ) -> WeightedSpec:
-        raw_choices = spec.get("choices")
-        if raw_choices is None:
-            return self._prepare_legacy(spec)
         distribution = prepare_distribution(
             _distribution_spec(spec),
             context.registry,

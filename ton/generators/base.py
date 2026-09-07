@@ -30,7 +30,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from inspect import signature
 from random import Random
 from typing import Any, ClassVar
 
@@ -62,9 +61,7 @@ class PreparationContext:
         return prepare_child_spec(parent_type, location, nested_spec, self.registry, self)
 
     def prepare_generator(self, generator: Generator, spec: Mapping[str, Any]) -> Any:
-        """Prepare through the context while retaining legacy plugin compatibility."""
-        if len(signature(generator.prepare).parameters) == 1:
-            return generator.prepare(spec)
+        """Prepare ``spec`` through this context's registry and services."""
         return generator.prepare(spec, self)
 
 
@@ -85,10 +82,6 @@ class Generator(ABC):
     #: third-party generators can opt in without subclassing a concrete type.
     is_paired: ClassVar[bool] = False
 
-    #: Legacy composite marker retained for compatibility. New extensions
-    #: accept ``PreparationContext`` in :meth:`prepare` instead.
-    is_composite: ClassVar[bool] = False
-
     def prepare(
         self,
         spec: Mapping[str, Any],
@@ -98,8 +91,7 @@ class Generator(ABC):
 
         Override to return a typed value-object (a dataclass works well)
         so that :meth:`generate` becomes a pure draw + format step.
-        The default passes the dict through, preserving the legacy
-        contract for third-party generators that take a raw dict.
+        The default passes the dict through unchanged.
 
         Composite generators use ``context.prepare_child(...)`` to resolve
         nested specs through the same registry as their parent.
@@ -113,22 +105,6 @@ class Generator(ABC):
             f"{self.type_name!r} requires the engine's composite preparation path; "
             "build an Engine instead of calling prepare() directly"
         )
-
-    def prepare_composite(
-        self,
-        spec: Mapping[str, Any],
-        registry: Mapping[str, Generator],
-    ) -> Any:
-        """Composite hook: prepare ``spec`` with access to ``registry``.
-
-        Default implementation delegates to :meth:`prepare` so non-
-        composite generators stay unaffected. Set
-        :attr:`is_composite` ``= True`` and override this method when
-        the prepared spec needs to resolve nested type specs against
-        the engine's registry (e.g. ``weighted`` composing other types).
-        """
-        del registry
-        return self.prepare(spec)
 
     def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
         """Return direct child generator references declared by ``spec``.

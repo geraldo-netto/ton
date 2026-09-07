@@ -8,6 +8,7 @@ from random import Random
 import pytest
 
 from ton._registry import default_registry
+from ton.generators.base import PreparationContext
 from ton.generators.weighted import WeightedGenerator
 
 
@@ -163,7 +164,7 @@ def test_weighted_composite_mixes_types_via_engine() -> None:
 
 def test_weighted_composite_uses_distribution_delegate() -> None:
     gen = WeightedGenerator()
-    prepared = gen.prepare_composite(
+    prepared = gen.prepare(
         {
             "type": "weighted",
             "choices": [
@@ -171,7 +172,7 @@ def test_weighted_composite_uses_distribution_delegate() -> None:
                 {"weight": 1, "spec": {"type": "string", "values": ["always"]}},
             ],
         },
-        default_registry(),
+        PreparationContext(default_registry()),
     )
 
     assert prepared.cum_weights == (0.0, 1.0)
@@ -180,14 +181,14 @@ def test_weighted_composite_uses_distribution_delegate() -> None:
 
 def test_weighted_composite_accepts_core_qualified_child_type() -> None:
     gen = WeightedGenerator()
-    prepared = gen.prepare_composite(
+    prepared = gen.prepare(
         {
             "type": "weighted",
             "choices": [
                 {"weight": 1, "spec": {"type": "core.string", "values": ["ok"]}},
             ],
         },
-        default_registry(),
+        PreparationContext(default_registry()),
     )
 
     assert gen.generate(prepared, Random(0)) == "ok"
@@ -319,13 +320,13 @@ def test_weighted_composite_rejects_boolean_weight_with_path() -> None:
     registry = default_registry()
 
     with pytest.raises(ValueError, match=r"choices\[0\]\.weight"):
-        gen.prepare_composite(
+        gen.prepare(
             {
                 "choices": [
                     {"weight": True, "spec": {"type": "string", "values": ["x"]}},
                 ]
             },
-            registry,
+            PreparationContext(registry),
         )
 
 
@@ -334,13 +335,13 @@ def test_weighted_composite_rejects_unknown_wrapper_key_with_suggestion() -> Non
     registry = default_registry()
 
     with pytest.raises(ValueError, match=r"weighted\.choices\[0\]\.weigth.*Did you mean 'weight'"):
-        gen.prepare_composite(
+        gen.prepare(
             {
                 "choices": [
                     {"weigth": 1, "spec": {"type": "string", "values": ["x"]}},
                 ]
             },
-            registry,
+            PreparationContext(registry),
         )
 
 
@@ -398,9 +399,11 @@ def test_weighted_composite_rejects_non_mapping_child_spec() -> None:
         list(api.generate(config))
 
 
-def test_weighted_legacy_composite_hook_delegates_to_legacy_prepare() -> None:
+def test_weighted_legacy_spec_prepares_without_a_registry() -> None:
     generator = WeightedGenerator()
 
-    prepared = generator.prepare_composite({"values": ["x"], "weights": [1]}, default_registry())
+    context = PreparationContext(default_registry())
+
+    prepared = generator.prepare({"values": ["x"], "weights": [1]}, context)
 
     assert generator.generate(prepared, Random(0)) == "x"

@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any, ClassVar
+from typing import Any
 
 from .._proof import ProofResult
 from .._transforms import TransformResult
@@ -40,7 +40,6 @@ class OneOfGenerator(Generator):
     """Pick uniformly between several nested generators."""
 
     type_name = "oneOf"
-    is_composite: ClassVar[bool] = True
 
     def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
         choices = spec.get("choices")
@@ -59,16 +58,6 @@ class OneOfGenerator(Generator):
     ) -> OneOfSpec:
         if context is None:
             raise self._composite_path_error()
-        return self._prepare(spec, context)
-
-    def prepare_composite(
-        self,
-        spec: Mapping[str, Any],
-        registry: Mapping[str, Generator],
-    ) -> OneOfSpec:
-        return self._prepare(spec, PreparationContext(registry))
-
-    def _prepare(self, spec: Mapping[str, Any], context: PreparationContext) -> OneOfSpec:
         raw = spec.get("choices")
         if not isinstance(raw, list) or not raw:
             raise ValueError("oneOf 'choices' must be a non-empty list")

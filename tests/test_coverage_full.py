@@ -351,15 +351,14 @@ def test_coerce_int_rejects_non_integer_value() -> None:
         coerce_int({"minValue": "not-a-number"}, "minValue", type_name="integer")
 
 
-def test_generator_default_prepare_composite_delegates_to_prepare() -> None:
-    """Non-composite generators must transparently route through the base hook."""
+def test_generator_prepare_ignores_context_when_not_composite() -> None:
+    """A non-composite generator prepares identically with or without a context."""
+    from ton.generators.base import PreparationContext
     from ton.generators.integer import IntegerGenerator
 
     gen = IntegerGenerator()
     spec = {"minValue": 0, "maxValue": 9, "padWithZero": False}
-    via_default = gen.prepare_composite(spec, registry={})
-    via_direct = gen.prepare(spec)
-    assert via_default == via_direct
+    assert gen.prepare(spec, PreparationContext({})) == gen.prepare(spec)
 
 
 # ---------------------------------------------------------------------------

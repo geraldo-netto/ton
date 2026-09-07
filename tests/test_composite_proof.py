@@ -11,7 +11,11 @@ from ton._engine import Engine, ProofError
 from ton._proof import ProofResult
 from ton._transforms import BaseTransform, TransformProof, TransformResult
 from ton.generators import Generator
-from ton.generators.base import ChildPipelineGenerator, ChildPipelineSpec
+from ton.generators.base import (
+    ChildPipelineGenerator,
+    ChildPipelineSpec,
+    PreparationContext,
+)
 from ton.generators.one_of import OneOfGenerator
 from ton.generators.sequence_of import SequenceOfGenerator
 from ton.generators.weighted import WeightedGenerator
@@ -57,9 +61,13 @@ def _registry() -> dict[str, Generator]:
     return reg
 
 
+def _context() -> PreparationContext:
+    return PreparationContext(_registry())
+
+
 def _one_of(*choices: dict[str, Any]) -> tuple[OneOfGenerator, Any]:
     gen = OneOfGenerator()
-    prepared = gen.prepare_composite({"choices": list(choices)}, _registry())
+    prepared = gen.prepare({"choices": list(choices)}, _context())
     return gen, prepared
 
 
@@ -133,15 +141,15 @@ def test_nested_pipeline_proof_is_permissive_without_generation_trace() -> None:
 
 def test_weighted_composite_prove_accepts_and_rejects() -> None:
     gen = WeightedGenerator()
-    ok_spec = gen.prepare_composite(
+    ok_spec = gen.prepare(
         {"choices": [{"weight": 1, "spec": {"type": "string", "values": ["a"]}}]},
-        _registry(),
+        _context(),
     )
     assert gen.prove(ok_spec, TransformResult("a")).ok
 
-    bad_spec = gen.prepare_composite(
+    bad_spec = gen.prepare(
         {"choices": [{"weight": 1, "spec": {"type": "reject"}}]},
-        _registry(),
+        _context(),
     )
     assert not gen.prove(bad_spec, TransformResult("x")).ok
 
@@ -183,7 +191,7 @@ def test_distribution_transform_prove_accepts_and_rejects() -> None:
 
 def _sequence_of(spec: dict[str, Any]) -> tuple[SequenceOfGenerator, Any]:
     gen = SequenceOfGenerator()
-    return gen, gen.prepare_composite(spec, _registry())
+    return gen, gen.prepare(spec, _context())
 
 
 def test_sequence_of_prove_without_separator_is_permissive() -> None:

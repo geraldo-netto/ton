@@ -252,7 +252,7 @@ def test_engine_wraps_unexpected_prepare_error_as_template_error() -> None:
     class BrokenGenerator(Generator):
         type_name = "broken"
 
-        def prepare(self, spec: Mapping[str, Any]) -> Any:
+        def prepare(self, spec: Mapping[str, Any], context: Any = None) -> Any:
             raise RuntimeError("third-party plugin blew up")
 
         def generate(self, prepared: Any, rng: Random) -> str:

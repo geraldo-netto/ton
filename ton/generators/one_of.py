@@ -28,7 +28,7 @@ from typing import Any
 
 from .._proof import ProofResult
 from .._transforms import TransformResult
-from .base import Generator, PreparationContext
+from .base import Generator, PreparationContext, drawn, prove_draws, proven_draws
 
 
 @dataclass(frozen=True)
@@ -68,11 +68,16 @@ class OneOfGenerator(Generator):
 
     def generate(self, prepared: OneOfSpec, rng: Random) -> str:
         child_gen, child_prepared = rng.choice(prepared.children)
-        return child_gen.generate(child_prepared, rng)
+        return drawn(child_gen, child_prepared, child_gen.generate(child_prepared, rng))
 
     def prove(self, prepared: OneOfSpec, result: TransformResult) -> ProofResult:
-        # The value came from one child, so it fails only if no child
-        # accepts it; permissive-default children never false-fail (REL-001).
+        # Prove the branch that actually ran. Asking every child instead let a
+        # permissive sibling mask the selected child's failure (REL-021).
+        draws = proven_draws(result, prepared.children)
+        if draws is not None:
+            return prove_draws(draws, "oneOf choice")
+        # A value TON did not draw here (external or re-derived): it is valid
+        # if any choice accepts it; permissive children never false-fail.
         proofs = tuple(gen.prove(prep, result) for gen, prep in prepared.children)
         if any(proof.ok for proof in proofs):
             return ProofResult(ok=True)

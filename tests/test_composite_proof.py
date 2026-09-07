@@ -15,6 +15,7 @@ from ton.generators import Generator
 from ton.generators.base import (
     ChildPipelineGenerator,
     ChildPipelineSpec,
+    DrawnValue,
     PreparationContext,
 )
 from ton.generators.one_of import OneOfGenerator
@@ -302,3 +303,62 @@ def test_root_transform_candidate_validators_reject_like_root_validators() -> No
 
     with pytest.raises(ValidationError, match="Nested value failed validator"):
         list(engine)
+
+
+def test_one_of_proves_the_branch_that_ran() -> None:
+    """A permissive sibling must not mask the selected child's failure (REL-021)."""
+    engine = Engine(
+        {
+            "rows": 1,
+            "format": "$x$",
+            "types": {
+                "x": {
+                    "type": "oneOf",
+                    "choices": [
+                        {
+                            "type": "string",
+                            "values": ["a"],
+                            "transforms": [{"type": "reject_transform"}],
+                        },
+                        {
+                            "type": "string",
+                            "values": ["b"],
+                            "transforms": [{"type": "reject_transform"}],
+                        },
+                    ],
+                }
+            },
+        },
+        transforms={"reject_transform": _RejectTransform()},
+        proof_mode="all",
+    )
+
+    with pytest.raises(ProofError, match="oneOf choice failed its own proof"):
+        list(engine)
+
+
+def test_one_of_stays_permissive_for_values_it_did_not_draw() -> None:
+    """An external value is still proven against every choice (REL-021)."""
+    gen = OneOfGenerator()
+    prepared = gen.prepare(
+        {"choices": [{"type": "string", "values": ["a"]}, {"type": "string", "values": ["b"]}]},
+        _context(),
+    )
+
+    assert gen.prove(prepared, TransformResult("b")).ok
+    assert not gen.prove(prepared, TransformResult("zzz")).ok
+
+
+def test_one_of_ignores_draw_tags_from_another_composite() -> None:
+    """Identity is checked, not merely 'is tagged': a foreign draw falls back (REL-021)."""
+    gen = OneOfGenerator()
+    source = gen.prepare({"choices": [{"type": "string", "values": ["a"]}]}, _context())
+    other = gen.prepare({"choices": [{"type": "string", "values": ["a"]}]}, _context())
+
+    tagged = gen.generate(source, Random(0))
+    assert isinstance(tagged, DrawnValue)
+
+    # Proven by a different oneOf: its draws name children this spec does not own,
+    # so it must fall back to the any-choice rule instead of trusting the tag.
+    assert gen.prove(other, TransformResult(tagged)).ok
+    assert not gen.prove(other, TransformResult("not-a-choice")).ok

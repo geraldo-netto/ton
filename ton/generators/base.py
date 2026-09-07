@@ -159,6 +159,71 @@ class Generator(ABC):
         return ProofResult(ok=True)
 
 
+@dataclass(frozen=True)
+class ChildDraw:
+    """One child draw: the generator/prepared pair and the text it produced."""
+
+    generator: Generator
+    prepared: Any
+    value: str
+
+
+class DrawnValue(str):
+    """Generated text tagged with the child draw(s) that produced it.
+
+    Composite generators (``oneOf``, ``weighted``, ``sequence_of``) and the
+    ``distribution`` transform pick one branch at row time but used to prove
+    a value by asking *every* branch. A branch whose proof is permissive
+    then masked the selected branch's failure (REL-021, REL-022, REL-023).
+    Carrying the draws lets each composite prove exactly what ran.
+
+    It subclasses ``str`` so the value stays an ordinary string everywhere
+    else -- rendering, transforms, validators, and output are unaffected.
+    """
+
+    draws: tuple[ChildDraw, ...]
+
+    def __new__(cls, value: str, draws: tuple[ChildDraw, ...]) -> DrawnValue:
+        instance = super().__new__(cls, value)
+        instance.draws = draws
+        return instance
+
+
+def drawn(generator: Generator, prepared: Any, value: str) -> DrawnValue:
+    """Tag ``value`` with the single child draw that produced it."""
+    return DrawnValue(value, (ChildDraw(generator, prepared, value),))
+
+
+def proven_draws(
+    result: TransformResult,
+    children: tuple[tuple[Generator, Any], ...],
+) -> tuple[ChildDraw, ...] | None:
+    """Return the recorded draws when they all name one of ``children``.
+
+    ``None`` means the value did not come from this composite (an external
+    or re-derived value), so the caller keeps its permissive fallback.
+    """
+    value = result.value
+    if not isinstance(value, DrawnValue) or not value.draws:
+        return None
+    known = {(id(generator), id(prepared)) for generator, prepared in children}
+    if any((id(draw.generator), id(draw.prepared)) not in known for draw in value.draws):
+        return None
+    return value.draws
+
+
+def prove_draws(draws: tuple[ChildDraw, ...], label: str) -> ProofResult:
+    """Prove every recorded draw against the child that produced it."""
+    for draw in draws:
+        proof = draw.generator.prove(draw.prepared, TransformResult(draw.value))
+        if not proof.ok:
+            reason = f"{label} failed its own proof"
+            return ProofResult(
+                ok=False, reason=f"{reason}: {proof.reason}" if proof.reason else reason
+            )
+    return ProofResult(ok=True)
+
+
 class _GeneratedChildValue(str):
     """String carrying the exact nested transform trace until proofing."""
 

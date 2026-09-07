@@ -637,3 +637,32 @@ def test_decimal_specs_serialize_exactly_into_proof_reports(tmp_path: Path) -> N
 
     spec = json.loads(report.getvalue().splitlines()[0])["spec"]
     assert Decimal(spec["minValue"]) == Decimal("0.5")
+
+
+def test_unknown_type_diagnostic_names_real_alternatives() -> None:
+    """The narrowed registry must not report 'Available types: (none)' (CFG-008)."""
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "nosuch"}}}
+
+    with pytest.raises(TemplateError) as excinfo:
+        list(api.generate(config))
+
+    message = str(excinfo.value)
+    assert "(none)" not in message
+    for expected in ("string", "integer", "weighted"):
+        assert expected in message
+
+
+def test_generate_and_validate_config_agree_on_available_types() -> None:
+    """Both entry points describe the same catalog for the same config (CFG-008)."""
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "nosuch"}}}
+
+    with pytest.raises(TemplateError) as from_generate:
+        list(api.generate(config))
+    with pytest.raises(ConfigError) as from_validate:
+        api.validate_config(config)
+
+    def _named(message: str) -> set[str]:
+        listed = message.rsplit("Available types: ", 1)[1].rstrip(".")
+        return {name.strip() for name in listed.split(",") if "." not in name}
+
+    assert _named(str(from_generate.value)) == _named(str(from_validate.value))

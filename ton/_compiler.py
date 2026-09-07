@@ -11,6 +11,7 @@ from ._logging import logger as _logger
 from ._proof import PreparedField, PreparedTransform
 from ._registry import (
     RegistryError,
+    default_registry,
     default_transforms,
     default_validators,
     make_registry,
@@ -177,11 +178,21 @@ class EngineCompiler:
                 raise TemplateError(str(exc)) from exc
             type_name = runtime_type_name(self.types[type_key]["type"])
             if type_name not in self.registry:
-                available = ", ".join(sorted(self.registry)) or "(none)"
                 raise TemplateError(
                     f"Unknown type {type_name!r} for variable {type_key!r}. "
-                    f"Available types: {available}."
+                    f"Available types: {self._available_type_names()}."
                 )
+
+    def _available_type_names(self) -> str:
+        """List every type a config could name, for an unknown-type diagnostic.
+
+        ``self.registry`` is narrowed to the names this config asked for, so
+        an unknown name leaves it empty and reporting from it said
+        "(none)" -- while ``validate_config`` listed every built-in for the
+        same config (CFG-008).
+        """
+        available = set(self.registry) | set(default_registry())
+        return ", ".join(sorted(available)) or "(none)"
 
     def _build_prepared(self) -> dict[str, PreparedField]:
         prepared: dict[str, PreparedField] = {}

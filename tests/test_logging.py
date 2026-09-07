@@ -14,7 +14,7 @@ from ton import api
 from ton._engine import Engine
 from ton._logging import LOGGER_NAME, LogEvent, configure_stderr, logger, terminal_failure_fields
 from ton._proof import ProofResult
-from ton._registry import clear_default_registry_cache, default_registry
+from ton._registry import clear_default_registry_cache, make_registry
 from ton._transforms import TransformResult
 from ton.cli import main
 from ton.generators import Generator
@@ -92,7 +92,7 @@ def test_engine_milestone_zero_disables_logging(
 def test_registry_discovery_emits_event(caplog: pytest.LogCaptureFixture) -> None:
     clear_default_registry_cache()
     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
-        default_registry()
+        make_registry()
     events = [r for r in caplog.records if getattr(r, "event", None) == "registry_discovered"]
     assert events, "expected a registry_discovered log record"
     assert events[0].generators >= 20  # type: ignore[attr-defined]

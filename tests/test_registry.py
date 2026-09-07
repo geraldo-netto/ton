@@ -24,8 +24,8 @@ from ton._registry import (
     build_extension_catalog,
     catalog_with_entry_points,
     clear_default_registry_cache,
-    default_registry,
     discover_generator_classes,
+    make_registry,
     normalize_reference,
     plugin_provenance,
     resolve_reference,
@@ -42,7 +42,7 @@ from ton.generators import Generator, StringGenerator
         "import ton.transforms; import ton.generators",
         "import ton.transforms.distribution; import ton.generators",
         "import ton.generators; import ton.transforms",
-        "import ton._registry; ton._registry.default_registry()",
+        "import ton._registry; ton._registry.make_registry()",
     ],
 )
 def test_public_packages_import_cleanly_in_fresh_interpreter(imports: str) -> None:
@@ -100,8 +100,8 @@ def test_discover_returns_only_concrete_named_subclasses() -> None:
         assert not inspect.isabstract(cls)
 
 
-def test_default_registry_covers_every_expected_type() -> None:
-    keys = set(default_registry().keys())
+def test_make_registry_covers_every_expected_type() -> None:
+    keys = set(make_registry().keys())
     missing = EXPECTED_TYPES - keys
     assert not missing, f"missing types in registry: {missing}"
     # Extras may show up legitimately when other tests in the same
@@ -111,28 +111,28 @@ def test_default_registry_covers_every_expected_type() -> None:
     # else is.
 
 
-def test_default_registry_instances_are_independent() -> None:
-    first = default_registry()
-    second = default_registry()
+def test_make_registry_instances_are_independent() -> None:
+    first = make_registry()
+    second = make_registry()
     # Different Generator instances per call so per-spec state (e.g.
     # SequenceGenerator counters) is not shared across engines.
     assert first["sequence"] is not second["sequence"]
 
 
-def test_default_registry_ignores_colliding_subclass() -> None:
+def test_make_registry_ignores_colliding_subclass() -> None:
     class CollidingString(StringGenerator):
         type_name = "string"
 
     assert CollidingString not in discover_generator_classes()
     clear_default_registry_cache()
-    assert type(default_registry()["string"]) is StringGenerator
+    assert type(make_registry()["string"]) is StringGenerator
 
 
 def test_clear_cache_rebuilds_defaults() -> None:
     clear_default_registry_cache()
-    first_keys = set(default_registry().keys())
+    first_keys = set(make_registry().keys())
     clear_default_registry_cache()
-    second_keys = set(default_registry().keys())
+    second_keys = set(make_registry().keys())
     assert first_keys == second_keys
     assert first_keys >= EXPECTED_TYPES
 
@@ -278,7 +278,7 @@ def test_catalog_serializes_registration_and_snapshot_reads() -> None:
 
 def test_extension_catalog_rejects_builtin_replacement() -> None:
     catalog = build_extension_catalog()
-    generator = default_registry()["string"]
+    generator = make_registry()["string"]
 
     with pytest.raises(RegistryError, match="reserved"):
         catalog.register_data_type("core", "string", generator)

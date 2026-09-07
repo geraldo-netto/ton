@@ -11,7 +11,6 @@ from ._logging import logger as _logger
 from ._proof import PreparedField, PreparedTransform
 from ._registry import (
     RegistryError,
-    default_registry,
     default_transforms,
     default_validators,
     make_registry,
@@ -195,7 +194,7 @@ class EngineCompiler:
         "(none)" -- while ``validate_config`` listed every built-in for the
         same config (CFG-008).
         """
-        available = set(self.registry) | set(default_registry())
+        available = set(self.registry) | set(make_registry())
         return ", ".join(sorted(available)) or "(none)"
 
     def _build_prepared(self) -> dict[str, PreparedField]:

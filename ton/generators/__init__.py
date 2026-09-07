@@ -42,7 +42,7 @@ from .uuid import UUIDGenerator
 from .weighted import WeightedGenerator
 
 #: Canonical built-in generator classes. Used as the allowlist for
-#: ``ton._registry.default_registry`` so in-process test fixtures or
+#: ``ton._registry.make_registry`` so in-process test fixtures or
 #: third-party subclasses (which still appear in
 #: ``Generator.__subclasses__()``) do not leak into the default registry
 #: (ARCH-005).

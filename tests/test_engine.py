@@ -21,7 +21,7 @@ from ton._engine import (
     ValidatorExecutionError,
 )
 from ton._proof import ProofResult
-from ton._registry import default_registry
+from ton._registry import make_registry
 from ton._transforms import (
     BaseTransform,
     IdentityTransform,
@@ -801,7 +801,7 @@ def test_default_engine_does_not_build_unused_generators(monkeypatch) -> None:
 
     monkeypatch.setattr(
         registry_module,
-        "default_registry",
+        "make_registry",
         lambda: pytest.fail("full generator catalog constructed"),
     )
 
@@ -934,6 +934,6 @@ def test_distribution_short_circuits_unrelated_source_generation() -> None:
             }
         },
     }
-    registry = {**default_registry(), "unused_source": UnusedSource()}
+    registry = {**make_registry(), "unused_source": UnusedSource()}
 
     assert list(Engine(config, registry=registry, rng=Random(0), proof_mode="all")) == ["yes"]

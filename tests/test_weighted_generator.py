@@ -8,7 +8,7 @@ from random import Random
 
 import pytest
 
-from ton._registry import default_registry
+from ton._registry import make_registry
 from ton.generators.base import PreparationContext
 from ton.generators.weighted import WeightedGenerator
 
@@ -52,14 +52,14 @@ def test_weighted_rejects_zero_total() -> None:
 def test_weighted_rejects_non_finite_weights(weight: float) -> None:
     generator = WeightedGenerator()
     with pytest.raises(ValueError, match="finite"):
-        generator.prepare(_choices(weight, 1), PreparationContext(default_registry()))
+        generator.prepare(_choices(weight, 1), PreparationContext(make_registry()))
 
 
 def test_weighted_accepts_finite_weights_whose_raw_sum_would_overflow() -> None:
     """Finite representable weights must not be rejected for their sum (SCALE-008)."""
     generator = WeightedGenerator()
 
-    prepared = generator.prepare(_choices(1e308, 1e308), PreparationContext(default_registry()))
+    prepared = generator.prepare(_choices(1e308, 1e308), PreparationContext(make_registry()))
 
     assert all(isfinite(bound) for bound in prepared.cum_weights)
     counts = Counter(generator.generate(prepared, Random(seed)) for seed in range(400))
@@ -70,7 +70,7 @@ def test_weighted_accepts_finite_weights_whose_raw_sum_would_overflow() -> None:
 def test_weighted_still_rejects_weights_that_are_all_zero() -> None:
     generator = WeightedGenerator()
     with pytest.raises(ValueError, match="must sum to a positive number"):
-        generator.prepare(_choices(0, 0), PreparationContext(default_registry()))
+        generator.prepare(_choices(0, 0), PreparationContext(make_registry()))
 
 
 @pytest.mark.parametrize(
@@ -83,7 +83,7 @@ def test_weighted_still_rejects_weights_that_are_all_zero() -> None:
 def test_weighted_rejects_boolean_weights(spec: dict[str, object], path: str) -> None:
     generator = WeightedGenerator()
     with pytest.raises(ValueError, match=path):
-        generator.prepare(spec, PreparationContext(default_registry()))
+        generator.prepare(spec, PreparationContext(make_registry()))
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ def test_weighted_composite_uses_distribution_delegate() -> None:
                 {"weight": 1, "spec": {"type": "string", "values": ["always"]}},
             ],
         },
-        PreparationContext(default_registry()),
+        PreparationContext(make_registry()),
     )
 
     assert prepared.cum_weights == (0.0, 1.0)
@@ -150,7 +150,7 @@ def test_weighted_composite_accepts_core_qualified_child_type() -> None:
                 {"weight": 1, "spec": {"type": "core.string", "values": ["ok"]}},
             ],
         },
-        PreparationContext(default_registry()),
+        PreparationContext(make_registry()),
     )
 
     assert gen.generate(prepared, Random(0)) == "ok"
@@ -278,7 +278,7 @@ def test_weighted_composite_rejects_non_numeric_weight() -> None:
 
 def test_weighted_composite_rejects_boolean_weight_with_path() -> None:
     gen = WeightedGenerator()
-    registry = default_registry()
+    registry = make_registry()
 
     with pytest.raises(ValueError, match=r"choices\[0\]\.weight"):
         gen.prepare(
@@ -293,7 +293,7 @@ def test_weighted_composite_rejects_boolean_weight_with_path() -> None:
 
 def test_weighted_composite_rejects_unknown_wrapper_key_with_suggestion() -> None:
     gen = WeightedGenerator()
-    registry = default_registry()
+    registry = make_registry()
 
     with pytest.raises(ValueError, match=r"weighted\.choices\[0\]\.weigth.*Did you mean 'weight'"):
         gen.prepare(

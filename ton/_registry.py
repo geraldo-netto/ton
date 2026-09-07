@@ -8,9 +8,8 @@ introspection, but the default registry no longer picks up in-process
 test fixtures or unrelated third-party subclasses.
 
 Construction goes through :func:`make_registry` so callers can request
-only the type names they need (PERF-012); the legacy
-:func:`default_registry` builds the full dictionary for backwards
-compatibility.
+only the type names they need (PERF-012); calling it without arguments
+builds the full dictionary.
 """
 
 from __future__ import annotations
@@ -100,7 +99,7 @@ class ExtensionCatalog:
         validators: Mapping[str, Any] | None = None,
     ) -> None:
         self._generators: dict[str, dict[str, Generator]] = {
-            CORE_NAMESPACE: dict(default_registry() if generators is None else generators)
+            CORE_NAMESPACE: dict(make_registry() if generators is None else generators)
         }
         self._transforms: dict[str, dict[str, Transform]] = {CORE_NAMESPACE: dict(transforms or {})}
         self._validators: dict[str, dict[str, Any]] = {CORE_NAMESPACE: dict(validators or {})}
@@ -532,7 +531,7 @@ _DEFAULT_CLASSES_LOCK = threading.Lock()
 
 
 def clear_default_registry_cache() -> None:
-    """Force the next :func:`default_registry` call to rebuild its class map.
+    """Force the next :func:`make_registry` call to rebuild its class map.
 
     Rebinds to a fresh empty dict (rather than clearing in place) so a
     concurrent reader keeps its own consistent snapshot (CONC-001).
@@ -573,13 +572,16 @@ def _ensure_default_classes() -> dict[str, type[Generator]]:
 
 
 def make_registry(type_names: Iterable[str] | None = None) -> dict[str, Generator]:
-    """Return a fresh registry containing only the requested built-ins.
+    """Return a fresh registry of built-in generators.
 
-    When ``type_names`` is ``None`` every built-in is instantiated
-    (matches :func:`default_registry`). When passed an iterable of names,
-    only those generators are constructed -- the Engine uses this to
-    skip the per-construction cost of generators it does not need
-    (PERF-012).
+    When ``type_names`` is ``None`` every built-in is instantiated. When
+    passed an iterable of names, only those generators are constructed --
+    the Engine uses this to skip the per-construction cost of generators it
+    does not need (PERF-012).
+
+    Each call constructs fresh instances so per-spec state (e.g.
+    :class:`ton.generators.sequence.SequenceGenerator` counters) stays
+    Engine-scoped.
 
     Unknown names are silently dropped; the Engine's existing
     "Unknown type" validation catches them with a better message.
@@ -589,16 +591,6 @@ def make_registry(type_names: Iterable[str] | None = None) -> dict[str, Generato
         return {name: cls() for name, cls in classes.items()}
     requested = set(type_names)
     return {name: classes[name]() for name in requested if name in classes}
-
-
-def default_registry() -> dict[str, Generator]:
-    """Return a fresh registry containing every built-in generator.
-
-    Each call constructs a new dict of fresh instances so per-spec state
-    (e.g. :class:`ton.generators.sequence.SequenceGenerator` counters)
-    stays Engine-scoped.
-    """
-    return make_registry()
 
 
 def _log_plugin_registered(kind: str, namespace: str, name: str) -> None:

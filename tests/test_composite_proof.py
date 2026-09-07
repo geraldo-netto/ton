@@ -66,9 +66,9 @@ class _SuffixTransform(BaseTransform):
 
 
 def _registry() -> dict[str, Generator]:
-    from ton._registry import default_registry
+    from ton._registry import make_registry
 
-    reg = default_registry()
+    reg = make_registry()
     reg["reject"] = _RejectGenerator()
     reg["permissive"] = _PermissiveGenerator()
     return reg

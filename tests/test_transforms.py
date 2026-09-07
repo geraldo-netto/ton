@@ -6,7 +6,7 @@ from math import isfinite
 from random import Random
 from typing import Any
 
-from ton._registry import default_registry
+from ton._registry import make_registry
 from ton._transforms import (
     BaseTransform,
     TransformCapabilities,
@@ -79,7 +79,7 @@ def test_distribution_transform_chooses_prepared_candidate() -> None:
                 {"weight": 1, "spec": {"type": "string", "values": ["always"]}},
             ],
         },
-        PreparationContext(default_registry()),
+        PreparationContext(make_registry()),
     )
 
     assert prepared.cum_weights == (0.0, 1.0)
@@ -110,7 +110,7 @@ def test_distribution_transform_requires_two_choices() -> None:
                     {"spec": {"type": "string", "values": ["only"]}},
                 ],
             },
-            PreparationContext(default_registry()),
+            PreparationContext(make_registry()),
         )
     except ValueError as exc:
         assert "at least 2" in str(exc)
@@ -130,7 +130,7 @@ def test_distribution_transform_rejects_negative_weight() -> None:
                     {"weight": 2, "spec": {"type": "string", "values": ["ok"]}},
                 ],
             },
-            PreparationContext(default_registry()),
+            PreparationContext(make_registry()),
         )
     except ValueError as exc:
         assert "non-negative" in str(exc)
@@ -150,7 +150,7 @@ def test_distribution_transform_rejects_boolean_weight_with_path() -> None:
                     {"weight": 1, "spec": {"type": "string", "values": ["ok"]}},
                 ],
             },
-            PreparationContext(default_registry()),
+            PreparationContext(make_registry()),
         )
     except ValueError as exc:
         assert "choices[0].weight" in str(exc)
@@ -170,7 +170,7 @@ def test_distribution_transform_rejects_unknown_choice_key() -> None:
                     {"spec": {"type": "string", "values": ["ok"]}},
                 ],
             },
-            PreparationContext(default_registry()),
+            PreparationContext(make_registry()),
         )
     except ValueError as exc:
         assert "distribution.choices[0].extra" in str(exc)
@@ -191,7 +191,7 @@ def test_distribution_transform_rejects_zero_total_weight() -> None:
                     {"weight": 0, "spec": {"type": "string", "values": ["b"]}},
                 ],
             },
-            PreparationContext(default_registry()),
+            PreparationContext(make_registry()),
         )
     except ValueError as exc:
         assert "positive number" in str(exc)
@@ -211,7 +211,7 @@ def test_distribution_accepts_finite_weights_whose_raw_sum_would_overflow() -> N
                 {"weight": 1e308, "spec": {"type": "string", "values": ["b"]}},
             ],
         },
-        PreparationContext(default_registry()),
+        PreparationContext(make_registry()),
     )
 
     assert all(isfinite(bound) for bound in prepared.cum_weights)

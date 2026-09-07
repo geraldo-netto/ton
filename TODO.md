@@ -30,7 +30,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| ARCH-009 | open | low | small | Architecture/modularity: `default_registry()` only wraps `make_registry()`, and the module overview explicitly calls it a compatibility entry point. Approved direction: keep `make_registry` as the sole built-in constructor and remove the wrapper, updating internal callers, test imports, cache-helper documentation, and generator module comments. `ton.api.build_extension_catalog` remains the public catalog construction surface. Coordinate with PLUG-006, which removes the facade's old registry shim. Acceptance: one constructor, fresh instances, preserved lazy selection, and no compatibility wording or replacement alias. |
 
 ### Plugin extensibility
 

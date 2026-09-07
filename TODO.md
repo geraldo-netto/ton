@@ -67,7 +67,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| DOC-011 | blocked | low | small | Documentation/task contradiction: this item's former direction was to correct the shared-cache comment in `registry_with_entry_points`, but approved PLUG-006 deletes that function. Both instructions target the same disappearing code and would create a redundant edit/commit. Blocked on PLUG-006's deletion; no standalone comment rewrite or compatibility restoration. The current comment is indeed false because `catalog.generators()` deep-copies its snapshot. Remove this row when PLUG-006 removes the function and its comment; do not report the underlying work complete before then. |
 
 ## Rejected / Won't fix
 

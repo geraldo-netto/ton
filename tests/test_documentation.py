@@ -163,3 +163,17 @@ def test_documented_decimal_sampling_matches_the_implementation() -> None:
     singleton = {"type": "decimal", "minValue": 0.5, "maxValue": 0.5, "decimals": 1}
     config = {"rows": 3, "format": "$x$", "types": {"x": singleton}}
     assert list(api.generate(config, seed=1, proof_mode="all")) == ["0.5"] * 3
+
+
+def test_documented_char_semantics_are_draw_count_not_length() -> None:
+    """maxChar counts draws from a pool that may hold multi-character entries (DOC-012)."""
+    section = README.split("#### `char`", 1)[1].split("#### ", 1)[0]
+    assert "number of draws" in section
+
+    config = {
+        "rows": 2,
+        "format": "$x$",
+        "types": {"x": {"type": "char", "values": ["ab"], "maxChar": 2}},
+    }
+
+    assert list(api.generate(config, seed=1, proof_mode="all")) == ["abab", "abab"]

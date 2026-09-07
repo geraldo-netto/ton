@@ -489,8 +489,12 @@ Concatenate `maxChar` random picks from `values` (with replacement).
 
 | field      | type      | description                              |
 |------------|-----------|------------------------------------------|
-| `values`   | string[]  | non-empty alphabet                       |
-| `maxChar`  | int       | output length (N ≥ 1)                     |
+| `values`   | string[]  | non-empty pool; entries may be longer than one character |
+| `maxChar`  | int       | number of draws (N ≥ 1), not output length |
+
+`maxChar` counts draws, so the output is `maxChar` characters only when every
+pool entry is a single character. With `{"values": ["ab"], "maxChar": 2}` each
+row is `abab` — two draws of a two-character entry.
 
 ```json
 {"type": "char", "values": ["A", "C", "G", "T"], "maxChar": 6}

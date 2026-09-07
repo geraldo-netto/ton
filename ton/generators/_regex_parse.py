@@ -236,14 +236,19 @@ class _Parser:
         if self._peek() == "^":
             self.pos += 1
             items.append((NEGATE, None))
+        # A ']' in the first member position is a literal, not the terminator:
+        # '[]a]' is the set {']', 'a'} and '[^]]' is "any char except ']'",
+        # both of which re accepts (REL-026).
+        first = True
         while True:
             char = self._peek()
             if char is None:
                 raise RegexParseError("unterminated character set")
-            if char == "]":
+            if char == "]" and not first:
                 self.pos += 1
                 return (IN, items)
             items.append(self._parse_class_member())
+            first = False
 
     def _parse_class_member(self) -> Node:
         item = self._parse_class_atom()

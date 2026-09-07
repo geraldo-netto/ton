@@ -169,8 +169,10 @@ def test_rejects_patterns_invalid_to_python_regex(pattern: str) -> None:
         generator.prepare({"pattern": pattern})
 
 
-@pytest.mark.parametrize("pattern", ["[]", "[^ -~]"])
+@pytest.mark.parametrize("pattern", ["[^ -~]"])
 def test_rejects_invalid_character_classes_at_prepare(pattern: str) -> None:
+    # '[]' is not here: its ']' is a member, so it fails as an unterminated
+    # set instead of an empty class (REL-026).
     generator = RegexGenerator()
     with pytest.raises(ValueError, match="character class"):
         generator.prepare({"pattern": pattern})
@@ -296,3 +298,31 @@ def test_open_ended_brace_is_an_unbounded_repeat_not_literal_text() -> None:
 
     assert set(rows) <= {"", "a", "aa", "aaa", "aaaa", "aaaaa", "aaaaaa"}
     assert "a{,}" not in rows
+
+
+@pytest.mark.parametrize("pattern", ["[^]]", "[]a]", "[]]", "[a-]]", "[a]", "[^a]"])
+def test_character_classes_agree_with_an_independent_matcher(pattern: str) -> None:
+    """A leading ']' is a class member, not the terminator (REL-026)."""
+    config = {"rows": 8, "format": "$x$", "types": {"x": {"type": "regex", "pattern": pattern}}}
+
+    rows = list(api.generate(config, seed=2, proof_mode="all"))
+
+    assert rows
+    assert all(re.fullmatch(pattern, row) for row in rows)
+
+
+def test_negated_class_of_only_a_bracket_never_emits_a_bracket() -> None:
+    """'[^]]' means 'any char except ]'; it used to emit two chars like '1]'."""
+    config = {"rows": 24, "format": "$x$", "types": {"x": {"type": "regex", "pattern": "[^]]"}}}
+
+    rows = list(api.generate(config, seed=2, proof_mode="all"))
+
+    assert all(len(row) == 1 and row != "]" for row in rows)
+
+
+def test_unterminated_class_is_still_rejected() -> None:
+    """'[]' consumes its ']' as a member, so the class never closes -- like re."""
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "regex", "pattern": "[]"}}}
+
+    with pytest.raises(TemplateError, match="unterminated character set"):
+        list(api.generate(config))

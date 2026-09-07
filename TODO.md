@@ -14,7 +14,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| REL-026 | open | high | small | Reliability/correctness: `_Parser._parse_class` closes on a leading `]` instead of treating the first class member as a literal. Confirmed: `[^]]` emits non-matching values such as `1]`, and valid `[]a]` is rejected. Approved direction: recognize the leading literal in positive and negated classes. Acceptance: both patterns prepare and generated samples match `re.fullmatch`; malformed unterminated classes still fail. |
 | REL-027 | open | medium | small | Reliability/correctness / CLI option integrity: `open_output_path` and `write_shard` expose raw `UnicodeEncodeError`; only CLI `_stream` translates it. Confirmed: an ASCII shard containing `é` raises the raw exception and correctly rolls back its regular-file stage. Approved direction: normalize output encoding failures at shared output boundaries with `OutputEncodingError` and accurate encoding metadata. Acceptance: direct output contexts and shards expose the domain error and retain regular-file rollback; FIFO remains a direct stream. When relocating `_stream` handling, preserve CLI stdout translation too—stdout bypasses `open_output_path`. Cover writes and output finalization without reclassifying unrelated pipeline failures. |
 
 ### Scalability

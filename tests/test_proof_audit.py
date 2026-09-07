@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+from collections.abc import Mapping
 from decimal import Decimal
 from random import Random
 from typing import Any
@@ -383,3 +384,58 @@ def test_audit_serialization_still_rejects_unsupported_objects() -> None:
     assert _json_default(Decimal("0.5")) == "0.5"
     with pytest.raises(TypeError, match="not JSON serializable"):
         _json_default(object())
+
+
+def _rejecting_engine(values: list[str]):
+    from ton._transforms import BaseTransform, TransformProof
+
+    class _Reject(BaseTransform):
+        type_name = "reject_arch"
+        config_keys = frozenset()
+
+        def prove(self, prepared, before, after):  # noqa: ANN001, ANN201
+            del prepared, before, after
+            return TransformProof(ok=False, reason="nope")
+
+    config = {
+        "rows": 3,
+        "format": "$x$",
+        "types": {
+            "x": {"type": "string", "values": values, "transforms": [{"type": "reject_arch"}]}
+        },
+    }
+    return Engine.from_config(
+        config, seed=1, proof_mode="audit", transforms={"reject_arch": _Reject()}
+    )
+
+
+def test_caller_mutation_cannot_change_a_recorded_audit_spec() -> None:
+    """The plan must not alias caller-owned config mappings (ARCH-006)."""
+    values = ["a"]
+    engine = _rejecting_engine(values)
+    rows = iter(engine)
+
+    next(rows)
+    values.append("MUTATED")
+    list(rows)
+
+    specs = [failure.spec for failure in engine.proof_failures]
+    assert specs
+    assert all(spec["values"] == ["a"] for spec in specs)
+
+
+def test_sink_mutation_cannot_reach_the_engine_snapshot() -> None:
+    """A sink that mutates what it receives must not corrupt later records."""
+    engine = _rejecting_engine(["a"])
+    seen: list[Mapping[str, Any]] = []
+
+    def _mutating_sink(failure: ProofFailure) -> None:
+        if failure.spec is not None:
+            seen.append(failure.spec)
+            failure.spec["values"].append("FROM_SINK")
+
+    engine.set_proof_failure_sink(_mutating_sink)
+    list(engine)
+
+    assert seen
+    assert engine._plan.types["x"]["values"] == ["a"]

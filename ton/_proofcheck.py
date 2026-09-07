@@ -21,6 +21,7 @@ from typing import Any
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import PreparedField, ProofFailure, TransformStep
+from ._specsnapshot import snapshot_spec
 from ._transforms import TransformResult
 
 #: Upper bound on the number of detailed audit failures retained in
@@ -73,6 +74,8 @@ class ProofChecker:
         self.failure_count = 0
         #: Per-type total audit failures, for provenance attribution.
         self.failure_counts: dict[str, int] = {}
+        #: Audit-facing spec copies, one per field (ARCH-006).
+        self._audit_specs: dict[str, Mapping[str, Any]] = {}
 
     @property
     def enabled(self) -> bool:
@@ -128,15 +131,30 @@ class ProofChecker:
         if not failures:
             return None
         if self.mode == "audit":
+            retained = self._audit_spec(type_key, spec)
             for failure in failures:
                 if self.failure_sink is not None or len(self.failures) < MAX_AUDIT_SAMPLE:
-                    failure = replace(failure, spec=spec)
+                    failure = replace(failure, spec=retained)
                 visible = self._record_audit(failure)
                 self._log_failure(visible)
             return None
         visible = failures[0].redacted() if self.redact else failures[0]
         self._log_failure(visible)
         return visible
+
+    def _audit_spec(self, type_key: str, spec: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Return this field's audit-facing spec copy, created once per engine.
+
+        Separate from the engine's snapshot so a sink that mutates what it
+        receives cannot reach the specs generation prepared from, and cached
+        per field so every failure shares one object -- the audit writer keys
+        its fingerprint cache on that identity (ARCH-006, PERF-003).
+        """
+        retained = self._audit_specs.get(type_key)
+        if retained is None:
+            retained = snapshot_spec(spec)
+            self._audit_specs[type_key] = retained
+        return retained
 
     def _record_audit(self, failure: ProofFailure) -> ProofFailure:
         """Tally, retain a bounded sample, and stream every audit failure."""

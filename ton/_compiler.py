@@ -19,6 +19,7 @@ from ._registry import (
     runtime_type_name,
 )
 from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
+from ._specsnapshot import snapshot_spec
 from ._template import Token, parse, split_segments
 from ._transforms import Transform, fold_paired_capabilities
 from ._validation import Validator
@@ -70,7 +71,10 @@ class EngineCompiler:
         prepare_all_fields: bool = False,
     ) -> None:
         self.template = str(config["format"])
-        self.types: Mapping[str, Mapping[str, Any]] = config["types"]
+        # One isolated snapshot per engine: the plan retained the caller's
+        # nested mappings, so mutating a values list after the first row
+        # changed an already-recorded audit failure (ARCH-006).
+        self.types: Mapping[str, Mapping[str, Any]] = snapshot_spec(config["types"])
         self.rows = int(config["rows"])
         self.has_child_pipelines = False
         self.tokens = tuple(parse(self.template))

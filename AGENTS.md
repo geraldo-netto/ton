@@ -18,7 +18,17 @@ File define expected behavior + usage model for AI agents in this repo.
 ## Rules
 
 - No assume. No hide confusion. Surface tradeoffs, ask user when unclear.
+- Report every contradiction encountered, of any kind, to the user and record each
+  as a separate `blocked` item in `TODO.md`. Include the conflicting statements or
+  behaviors, their sources, the impact, and the decision or change needed to resolve
+  the contradiction. This applies to instructions, requirements, code, tests,
+  configuration, documentation, and any other source. Never silently omit a contradiction.
 - Write minimum code that solve problem. No speculative or unneeded changes.
+- Compatibility is not a goal: we can freely change everything. Remove legacy layers,
+  shims, deprecated paths, signature sniffing, and alternate spec forms instead of
+  preserving them. Breaking changes to the public API, CLI, config schema, and file
+  formats are acceptable when they make the architecture cleaner, leaner, more robust,
+  or faster. Do not add deprecation periods, compatibility notes, or migration shims.
 - Touch only what must. Clean own mess. Leave workspace cleaner than found.
 - Define success criteria before changes. Verify against criteria, iterate until satisfied.
 - Keep code complexity <= 10 for any new function, class, or method.
@@ -37,9 +47,11 @@ File define expected behavior + usage model for AI agents in this repo.
 - Propose business/design patterns + DDD only when improve clarity or structure.
 - ALWAYS record review findings in `TODO.md` — never report only in chat. Any time
   scan, review, audit, or "look for issues" (not just major changes), add each finding to
-  matching category table in `TODO.md` before/while reporting.
-- Major changes: rescan whole project. Create or update `TODO.md` with one table per relevant review category.
-  Table format: `id | status | effort | description`.
+  the matching lifecycle table in `TODO.md` before/while reporting.
+- Major changes: rescan whole project. Create or update `TODO.md` with one table per lifecycle
+  section: `Open`, `Blocked / Deferred`, `Rejected / Won't fix`. Remove items once done.
+  Table format: `id | status | severity | effort | description`. Ids carry a category prefix
+  (e.g. `REL-021`, `CFG-004`); descriptions open with the review category. Categories:
   - security
   - code complexity
   - code duplication

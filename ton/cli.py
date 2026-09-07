@@ -318,18 +318,28 @@ def _prepare_engine(args: argparse.Namespace) -> tuple[Engine, str] | int:
 
 
 def _map_config_errors(operation: Callable[[], _T]) -> _T | int:
-    """Run a config operation and map its domain failures to CLI exit codes."""
+    """Run a config operation and map its domain failures to CLI exit codes.
+
+    Every exit here is terminal, so each one emits ``cli_failed`` -- these
+    paths used to return silently, leaving a missing config with no terminal
+    record at all (OBS-009). No rows can have been written yet, so the counts
+    are zero.
+    """
     try:
         return operation()
     except FileNotFoundError as exc:
-        print(f"ton: {exc}", file=sys.stderr)
-        return 1
+        return _fail_before_generation("output", 1, exc, f"ton: {exc}")
     except RegistryError as exc:
-        print(f"ton: plugin error: {exc}", file=sys.stderr)
-        return 2
+        return _fail_before_generation("validation", 2, exc, f"ton: plugin error: {exc}")
     except (ConfigError, TemplateError, json.JSONDecodeError) as exc:
-        print(f"ton: invalid config: {exc}", file=sys.stderr)
-        return 2
+        return _fail_before_generation("validation", 2, exc, f"ton: invalid config: {exc}")
+
+
+def _fail_before_generation(category: str, exit_code: int, exc: Exception, message: str) -> int:
+    """Record and report a failure that happened before any row was generated."""
+    _log_terminal_failure(category, exit_code, 0, 0, exc)
+    print(message, file=sys.stderr)
+    return exit_code
 
 
 def _warn_resume_overshoot(engine: Engine, resume_from: int) -> None:

@@ -66,7 +66,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| OBS-009 | open | medium | small | Observability: `_map_config_errors` returns for missing files, invalid config, registry errors, and preparation failures without a `cli_failed` event; missing config arguments and invalid proof-report option combinations also return without it. Confirmed these handled paths emit zero terminal events. Approved direction: each handled pre-generation failure after argument parsing emits exactly one safe terminal record with consistent category, its existing exit code, and zero row counts. Cover generation, `--validate`, namespace/plugin loading, and option-validation paths; preserve single emission for the existing outer unexpected-error handler. This scope does not claim argparse failures before logging setup are already covered. |
 
 ### Documentation
 

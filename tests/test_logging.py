@@ -16,6 +16,7 @@ from ton._logging import LOGGER_NAME, LogEvent, configure_stderr, logger, termin
 from ton._proof import ProofResult
 from ton._registry import clear_default_registry_cache, default_registry
 from ton._transforms import TransformResult
+from ton.cli import main
 from ton.generators import Generator
 
 
@@ -187,8 +188,6 @@ def test_proof_failure_logs_identifier_without_value(
 def test_cli_audit_emits_one_canonical_summary(
     caplog: pytest.LogCaptureFixture, write_config
 ) -> None:
-    from ton.cli import main
-
     config = write_config()
     with caplog.at_level(logging.INFO, logger=LOGGER_NAME):
         main([str(config), "--proof-check", "audit", "--seed", "0"])
@@ -264,3 +263,37 @@ def test_configure_stderr_existing_handler_can_lower_logger_level() -> None:
     finally:
         logger.removeHandler(handler)
         logger.setLevel(original_level)
+
+
+@pytest.mark.parametrize(
+    ("body", "exit_code", "category", "error_type"),
+    [
+        (None, 1, "output", "FileNotFoundError"),
+        ('{"rows": 1}', 2, "validation", "ConfigError"),
+        ("{not json", 2, "validation", "JSONDecodeError"),
+    ],
+    ids=["missing", "invalid", "malformed"],
+)
+def test_pre_generation_failures_emit_one_terminal_record(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    body: str | None,
+    exit_code: int,
+    category: str,
+    error_type: str,
+) -> None:
+    """Every terminal CLI exit records cli_failed, not just post-engine ones (OBS-009)."""
+    path = tmp_path / "config.json"
+    if body is not None:
+        path.write_text(body, encoding="utf-8")
+
+    with caplog.at_level(logging.ERROR, logger="ton"):
+        assert main([str(path)]) == exit_code
+
+    records = [r for r in caplog.records if getattr(r, "event", None) == "cli_failed"]
+    assert len(records) == 1
+    assert records[0].error_category == category
+    assert records[0].exit_code == exit_code
+    assert records[0].rows_written == 0
+    assert records[0].total_rows == 0
+    assert records[0].error_type == error_type

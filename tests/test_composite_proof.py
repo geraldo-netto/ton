@@ -451,3 +451,31 @@ def test_weighted_stays_permissive_for_values_it_did_not_draw() -> None:
 
     assert gen.prove(prepared, TransformResult("b")).ok
     assert not gen.prove(prepared, TransformResult("zzz")).ok
+
+
+@pytest.mark.parametrize("separator", ["-", "", "a"], ids=["plain", "empty", "ambiguous"])
+def test_sequence_of_proves_every_element_it_generated(separator: str) -> None:
+    """Concatenation must not drop the elements' proof context (REL-023)."""
+    engine = Engine(
+        {
+            "rows": 1,
+            "format": "$x$",
+            "types": {
+                "x": {
+                    "type": "sequence_of",
+                    "count": 2,
+                    "separator": separator,
+                    "spec": {
+                        "type": "string",
+                        "values": ["a"],
+                        "transforms": [{"type": "reject_transform"}],
+                    },
+                }
+            },
+        },
+        transforms={"reject_transform": _RejectTransform()},
+        proof_mode="all",
+    )
+
+    with pytest.raises(ProofError, match="sequence_of element failed its own proof"):
+        list(engine)

@@ -28,9 +28,13 @@ from typing import Any
 from .._proof import ProofResult
 from .._transforms import TransformResult
 from .base import (
+    ChildDraw,
+    DrawnValue,
     Generator,
     PreparationContext,
     coerce_int,
+    prove_draws,
+    proven_draws,
 )
 
 
@@ -68,15 +72,23 @@ class SequenceOfGenerator(Generator):
 
     def generate(self, prepared: SequenceOfSpec, rng: Random) -> str:
         child_gen, child_prepared = prepared.child
-        return prepared.separator.join(
-            child_gen.generate(child_prepared, rng) for _ in range(prepared.count)
+        parts = [child_gen.generate(child_prepared, rng) for _ in range(prepared.count)]
+        # Keep every element's own draw: joining into plain text dropped the
+        # children's proof context, so a rejecting child passed (REL-023).
+        return DrawnValue(
+            prepared.separator.join(parts),
+            tuple(ChildDraw(child_gen, child_prepared, part) for part in parts),
         )
 
     def prove(self, prepared: SequenceOfSpec, result: TransformResult) -> ProofResult:
-        # Recurse into the child for each element (REL-001). Only attempt
-        # this when a non-empty separator lets us split unambiguously into
-        # exactly ``count`` parts; otherwise stay permissive rather than
-        # risk a false failure on a separator that also occurs in output.
+        # Elements TON generated carry their own draws, so every element is
+        # proven even with an empty or ambiguous separator (REL-023).
+        draws = proven_draws(result, (prepared.child,))
+        if draws is not None:
+            return prove_draws(draws, "sequence_of element")
+        # A value TON did not generate here can only be split heuristically:
+        # attempt it when a non-empty separator yields exactly ``count`` parts,
+        # otherwise stay permissive rather than risk a false failure.
         child_gen, child_prepared = prepared.child
         if not prepared.separator:
             return ProofResult(ok=True)

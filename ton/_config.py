@@ -22,6 +22,7 @@ from ._logging import logger as _logger
 from ._registry import ExtensionCatalog
 from ._speckeys import COMMON_FIELD_KEYS, unknown_key_message
 from ._template import UndeclaredVariableError, validate_against
+from .generators.base import str_to_int
 
 
 class ConfigError(ValueError):
@@ -53,7 +54,10 @@ def load(path: str | Path) -> dict[str, Any]:
 
     try:
         with config_path.open(encoding="utf-8") as fh:
-            data = json.load(fh)
+            # ``str_to_int`` keeps arbitrarily large JSON integers loadable:
+            # the stdlib parser inherits CPython's 4,300-digit conversion
+            # ceiling and would fail before structural validation (CFG-006).
+            data = json.load(fh, parse_int=str_to_int)
     except UnicodeDecodeError as exc:
         raise ConfigError(f"Config file must be valid UTF-8: {exc}") from exc
 

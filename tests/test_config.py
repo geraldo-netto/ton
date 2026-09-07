@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from pathlib import Path
 from typing import ClassVar
 
@@ -563,3 +564,28 @@ def test_transform_owned_child_specs_reach_the_key_boundary() -> None:
 
     assert "types.x.transforms[0].choices[0].spec.padWithZer" in str(excinfo.value)
     assert "padWithZero" in str(excinfo.value)
+
+
+def test_config_loads_arbitrarily_large_integers(tmp_path: Path) -> None:
+    """The stdlib parser's digit ceiling is not a row-count ceiling (CFG-006)."""
+    big = "9" * 4301
+    path = tmp_path / "big.json"
+    path.write_text(
+        f'{{"rows": {big}, "format": "$x$", '
+        '"types": {"x": {"type": "string", "values": ["a"]}}}',
+        encoding="utf-8",
+    )
+
+    assert load(path)["rows"] == int(Decimal(big))
+
+
+def test_large_integer_parsing_preserves_intentional_validation_errors(tmp_path: Path) -> None:
+    """Widening the parser must not swallow real config errors (CFG-006)."""
+    path = tmp_path / "bad.json"
+    path.write_text(
+        '{"rows": -1, "format": "$x$", "types": {"x": {"type": "string", "values": ["a"]}}}',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigError, match="non-negative integer"):
+        load(path)

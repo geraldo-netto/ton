@@ -400,7 +400,7 @@ options therefore remain compatible.
 
 ### Type reference
 
-Twenty-three built-in types. Every output below was produced with `--seed 1` on a 4-row config of the form `{"rows": 4, "format": "$x$", "types": {"x": <spec>}}` so the examples are byte-reproducible.
+Twenty-two built-in types. Every output below was produced with `--seed 1` on a 4-row config of the form `{"rows": 4, "format": "$x$", "types": {"x": <spec>}}` so the examples are byte-reproducible.
 
 #### `boolean`
 
@@ -472,10 +472,10 @@ Uniform float in `[minValue, maxValue]`, rounded and formatted to exactly `decim
 ```
 
 ```
-13.44
-84.74
-76.38
-25.51
+22.01
+93.25
+10.33
+41.79
 ```
 
 #### `char`
@@ -492,10 +492,10 @@ Concatenate `maxChar` random picks from `values` (with replacement).
 ```
 
 ```
-CAGATT
-TTCATA
-TTATGC
-AGAAAA
+ATTCCC
+GTAATC
+TACGAT
+TAAGTC
 ```
 
 #### `string`
@@ -920,10 +920,10 @@ Replace every `#` in `format` with a random decimal digit.
 ```
 
 ```
-+1 (291) 417-7763
-+1 (170) 669-0743
-+1 (915) 000-8063
-+1 (608) 377-8353
++1 (187) 244-6700
++1 (847) 047-2990
++1 (059) 324-0244
++1 (222) 420-8561
 ```
 
 #### `text`

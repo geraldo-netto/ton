@@ -19,7 +19,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| SCALE-007 | open | medium | large | Scalability: `_discover_generator_types` is already iterative; `_validate_generator_keys` and composite child preparation still recurse. Confirmed locally on CPython 3.11.15: 50 nested single-choice `oneOf` levels generate `x`, while 150 and 250 fail during preparation with a wrapped `RecursionError`. The threshold is runtime-dependent, not a fixed TON limit. Approved direction: explicit-stack key validation and preparation, retaining iterative discovery and complete diagnostics. Sequence last; coordinate with ARCH-006 so config snapshotting does not reintroduce recursion failure. Acceptance: deeply nested valid specs prepare without changing recursion settings, and representative generation/proof checks succeed. This finding's measured failure is preparation; do not claim unlimited runtime nesting solely from a preparation fix. |
 
 ### Concurrency
 

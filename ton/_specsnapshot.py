@@ -20,9 +20,24 @@ from typing import Any
 
 
 def snapshot_spec(value: Any) -> Any:
-    """Return a deep, independently owned copy of ``value``."""
-    if isinstance(value, Mapping):
-        return {key: snapshot_spec(item) for key, item in value.items()}
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return [snapshot_spec(item) for item in value]
-    return value
+    """Return a deep, independently owned copy of ``value``.
+
+    Copying iteratively keeps engine construction stack-safe for deeply
+    nested composite specs: this runs before the compiler can size its
+    recursion head-room, so it must not recurse itself (SCALE-007).
+    """
+    root: list[Any] = [None]
+    pending: list[tuple[Any, Any, Any]] = [(root, 0, value)]
+    while pending:
+        target, key, item = pending.pop()
+        if isinstance(item, Mapping):
+            copied: Any = {}
+            target[key] = copied
+            pending.extend((copied, item_key, sub) for item_key, sub in item.items())
+        elif isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)):
+            copied = [None] * len(item)
+            target[key] = copied
+            pending.extend((copied, index, sub) for index, sub in enumerate(item))
+        else:
+            target[key] = item
+    return root[0]

@@ -8,8 +8,9 @@ from random import Random
 
 import pytest
 
-from ton import api
+from ton import _recursion, api
 from ton._engine import Engine, TemplateError
+from ton._specsnapshot import snapshot_spec
 from ton.generators import Generator
 from ton.generators.base import int_to_str, str_to_int
 from ton.generators.bytes import BytesGenerator
@@ -155,3 +156,66 @@ def test_int_conversion_helpers_stay_as_strict_as_int() -> None:
     for text in ("abc", "1.5", "", "1e5"):
         with pytest.raises(ValueError):
             str_to_int(text)
+
+
+def _nested_one_of(levels: int) -> dict:
+    spec: dict = {"type": "string", "values": ["x"]}
+    for _ in range(levels):
+        spec = {"type": "oneOf", "choices": [spec]}
+    return {"rows": 1, "format": "$x$", "types": {"x": spec}}
+
+
+def test_deeply_nested_composites_prepare_and_generate() -> None:
+    """A chain far past the default recursion limit must produce its row (SCALE-007)."""
+    assert list(api.generate(_nested_one_of(600), seed=1, proof_mode="all")) == ["x"]
+
+
+def test_nesting_beyond_the_process_stack_reports_the_operator_remedy() -> None:
+    """Past what the stack supports TON explains the fix; it does not crash."""
+    too_deep = _recursion.max_supported_depth() + 50
+
+    with pytest.raises(TemplateError, match="TON imposes no nesting limit of its own"):
+        list(api.generate(_nested_one_of(too_deep), seed=1))
+
+
+def test_depth_headroom_only_ever_raises_the_limit() -> None:
+    """A caller that already raised the limit keeps its own setting."""
+    original = sys.getrecursionlimit()
+    sys.setrecursionlimit(original + 50_000)
+    try:
+        _recursion.ensure_depth_headroom(10)
+        assert sys.getrecursionlimit() == original + 50_000
+    finally:
+        sys.setrecursionlimit(original)
+
+
+def test_spec_snapshot_is_stack_safe_independently_of_the_limit() -> None:
+    """Snapshotting runs before head-room is sized, so it must not recurse."""
+    spec: dict = {"type": "string", "values": ["x"]}
+    for _ in range(5_000):
+        spec = {"type": "oneOf", "choices": [spec]}
+
+    copied = snapshot_spec(spec)
+
+    # Walk both iteratively: a deep == would recurse in the assertion itself.
+    depth, original, clone = 0, spec, copied
+    while clone["type"] == "oneOf":
+        assert clone is not original
+        original, clone = original["choices"][0], clone["choices"][0]
+        depth += 1
+
+    assert depth == 5_000
+    assert clone == {"type": "string", "values": ["x"]}
+    assert clone is not original
+
+
+def test_unlimited_stack_falls_back_to_an_assumed_size(monkeypatch) -> None:
+    """An unlimited RLIMIT_STACK still yields a usable depth (SCALE-007)."""
+    import resource
+
+    monkeypatch.setattr(
+        resource, "getrlimit", lambda _which: (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
+    )
+
+    assert _recursion._stack_bytes() == _recursion.DEFAULT_STACK_BYTES
+    assert _recursion.max_supported_depth() > 0

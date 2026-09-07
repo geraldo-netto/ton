@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import PreparedField, PreparedTransform
+from ._recursion import NestingTooDeepError, ensure_depth_headroom
 from ._registry import (
     RegistryError,
     default_transforms,
@@ -76,6 +77,7 @@ class EngineCompiler:
         self.types: Mapping[str, Mapping[str, Any]] = snapshot_spec(config["types"])
         self.rows = int(config["rows"])
         self.has_child_pipelines = False
+        self.max_nesting_depth = 0
         self.tokens = tuple(parse(self.template))
         self.field_keys = (
             tuple(self.types)
@@ -103,6 +105,12 @@ class EngineCompiler:
         self.registry = self._resolve_registry(registry)
 
     def compile(self) -> CompiledPlan:
+        # Preparation and row generation both descend once per nesting level;
+        # discovery already measured how deep this config goes (SCALE-007).
+        try:
+            ensure_depth_headroom(self.max_nesting_depth)
+        except NestingTooDeepError as exc:
+            raise TemplateError(str(exc)) from exc
         self._validate()
         prepared = self._build_prepared()
         self._validate_id_references(prepared)
@@ -138,16 +146,25 @@ class EngineCompiler:
         self,
         root_specs: list[Mapping[str, Any]],
     ) -> set[str]:
+        """Collect every referenced type name and record the nesting depth.
+
+        The walk is iterative, so discovery itself has no nesting ceiling and
+        can measure the depth that preparation and row generation will
+        descend (SCALE-007).
+        """
         needed: set[str] = set()
-        pending = list(root_specs)
+        pending = [(spec, 1) for spec in root_specs]
         while pending:
-            spec = pending.pop()
+            spec, depth = pending.pop()
+            self.max_nesting_depth = max(self.max_nesting_depth, depth)
             type_name = runtime_type_name(spec.get("type"))
             needed.add(type_name)
             generator = make_registry((type_name,)).get(type_name)
             if generator is not None:
-                pending.extend(child for _location, child in generator.nested_specs(spec))
-            pending.extend(self._transform_child_specs(spec))
+                pending.extend(
+                    (child, depth + 1) for _location, child in generator.nested_specs(spec)
+                )
+            pending.extend((child, depth + 1) for child in self._transform_child_specs(spec))
         return needed
 
     def _transform_child_specs(
@@ -278,29 +295,45 @@ class EngineCompiler:
         spec: Mapping[str, Any],
         generator: Generator,
     ) -> None:
-        error = extension_key_error(path, spec, generator.config_keys, COMMON_FIELD_KEYS)
-        if error is not None:
-            raise TemplateError(error)
-        self._validate_child_keys(path, generator.nested_specs(spec))
+        self._validate_child_keys(path, ((None, spec, generator),))
 
     def _validate_child_keys(
         self,
         path: str,
-        nested: Iterable[tuple[str, Mapping[str, Any]]],
+        seeded: Iterable[tuple[str | None, Mapping[str, Any], Generator]] | None = None,
+        nested: Iterable[tuple[str, Mapping[str, Any]]] | None = None,
     ) -> None:
-        """Key-check declared child generator specs, whoever owns them (CFG-004).
+        """Key-check a spec and every child it declares, whoever owns them.
 
         Generators and transforms both declare children through
-        ``nested_specs``, so both reach the same validation boundary with
-        path-specific diagnostics.
+        ``nested_specs``, so both reach this one boundary with path-specific
+        diagnostics (CFG-004). The walk is iterative so nesting depth costs
+        no stack (SCALE-007).
         """
+        pending: list[tuple[str, Mapping[str, Any], Generator]] = []
+        for location, spec, generator in seeded or ():
+            pending.append((path if location is None else f"{path}.{location}", spec, generator))
+        pending.extend(self._resolved_children(path, nested or ()))
+        while pending:
+            child_path, spec, generator = pending.pop()
+            error = extension_key_error(child_path, spec, generator.config_keys, COMMON_FIELD_KEYS)
+            if error is not None:
+                raise TemplateError(error)
+            pending.extend(self._resolved_children(child_path, generator.nested_specs(spec)))
+
+    def _resolved_children(
+        self,
+        path: str,
+        nested: Iterable[tuple[str, Mapping[str, Any]]],
+    ) -> Iterator[tuple[str, Mapping[str, Any], Generator]]:
+        """Pair each declared child spec with its registered generator."""
         for location, nested_spec in nested:
             reference = nested_spec.get("type")
             if not isinstance(reference, str):
                 continue
             child = self.registry.get(runtime_type_name(reference))
             if child is not None:
-                self._validate_generator_keys(f"{path}.{location}", nested_spec, child)
+                yield f"{path}.{location}", nested_spec, child
 
     def _prepare_transforms(
         self,
@@ -347,7 +380,7 @@ class EngineCompiler:
                 raise TemplateError(error)
             self._validate_child_keys(
                 f"types.{type_key}.transforms[{index}]",
-                transform.nested_specs(transform_spec),
+                nested=transform.nested_specs(transform_spec),
             )
             prepared.append(
                 PreparedTransform(

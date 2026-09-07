@@ -28,6 +28,7 @@ from .api import (
     Engine,
     EngineOptions,
     LogEvent,
+    PipelineStageError,
     ProofError,
     RegistryError,
     TemplateError,
@@ -392,6 +393,13 @@ def _execute(engine: Engine, args: argparse.Namespace, encoding: str) -> int:
         _log_terminal_failure("output", 1, write_state.rows_written, engine.total_rows, exc)
         print(f"ton: cannot write output: {exc}", file=sys.stderr)
         return 1
+    except PipelineStageError as exc:
+        # A component raised at row time: an unexpected failure (exit 3), not
+        # an invalid config (exit 2). Reported with the real row counts, which
+        # the top-level safety net cannot know (CLI-002).
+        _log_terminal_failure("pipeline", 3, write_state.rows_written, engine.total_rows, exc)
+        print(f"ton: unexpected error: {exc}", file=sys.stderr)
+        return 3
     except ProofError as exc:
         _log_terminal_failure("proof", 2, write_state.rows_written, engine.total_rows, exc)
         print(f"ton: proof failed: {exc}", file=sys.stderr)

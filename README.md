@@ -74,7 +74,7 @@ to stderr (`ton: proof-check audit: …`). Add `--proof-report PATH` for
 diagnostic values/specs. Each failure also emits a value-free
 `proof_check_failed` log event (see `--log-level warning`).
 
-Everything observability-related goes to stderr; stdout stays clean for piping. Exit codes: `0` success, `1` missing config / output error / refused special-file target, `2` invalid config or unknown variable, `3` unexpected error, `130` interrupted (Ctrl-C).
+Everything observability-related goes to stderr; stdout stays clean for piping. Exit codes: `0` success, `1` missing config / output error / refused special-file target, `2` invalid config or unknown variable, `3` unexpected error — including a generator, transform, validator, or proof hook raising during generation — `130` interrupted (Ctrl-C).
 
 ### Partition a long run across processes
 
@@ -223,7 +223,9 @@ for row in api.generate(config_dict, seed=42):
 try:
     rows = list(api.generate(bad_config))
 except (api.ConfigError, api.TemplateError, api.OutputEncodingError) as exc:
-    ...
+    ...  # the config is invalid, or a value could not be encoded
+except api.PipelineStageError as exc:
+    ...  # a generator/transform/validator/proof hook raised at row time
 ```
 
 For finer control, construct an `Engine` directly:

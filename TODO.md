@@ -49,7 +49,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| CLI-002 | open | medium | small | CLI / option integrity: `PipelineStageError` inherits `TemplateError`, so `_execute` classifies unexpected component failures as invalid config. Confirmed: a generator failing after one successful row returns exit 2 with category `validation` and counts 1/3. Approved B: detach pipeline errors from `TemplateError`, handle them explicitly in `_execute` with exit 3 and a new `pipeline` category, and preserve actual write/total counts. Update `_logging.FAILURE_CATEGORIES`, README exit-code text, library exception example, and exception-contract tests. Acceptance: source/transform/proof/validator exceptions emit one pipeline terminal event; ordinary config errors and proof/validation rejections retain exit 2. Coordinate redaction with DG-004. |
 
 ### Configuration discoverability
 

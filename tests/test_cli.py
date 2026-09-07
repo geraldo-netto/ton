@@ -8,6 +8,7 @@ import logging
 import os
 import stat
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from random import Random
 from types import SimpleNamespace
@@ -16,6 +17,7 @@ from unittest import mock
 
 import pytest
 
+from ton import api
 from ton._engine import Engine
 from ton._output import OutputPublishedError, PartialOutputCommitError, atomic_output
 from ton._proof import REDACTED, ProofResult
@@ -1355,3 +1357,56 @@ def test_open_output_rejects_changed_fifo_descriptor(tmp_path: Path) -> None:
         pass
 
     close_descriptor.assert_called_once_with(42)
+
+
+class _RowTimeCrashGenerator(Generator):
+    """Raises during generation, after some rows have already been written."""
+
+    type_name = "row_crash"
+
+    def __init__(self) -> None:
+        self.drawn = 0
+
+    def prepare(self, spec: Mapping[str, Any], context: Any = None) -> Any:
+        del spec, context
+        return {}
+
+    def generate(self, prepared: Any, rng: Random) -> str:
+        del prepared, rng
+        self.drawn += 1
+        if self.drawn > 3:
+            raise RuntimeError("kaboom")
+        return "ok"
+
+
+def test_cli_reports_row_time_component_failures_as_unexpected(
+    write_config, monkeypatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A component raising at row time exits 3, not 2 'invalid config' (CLI-002)."""
+    original = api.build_extension_catalog
+
+    def _with_crash(**kwargs: Any) -> Any:
+        catalog = original(**kwargs)
+        catalog.register_data_type("acme", "row_crash", _RowTimeCrashGenerator())
+        return catalog
+
+    monkeypatch.setattr(api, "build_extension_catalog", _with_crash)
+    path = write_config({"rows": 10, "format": "$x$", "types": {"x": {"type": "acme.row_crash"}}})
+
+    with caplog.at_level(logging.ERROR, logger="ton"):
+        exit_code = main([str(path), "--seed", "1", "--entry-points"])
+
+    assert exit_code == 3
+    failures = [r for r in caplog.records if getattr(r, "event", None) == "cli_failed"]
+    assert failures
+    assert failures[0].error_category == "pipeline"
+    assert failures[0].rows_written == 3
+    assert failures[0].total_rows == 10
+
+
+def test_pipeline_stage_error_is_not_a_config_error() -> None:
+    """Library callers can tell a component defect from an invalid config."""
+    error = api.PipelineStageError("Generator", "X", "x", RuntimeError("boom"))
+
+    assert not isinstance(error, api.TemplateError)
+    assert not isinstance(error, api.ConfigError)

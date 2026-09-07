@@ -20,7 +20,7 @@ from unittest import mock
 import pytest
 
 from ton import api
-from ton._engine import Engine, TemplateError
+from ton._engine import Engine, PipelineStageError, TemplateError
 from ton._registry import (
     _ensure_default_classes,
     _entry_point_dist,
@@ -214,9 +214,10 @@ class _RaisingGenerator(Generator):
         raise RuntimeError("boom")
 
 
-def test_engine_logs_generate_failed_and_wraps_in_template_error(
+def test_engine_logs_generate_failed_and_wraps_in_pipeline_error(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """A generator raising at row time is a pipeline error, not a config error."""
     registry: Mapping[str, Generator] = {"raises": _RaisingGenerator()}
     config = {
         "rows": 1,
@@ -224,11 +225,12 @@ def test_engine_logs_generate_failed_and_wraps_in_template_error(
         "types": {"v": {"type": "raises"}},
     }
     engine = Engine(config, registry=registry, rng=Random(0))
-    with caplog.at_level(logging.ERROR, logger="ton"), pytest.raises(TemplateError):
+    with caplog.at_level(logging.ERROR, logger="ton"), pytest.raises(PipelineStageError):
         list(engine)
     events = [r for r in caplog.records if getattr(r, "event", None) == "generate_failed"]
     assert events
     assert getattr(events[0], "generator_type", "") == "_RaisingGenerator"
+    assert not isinstance(PipelineStageError("s", "r", "k", RuntimeError()), TemplateError)
 
 
 # ---------------------------------------------------------------------------

@@ -69,7 +69,10 @@ class LogEvent(str, Enum):
     CLI_FAILED = "cli_failed"
 
 
-FAILURE_CATEGORIES = frozenset(("validation", "proof", "output", "unexpected"))
+#: ``pipeline`` is a component (generator/transform/validator/proof hook)
+#: raising at row time; ``unexpected`` is anything the CLI did not
+#: attribute to one. Both exit 3 (CLI-002).
+FAILURE_CATEGORIES = frozenset(("validation", "proof", "output", "pipeline", "unexpected"))
 
 
 def terminal_failure_fields(

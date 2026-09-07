@@ -37,8 +37,15 @@ class ProofError(TemplateError):
     """Raised when strict proof checking finds an invalid generated value."""
 
 
-class PipelineStageError(TemplateError):
-    """Base for unexpected failures attributed to one pipeline component."""
+class PipelineStageError(ValueError):
+    """Base for unexpected failures attributed to one pipeline component.
+
+    Deliberately *not* a :class:`TemplateError`: a generator, transform,
+    validator or proof hook raising at row time is a defect in that
+    component, not an invalid config. Sharing the config-error type made
+    the CLI report plugin crashes as "invalid config" with exit 2 where
+    exit 3 is documented (CLI-002).
+    """
 
     def __init__(
         self,

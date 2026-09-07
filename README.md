@@ -215,9 +215,10 @@ from ton import api
 # One-shot, deterministic:
 rows = list(api.generate_from_file("examples/dna.json", seed=42))
 
-# Streaming form for large outputs:
+# Streaming form for large outputs. Rows carry no line terminator, so a
+# text sink needs one -- writing the bare row concatenates every record:
 for row in api.generate(config_dict, seed=42):
-    sink.write(row)
+    sink.write(f"{row}\n")
 
 # Exceptions, Engine, and the LogEvent enum are all re-exported:
 try:

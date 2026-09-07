@@ -59,7 +59,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| DOC-009 | open | medium | small | Documentation/test integrity: README and the `ton.api` docstring use `sink.write(row)`, but generated rows contain no added terminator. `test_library_streaming_example_writes_each_row_once` only counts that incorrect literal. Approved direction: show `sink.write(row + "\n")` in both examples and execute the extracted streaming example against a text sink. Acceptance: each generated row appears once with its intended newline boundary; avoid testing only source-text occurrence counts. |
 | DOC-012 | open | low | small | Documentation: README's char table calls `maxChar` output length, while `CharGenerator` uses it as draw count and allows multi-character pool strings. Confirmed: `values: ["ab"]`, `maxChar: 2` emits `abab`. Approved direction: document number of draws with replacement and multi-character token semantics; output length is the sum of the selected token lengths. |
 
 ## Blocked / Deferred

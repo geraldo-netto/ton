@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import re
 from pathlib import Path
@@ -20,10 +21,39 @@ PRE_COMMIT = (ROOT / ".githooks" / "pre-commit").read_text(encoding="utf-8")
 SEQUENCE_MODULE = (ROOT / "ton" / "generators" / "sequence.py").read_text(encoding="utf-8")
 
 
-def test_library_streaming_example_writes_each_row_once() -> None:
-    streaming_example = README.split("# Streaming form for large outputs:", 1)[1].split("```", 1)[0]
+def test_library_streaming_example_preserves_record_boundaries() -> None:
+    """Running the documented snippet must yield separable records (DOC-009).
 
-    assert streaming_example.count("sink.write(row)") == 1
+    Counting the literal only proved the text was present; rows carry no
+    terminator, so the previous snippet concatenated every record.
+    """
+    snippet = README.split("# Streaming form for large outputs", 1)[1].split("```", 1)[0]
+    assert 'sink.write(f"{row}\\n")' in snippet
+
+    config = {
+        "rows": 3,
+        "format": "$x$",
+        "types": {"x": {"type": "integer", "minValue": 1, "maxValue": 9}},
+    }
+    sink = io.StringIO()
+    for row in api.generate(config, seed=42):
+        sink.write(f"{row}\n")
+
+    assert sink.getvalue().splitlines() == list(api.generate(config, seed=42))
+
+
+def test_generated_rows_carry_no_line_terminator() -> None:
+    """The premise of the streaming guidance: a bare write would concatenate."""
+    config = {
+        "rows": 3,
+        "format": "$x$",
+        "types": {"x": {"type": "integer", "minValue": 1, "maxValue": 9}},
+    }
+
+    rows = list(api.generate(config, seed=42))
+
+    assert all(not row.endswith("\n") for row in rows)
+    assert len("".join(rows).splitlines()) == 1
 
 
 def test_documented_quality_commands_match_ci_and_pre_commit_gate() -> None:

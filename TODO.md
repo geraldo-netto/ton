@@ -61,7 +61,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| DG-004 | open | high | medium | Data governance: a proof hook raising `ValueError("private-proof-value")` leaks that text through `ProofEvaluationError` even with redaction enabled. Confirmed in the library exception string, explicit cause, and formatted traceback; CLI prints the same diagnostic. Approved D1: redacted hook failures retain stage/reference/field and exception class, omit exception text, and suppress chaining; unredacted diagnostics stay detailed. Acceptance: check library `str(exc)`, `__cause__`, default formatted/logged tracebacks, and CLI stderr for source and transform hooks. Do not describe `raise ... from None` as erasing `__context__`; ensure any public cause attribute does not re-expose the redacted message. Coordinate CLI classification with CLI-002. |
 
 ### Observability
 

@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import re
 import subprocess
+import traceback
 from pathlib import Path
 from random import Random
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
+from ton import api
 from ton._engine import Engine
 from ton._proof import REDACTED, ProofFailure
 from ton._proofcheck import ProofChecker
-from ton._transforms import TransformResult
+from ton._transforms import BaseTransform, TransformResult
 from ton.generators import Generator
 from ton.generators.base import coerce_int
 
@@ -167,3 +169,62 @@ def test_coerce_int_rejects_non_integral_numerics(raw: object) -> None:
 
 def test_coerce_int_accepts_integral_float() -> None:
     assert coerce_int({"value": 3.0}, "value", type_name="test") == 3
+
+
+class _LeakyProofTransform(BaseTransform):
+    """Proof hook raising a message a plugin must not be able to publish."""
+
+    type_name = "leaky_proof"
+    config_keys: ClassVar[frozenset[str] | None] = frozenset()
+
+    def prove(self, prepared: Any, before: Any, after: Any) -> Any:
+        del prepared, before, after
+        raise ValueError("private-proof-value")
+
+
+LEAKY_CONFIG = {
+    "rows": 1,
+    "format": "$x$",
+    "types": {"x": {"type": "string", "values": ["a"], "transforms": [{"type": "leaky_proof"}]}},
+}
+
+
+def test_redaction_hides_proof_hook_exception_text_everywhere() -> None:
+    """Message, chained traceback and attribute must all stay clean (DG-004)."""
+    with pytest.raises(api.ProofEvaluationError) as excinfo:
+        list(
+            api.generate(
+                LEAKY_CONFIG,
+                seed=1,
+                transforms={"leaky_proof": _LeakyProofTransform()},
+                proof_mode="all",
+                redact_proof_failures=True,
+            )
+        )
+
+    error = excinfo.value
+    rendered = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    assert "private-proof-value" not in str(error)
+    assert "private-proof-value" not in rendered
+    assert error.__cause__ is None
+    assert error.cause is None
+    # Safe structural context is retained.
+    assert error.cause_type == "ValueError"
+    assert "Transform proof" in str(error)
+    assert "leaky_proof" in str(error)
+
+
+def test_proof_hook_diagnostics_stay_complete_without_redaction() -> None:
+    """Redaction is what removes plugin text; debugging is unaffected otherwise."""
+    with pytest.raises(api.ProofEvaluationError) as excinfo:
+        list(
+            api.generate(
+                LEAKY_CONFIG,
+                seed=1,
+                transforms={"leaky_proof": _LeakyProofTransform()},
+                proof_mode="all",
+            )
+        )
+
+    assert "private-proof-value" in str(excinfo.value)
+    assert excinfo.value.__cause__ is not None

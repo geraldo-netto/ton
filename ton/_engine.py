@@ -53,13 +53,20 @@ class PipelineStageError(ValueError):
         reference: str,
         type_key: str,
         cause: Exception,
+        *,
+        redact: bool = False,
     ) -> None:
         self.stage = stage
         self.reference = reference
         self.type_key = type_key
-        self.cause = cause
+        self.cause_type = type(cause).__name__
+        # Under redaction the plugin-controlled exception text is dropped
+        # everywhere it could surface -- message, attribute, and chained
+        # traceback -- leaving only the stage/reference/type context (DG-004).
+        self.cause: Exception | None = None if redact else cause
+        detail = "" if redact else f": {cause}"
         super().__init__(
-            f"{stage} {reference} for variable {type_key!r} raised {type(cause).__name__}: {cause}"
+            f"{stage} {reference} for variable {type_key!r} raised {self.cause_type}{detail}"
         )
 
 
@@ -509,6 +516,7 @@ class Engine:
                 exc.reference,
                 type_key,
                 exc.cause,
+                redact=self._proof.redact,
             )
         if failure is not None:
             raise ProofError(
@@ -552,6 +560,8 @@ class Engine:
         reference: str,
         type_key: str,
         cause: Exception,
+        *,
+        redact: bool = False,
     ) -> NoReturn:
         _logger.error(
             "pipeline_stage_failed stage=%s reference=%s type_key=%s row=%d error_type=%s",
@@ -570,7 +580,9 @@ class Engine:
                 "error_type": type(cause).__name__,
             },
         )
-        raise error_type(stage, reference, type_key, cause) from cause
+        raise error_type(stage, reference, type_key, cause, redact=redact) from (
+            None if redact else cause
+        )
 
 
 def _rng_for_seed(seed: int | None) -> Random:

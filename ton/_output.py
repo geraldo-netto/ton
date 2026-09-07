@@ -216,16 +216,12 @@ def _stage_file_prefix(basename: str) -> str:
 def _staged_candidates(path: str) -> list[_StagedCandidate]:
     directory = os.path.dirname(os.path.abspath(path)) or "."
     basename = os.path.basename(path)
-    # Continue recognizing stages written before hashed destination names.
-    file_prefixes = (_stage_file_prefix(basename), f".{basename}.")
+    file_prefix = _stage_file_prefix(basename)
     now_ns = time.time_ns()
     candidates: list[_StagedCandidate] = []
     with os.scandir(directory) as entries:
         for entry in entries:
-            file_prefix = next(
-                (prefix for prefix in file_prefixes if entry.name.startswith(prefix)), None
-            )
-            if file_prefix is None or not entry.name.endswith(".tmp"):
+            if not entry.name.startswith(file_prefix) or not entry.name.endswith(".tmp"):
                 continue
             try:
                 # Windows DirEntry metadata may omit the stable file identity

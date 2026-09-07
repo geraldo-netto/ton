@@ -301,14 +301,21 @@ def test_output_stage_inspection_preserves_live_writer(tmp_path: Path) -> None:
     assert api.inspect_staged_outputs(str(output)) == ()
 
 
+def _stage_name(basename: str, suffix: str) -> str:
+    """Build a stage filename for ``basename`` the way ton._output does."""
+    from ton import _output
+
+    return f"{_output._stage_file_prefix(basename)}{suffix}"
+
+
 def test_output_stage_cleanup_removes_only_confirmed_abandoned_writer(
     monkeypatch, tmp_path: Path
 ) -> None:
     from ton import _output
 
     output = tmp_path / "rows.txt"
-    managed = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
-    legacy = tmp_path / ".rows.txt.legacy.tmp"
+    managed = tmp_path / _stage_name("rows.txt", "ton-999999-1-token.tmp")
+    legacy = tmp_path / _stage_name("rows.txt", "legacy.tmp")
     managed.write_text("partial\n", encoding="utf-8")
     legacy.write_text("unknown\n", encoding="utf-8")
     monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
@@ -327,7 +334,7 @@ def test_output_stage_cleanup_removes_only_confirmed_abandoned_writer(
 
 def test_output_stage_inspection_ignores_non_regular_candidates(tmp_path: Path) -> None:
     output = tmp_path / "rows.txt"
-    (tmp_path / ".rows.txt.legacy.tmp").mkdir()
+    (tmp_path / _stage_name("rows.txt", "legacy.tmp")).mkdir()
 
     assert api.inspect_staged_outputs(str(output)) == ()
 
@@ -336,7 +343,7 @@ def test_output_stage_inspection_tolerates_publish_race(monkeypatch, tmp_path: P
     from ton import _output
 
     entry = mock.Mock()
-    entry.name = ".rows.txt.ton-999999-1-token.tmp"
+    entry.name = _stage_name("rows.txt", "ton-999999-1-token.tmp")
     entry.path = str(tmp_path / entry.name)
     scan = mock.MagicMock()
     scan.__enter__.return_value = [entry]
@@ -350,15 +357,18 @@ def test_output_stage_inspection_tolerates_publish_race(monkeypatch, tmp_path: P
 
 
 @pytest.mark.parametrize(
-    "name",
+    "suffix",
     [
-        ".rows.txt.ton-not-a-pid-1-token.tmp",
-        ".rows.txt.ton-1-not-a-time-token.tmp",
-        ".rows.txt.ton-0-1-token.tmp",
-        ".rows.txt.ton-1-0-token.tmp",
+        "ton-not-a-pid-1-token.tmp",
+        "ton-1-not-a-time-token.tmp",
+        "ton-0-1-token.tmp",
+        "ton-1-0-token.tmp",
     ],
 )
-def test_output_stage_inspection_treats_bad_metadata_as_unowned(name: str, tmp_path: Path) -> None:
+def test_output_stage_inspection_treats_bad_metadata_as_unowned(
+    suffix: str, tmp_path: Path
+) -> None:
+    name = _stage_name("rows.txt", suffix)
     output = tmp_path / "rows.txt"
     (tmp_path / name).write_text("partial\n", encoding="utf-8")
 
@@ -373,7 +383,7 @@ def test_output_stage_cleanup_waits_for_stale_age(monkeypatch, tmp_path: Path) -
 
     output = tmp_path / "rows.txt"
     created_at_ns = _output.time.time_ns()
-    stage = tmp_path / f".rows.txt.ton-999999-{created_at_ns}-token.tmp"
+    stage = tmp_path / _stage_name("rows.txt", f"ton-999999-{created_at_ns}-token.tmp")
     stage.write_text("partial\n", encoding="utf-8")
     monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
 
@@ -385,7 +395,7 @@ def test_output_stage_cleanup_rechecks_owner_liveness(monkeypatch, tmp_path: Pat
     from ton import _output
 
     output = tmp_path / "rows.txt"
-    stage = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
+    stage = tmp_path / _stage_name("rows.txt", "ton-999999-1-token.tmp")
     stage.write_text("partial\n", encoding="utf-8")
     running = mock.Mock(side_effect=[False, True])
     monkeypatch.setattr(_output, "_process_is_running", running)
@@ -400,7 +410,7 @@ def test_output_stage_cleanup_tolerates_concurrent_disappearance(
     from ton import _output
 
     output = tmp_path / "rows.txt"
-    stage = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
+    stage = tmp_path / _stage_name("rows.txt", "ton-999999-1-token.tmp")
     stage.write_text("partial\n", encoding="utf-8")
     monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
     candidate = _output._staged_candidates(str(output))[0]
@@ -413,7 +423,7 @@ def test_output_stage_cleanup_preserves_replaced_candidate(monkeypatch, tmp_path
     from ton import _output
 
     output = tmp_path / "rows.txt"
-    stage = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
+    stage = tmp_path / _stage_name("rows.txt", "ton-999999-1-token.tmp")
     replacement = tmp_path / "replacement.tmp"
     stage.write_text("partial\n", encoding="utf-8")
     replacement.write_text("live\n", encoding="utf-8")
@@ -429,7 +439,7 @@ def test_output_stage_cleanup_tolerates_unlink_race(monkeypatch, tmp_path: Path)
     from ton import _output
 
     output = tmp_path / "rows.txt"
-    stage = tmp_path / ".rows.txt.ton-999999-1-token.tmp"
+    stage = tmp_path / _stage_name("rows.txt", "ton-999999-1-token.tmp")
     stage.write_text("partial\n", encoding="utf-8")
     monkeypatch.setattr(_output, "_process_is_running", lambda pid: False)
     candidate = _output._staged_candidates(str(output))[0]

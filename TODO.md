@@ -25,7 +25,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| CONC-005 | open | high | medium | Concurrency: `_offset_sequence_spec` returns early for `sequence` and `sequence_of`, skipping their transform-owned sequences. Confirmed: two two-row workers whose sequence source is replaced by a distribution-selected sequence both emit `0, 1`. Approved direction: traverse source children and transform children independently. Apply `sequence_of.count` only to its source child's draw count, not to transforms of the enclosing field. Acceptance: replacing transforms on both source kinds receive correct worker offsets; repeated template fields and child counts preserve non-overlap. Coordinate validation with CONC-004 and context routing with REL-020. |
 | CONC-006 | open | low | small | Concurrency/test integrity: `test_fork_engine_workers_yield_disjoint_streams_when_partitioned` creates different configs with manual starts and gives each config only 50 total rows while requesting four 50-row shards. It contradicts automatic-offset guidance and can pass if automatic offsets disappear. Approved direction: use one unoffset 200-row config, derive each worker's 50-row share, and assert exact consecutive ranges for workers 0–3 plus the complete combined range. A disjointness-only assertion is insufficient. |
 
 ### Architecture / modularity / SOLID

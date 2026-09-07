@@ -220,21 +220,38 @@ def _offset_sequences(config: Mapping[str, Any], offset: int) -> dict[str, Any]:
 
 
 def _offset_sequence_spec(value: Any, offset: int) -> None:
-    if isinstance(value, dict):
-        type_name = runtime_type_name(value.get("type"))
-        if type_name == "sequence":
-            # Use the generator's own numeric rule so a worker never renders
-            # a spec ordinary generation would reject (CONC-004).
-            start = coerce_int(value, "start", type_name="sequence", default=0)
-            step = coerce_int(value, "step", type_name="sequence", default=1)
-            value["start"] = start + offset * step
-            return
-        if type_name == "sequence_of":
-            count = coerce_int(value, "count", type_name="sequence_of", default=0)
-            _offset_sequence_spec(value.get("spec"), offset * count)
-            return
-        for nested in value.values():
-            _offset_sequence_spec(nested, offset)
-    elif isinstance(value, list):
+    """Offset every generated sequence reachable from ``value``.
+
+    A field's nominal source is not the only place a sequence can live: a
+    replacing transform (``distribution``) carries its own child specs, and
+    returning as soon as the source was recognized left those un-offset --
+    so two workers emitted identical ids (CONC-005). Source and transform
+    children are therefore traversed independently.
+    """
+    if isinstance(value, list):
         for nested in value:
+            _offset_sequence_spec(nested, offset)
+        return
+    if not isinstance(value, dict):
+        return
+    _offset_source_spec(value, offset)
+    _offset_sequence_spec(value.get("transforms"), offset)
+
+
+def _offset_source_spec(value: dict[str, Any], offset: int) -> None:
+    """Offset the sequences reachable through a spec's own source shape."""
+    type_name = runtime_type_name(value.get("type"))
+    if type_name == "sequence":
+        # Use the generator's own numeric rule so a worker never renders
+        # a spec ordinary generation would reject (CONC-004).
+        start = coerce_int(value, "start", type_name="sequence", default=0)
+        step = coerce_int(value, "step", type_name="sequence", default=1)
+        value["start"] = start + offset * step
+        return
+    if type_name == "sequence_of":
+        count = coerce_int(value, "count", type_name="sequence_of", default=0)
+        _offset_sequence_spec(value.get("spec"), offset * count)
+        return
+    for key, nested in value.items():
+        if key != "transforms":
             _offset_sequence_spec(nested, offset)

@@ -360,3 +360,57 @@ def test_worker_helpers_reject_a_boolean_row_count(tmp_path: Path, helper: str) 
             fork_engine(config, parent_seed=1, worker_id=0, workers=1)
         else:
             write_shard(config, str(tmp_path / "shard.txt"), parent_seed=1, worker_id=0, workers=1)
+
+
+@pytest.mark.parametrize(
+    ("label", "field"),
+    [
+        ("plain", {"type": "sequence", "start": 0}),
+        (
+            "transform_owned",
+            {
+                "type": "sequence",
+                "start": 0,
+                "transforms": [
+                    {
+                        "type": "distribution",
+                        "choices": [
+                            {"weight": 100, "spec": {"type": "sequence", "start": 0}},
+                            {"weight": 0, "spec": {"type": "string", "values": ["z"]}},
+                        ],
+                    }
+                ],
+            },
+        ),
+        (
+            "nested",
+            {
+                "type": "sequence_of",
+                "count": 2,
+                "separator": "-",
+                "spec": {"type": "sequence", "start": 0},
+            },
+        ),
+    ],
+)
+def test_partitioned_workers_emit_disjoint_sequences(label: str, field: dict) -> None:
+    """A sequence in a replacing transform must be offset too (CONC-005)."""
+    workers = 3
+    config = {"rows": 12, "format": "$x$", "types": {"x": field}}
+
+    shards = [
+        list(
+            fork_engine(
+                config,
+                parent_seed=1,
+                worker_id=worker_id,
+                workers=workers,
+                rows=chunk_rows(config["rows"], workers, worker_id),
+            )
+        )
+        for worker_id in range(workers)
+    ]
+
+    emitted = [value for shard in shards for value in shard]
+    assert len(emitted) == config["rows"]
+    assert len(set(emitted)) == len(emitted)

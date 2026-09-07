@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import multiprocessing
+import pickle
+from multiprocessing import get_context
 from pathlib import Path
 from random import Random
 
@@ -11,6 +13,7 @@ import pytest
 from ton import concurrency
 from ton._engine import Engine
 from ton.concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write_shard
+from ton.generators import _regex_parse as rx
 
 
 def _render_engine(engine: Engine) -> list[str]:
@@ -313,3 +316,26 @@ def test_write_shard_streams_without_returning_rows(tmp_path) -> None:
     path = tmp_path / "part.txt"
     assert write_shard(config, str(path), parent_seed=1, worker_id=0, workers=1) == 2
     assert path.read_text().splitlines() == ["5", "6"]
+
+
+def _drain(engine: Engine) -> list[str]:
+    return list(engine)
+
+
+def test_prepared_regex_engine_survives_a_spawn_round_trip() -> None:
+    """Unbounded repeats must keep their sentinel identity across processes (CONC-007)."""
+    config = {
+        "rows": 3,
+        "format": "$x$",
+        "types": {"x": {"type": "regex", "pattern": "a+"}},
+    }
+    engine = Engine.from_config(config, seed=1)
+    expected = list(Engine.from_config(config, seed=1))
+
+    with get_context("spawn").Pool(1) as pool:
+        assert pool.apply(_drain, (engine,)) == expected
+
+
+def test_repeat_sentinel_identity_survives_pickling() -> None:
+    """Enum members pickle by name, so ``is`` comparisons stay valid (CONC-007)."""
+    assert pickle.loads(pickle.dumps(rx.MAXREPEAT)) is rx.MAXREPEAT

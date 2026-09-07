@@ -76,8 +76,21 @@ CATEGORY_NOT_WORD = Category.NOT_WORD
 CATEGORY_SPACE = Category.SPACE
 CATEGORY_NOT_SPACE = Category.NOT_SPACE
 
+
+class Repeat(enum.Enum):
+    """Sentinel for an open-ended upper repeat bound (``*``, ``+``, ``{n,}``).
+
+    An ``object()`` sentinel changed identity across a pickle round-trip, so
+    a prepared engine shipped to a worker process treated it as a numeric
+    bound and raised TypeError. Enum members pickle by name, so identity
+    survives (CONC-007).
+    """
+
+    MAX = "max"
+
+
 #: Sentinel for an open-ended upper repeat bound (``*``, ``+``, ``{n,}``).
-MAXREPEAT = object()
+MAXREPEAT = Repeat.MAX
 
 _CATEGORY_ESCAPES = {
     "d": CATEGORY_DIGIT,

@@ -27,9 +27,11 @@ engine is constructed, plus the per-row ``generate`` call:
 
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from random import Random
 from typing import Any, ClassVar
 
@@ -346,6 +348,35 @@ class PairedGenerator(Generator):
         """
         id_value, primary = self.generate_pair(prepared, rng)
         return id_value if self.generate_returns_id else primary
+
+
+#: Shape of a plain decimal integer, used to keep :func:`str_to_int` as
+#: strict as ``int`` when it falls back to the arbitrary-size path.
+_INTEGER_TEXT = re.compile(r"[+-]?\d+")
+
+
+def int_to_str(value: int) -> str:
+    """Render ``value`` in decimal, whatever its size.
+
+    CPython refuses ``str()`` on integers over ``sys.get_int_max_str_digits()``
+    (4,300 by default). TON has no digit ceiling, so oversized values fall back
+    to an exact ``Decimal`` rendering instead of failing or requiring a
+    process-global setting change (SCALE-005). The fast path is unchanged.
+    """
+    try:
+        return str(value)
+    except ValueError:
+        return format(Decimal(value), "f")
+
+
+def str_to_int(text: str) -> int:
+    """Parse a decimal integer of any size, as strictly as ``int``."""
+    try:
+        return int(text)
+    except ValueError:
+        if not _INTEGER_TEXT.fullmatch(text.strip()):
+            raise
+        return int(Decimal(text))
 
 
 def pad_with_zero(value: str, width: int) -> str:

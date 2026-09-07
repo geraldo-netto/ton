@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import base64
+import sys
 from random import Random
 
 import pytest
 
+from ton import api
 from ton._engine import Engine, TemplateError
 from ton.generators import Generator
+from ton.generators.base import int_to_str, str_to_int
 from ton.generators.bytes import BytesGenerator
 from ton.generators.char import CharGenerator
 from ton.generators.regex import RegexGenerator
@@ -107,3 +110,48 @@ def test_row_width_guards_composite_and_unknown_width_values() -> None:
     engine = Engine(unknown, registry={"unknown": UnknownWidth()})
     with pytest.raises(TemplateError, match="maxRowWidth"):
         list(engine)
+
+
+BIG = 10**4300
+
+
+@pytest.mark.parametrize(
+    ("label", "spec"),
+    [
+        ("integer", {"type": "integer", "minValue": BIG, "maxValue": BIG}),
+        ("sequence", {"type": "sequence", "start": BIG}),
+        ("decimal", {"type": "decimal", "minValue": 0, "maxValue": 1, "decimals": 4301}),
+    ],
+)
+def test_numeric_rendering_has_no_digit_ceiling(label: str, spec: dict) -> None:
+    """CPython's 4,300-digit int->str limit is not TON's ceiling (SCALE-005)."""
+    config = {"rows": 1, "format": "$x$", "types": {"x": spec}}
+
+    rows = list(api.generate(config, seed=1, proof_mode="all"))
+
+    assert len(rows[0].lstrip("-")) > 4300
+    if label != "decimal":
+        assert rows[0] == "1" + "0" * 4300
+
+
+def test_oversized_rendering_does_not_change_the_process_limit() -> None:
+    """The fix must not reach for a process-global setting (SCALE-005)."""
+    before = sys.get_int_max_str_digits()
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {"x": {"type": "integer", "minValue": BIG, "maxValue": BIG}},
+    }
+
+    list(api.generate(config, seed=1))
+
+    assert sys.get_int_max_str_digits() == before
+
+
+def test_int_conversion_helpers_stay_as_strict_as_int() -> None:
+    """The arbitrary-size fallback must not widen what counts as an integer."""
+    assert str_to_int(int_to_str(BIG)) == BIG
+    assert str_to_int(int_to_str(-BIG)) == -BIG
+    for text in ("abc", "1.5", "", "1e5"):
+        with pytest.raises(ValueError):
+            str_to_int(text)

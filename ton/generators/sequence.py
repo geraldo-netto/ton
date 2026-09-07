@@ -35,7 +35,7 @@ from typing import Any
 
 from .._proof import ProofResult
 from .._transforms import TransformResult
-from .base import Generator, coerce_int, pad_with_zero, proof_result
+from .base import Generator, coerce_int, int_to_str, pad_with_zero, proof_result, str_to_int
 
 
 @dataclass(frozen=True)
@@ -68,17 +68,17 @@ class SequenceGenerator(Generator):
 
     def generate(self, prepared: SequenceSpec, rng: Random) -> str:
         # rng is intentionally unused -- the value is deterministic by design.
-        value = str(next(prepared.counter))
+        value = int_to_str(next(prepared.counter))
         if prepared.pad_width:
             return pad_with_zero(value, prepared.pad_width)
         return value
 
     def prove(self, prepared: SequenceSpec, result: TransformResult) -> ProofResult:
         try:
-            value = int(result.value)
+            value = str_to_int(result.value)
         except ValueError:
             return proof_result(False, "sequence value is not an integer")
-        if result.value != str(value).zfill(prepared.pad_width):
+        if result.value != int_to_str(value).zfill(prepared.pad_width):
             return proof_result(False, "sequence value violates its padding contract")
         delta = value - prepared.start
         valid = delta % prepared.step == 0 and delta // prepared.step >= 0

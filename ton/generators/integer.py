@@ -13,9 +13,11 @@ from .base import (
     Generator,
     coerce_bool,
     coerce_int,
+    int_to_str,
     pad_with_zero,
     proof_result,
     require_min_le_max,
+    str_to_int,
 )
 
 
@@ -44,14 +46,14 @@ class IntegerGenerator(Generator):
         return IntegerSpec(min_value=min_value, max_value=max_value, pad_width=pad_width)
 
     def generate(self, prepared: IntegerSpec, rng: Random) -> str:
-        value = str(rng.randint(prepared.min_value, prepared.max_value))
+        value = int_to_str(rng.randint(prepared.min_value, prepared.max_value))
         if prepared.pad_width:
             return pad_with_zero(value, prepared.pad_width)
         return value
 
     def prove(self, prepared: IntegerSpec, result: TransformResult) -> ProofResult:
         try:
-            value = int(result.value)
+            value = str_to_int(result.value)
         except ValueError:
             return proof_result(False, "value is not an integer")
         width_ok = not prepared.pad_width or len(result.value) == prepared.pad_width

@@ -15,6 +15,7 @@ from .base import (
     Generator,
     coerce_bool,
     coerce_int,
+    int_to_str,
     pad_with_zero,
     proof_result,
     require_min_le_max,
@@ -175,7 +176,7 @@ def _scaled_integral(value: Decimal, scale: int, decimals: int, rounding: str) -
 
 def _format_step(step: int, scale: int, decimals: int) -> str:
     if decimals == 0:
-        return str(step)
+        return int_to_str(step)
     whole, fraction = divmod(abs(step), scale)
     sign = "-" if step < 0 else ""
-    return f"{sign}{whole}.{fraction:0{decimals}d}"
+    return f"{sign}{int_to_str(whole)}.{int_to_str(fraction).zfill(decimals)}"

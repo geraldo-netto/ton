@@ -526,3 +526,40 @@ def test_nested_builtin_generator_rejects_key_typo() -> None:
 
     with pytest.raises(ConfigError, match=r"types.a.spec.value.*Did you mean 'values'"):
         api.validate_config(payload)
+
+
+def test_transform_owned_child_specs_reach_the_key_boundary() -> None:
+    """A typo inside a distribution candidate is rejected with its path (CFG-004)."""
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {
+            "x": {
+                "type": "string",
+                "values": ["s"],
+                "transforms": [
+                    {
+                        "type": "distribution",
+                        "choices": [
+                            {
+                                "weight": 1,
+                                "spec": {
+                                    "type": "integer",
+                                    "minValue": 1,
+                                    "maxValue": 9,
+                                    "padWithZer": True,
+                                },
+                            },
+                            {"weight": 1, "spec": {"type": "string", "values": ["b"]}},
+                        ],
+                    }
+                ],
+            }
+        },
+    }
+
+    with pytest.raises(ConfigError) as excinfo:
+        api.validate_config(config)
+
+    assert "types.x.transforms[0].choices[0].spec.padWithZer" in str(excinfo.value)
+    assert "padWithZero" in str(excinfo.value)

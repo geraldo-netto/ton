@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -267,7 +267,20 @@ class EngineCompiler:
         error = extension_key_error(path, spec, generator.config_keys, COMMON_FIELD_KEYS)
         if error is not None:
             raise TemplateError(error)
-        for location, nested_spec in generator.nested_specs(spec):
+        self._validate_child_keys(path, generator.nested_specs(spec))
+
+    def _validate_child_keys(
+        self,
+        path: str,
+        nested: Iterable[tuple[str, Mapping[str, Any]]],
+    ) -> None:
+        """Key-check declared child generator specs, whoever owns them (CFG-004).
+
+        Generators and transforms both declare children through
+        ``nested_specs``, so both reach the same validation boundary with
+        path-specific diagnostics.
+        """
+        for location, nested_spec in nested:
             reference = nested_spec.get("type")
             if not isinstance(reference, str):
                 continue
@@ -318,6 +331,10 @@ class EngineCompiler:
             )
             if error is not None:
                 raise TemplateError(error)
+            self._validate_child_keys(
+                f"types.{type_key}.transforms[{index}]",
+                transform.nested_specs(transform_spec),
+            )
             prepared.append(
                 PreparedTransform(
                     transform,

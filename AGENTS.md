@@ -47,9 +47,17 @@ File define expected behavior + usage model for AI agents in this repo.
 - Propose business/design patterns + DDD only when improve clarity or structure.
 - ALWAYS record review findings in `TODO.md` — never report only in chat. Any time
   scan, review, audit, or "look for issues" (not just major changes), add each finding to
-  the matching lifecycle table in `TODO.md` before/while reporting.
-- Major changes: rescan whole project. Create or update `TODO.md` with one table per lifecycle
-  section: `Open`, `Blocked / Deferred`, `Rejected / Won't fix`. Remove items once done.
+  its category table under `Open` or the appropriate non-open lifecycle table
+  in `TODO.md` before/while reporting.
+- Major changes: rescan whole project. Create or update `TODO.md` with this structure:
+  - `Open`: one separate table per relevant review category, under category subheadings.
+    Keep `open` and `in_progress` items in their category tables.
+  - `Blocked / Deferred`: one shared table for all `blocked` and `deferred` items,
+    regardless of category.
+  - `Rejected / Won't fix`: one shared table for all `rejected` and `wont_fix` items,
+    regardless of category.
+  Place each item exactly once, using its ID prefix as its primary category.
+  Move the row when its status changes; remove it once done.
   Table format: `id | status | severity | effort | description`. Ids carry a category prefix
   (e.g. `REL-021`, `CFG-004`); descriptions open with the review category. Categories:
   - security

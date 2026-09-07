@@ -7,6 +7,8 @@ from random import Random
 
 import pytest
 
+from ton import api
+from ton._engine import TemplateError
 from ton._transforms import TransformResult
 from ton.generators import _regex_parse as rx
 from ton.generators import regex as regex_module
@@ -254,3 +256,22 @@ def test_ast_matcher_atom_dispatch_covers_defensive_nodes() -> None:
     assert not regex_module._atom_matches(regex_module._MatchNode(rx.ANY, None), "\n")
     assert regex_module._atom_matches(regex_module._MatchNode(rx.RANGE, (ord("a"), ord("c"))), "b")
     assert not regex_module._atom_matches(regex_module._MatchNode(rx.AT, "^"), "a")
+
+
+def test_large_explicit_repeat_prepares_without_expanding() -> None:
+    """re's numeric repetition limit is not TON's ceiling (SCALE-006)."""
+    config = {
+        "rows": 0,
+        "format": "$x$",
+        "types": {"x": {"type": "regex", "pattern": "a{4294967295}"}},
+    }
+
+    assert list(api.generate(config, seed=1)) == []
+
+
+def test_invalid_pattern_is_still_rejected_during_preparation() -> None:
+    """Relaxing re's limits must not stop rejecting genuinely invalid patterns."""
+    config = {"rows": 0, "format": "$x$", "types": {"x": {"type": "regex", "pattern": "(bad"}}}
+
+    with pytest.raises(TemplateError, match="not a valid regex"):
+        list(api.generate(config))

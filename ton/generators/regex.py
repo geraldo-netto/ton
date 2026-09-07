@@ -101,8 +101,10 @@ class RegexGenerator(Generator):
         prepared = _prepare_nodes(parsed)
         try:
             re.compile(pattern)
-        except RecursionError:
-            pass  # The iterative vendored parser already validated deep nesting.
+        except (RecursionError, OverflowError):
+            # The iterative vendored parser already validated deep nesting and
+            # large repeat counts; re's own limits are not TON's (SCALE-006).
+            pass
         except re.error as exc:
             raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
         return RegexSpec(pattern=pattern, parsed=prepared, matcher=_build_matcher(prepared))

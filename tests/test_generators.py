@@ -11,6 +11,7 @@ from unittest import mock
 
 import pytest
 
+from ton import api
 from ton._transforms import TransformResult
 from ton.generators import (
     BooleanGenerator,
@@ -629,3 +630,38 @@ def test_same_seed_yields_same_value(seed: int) -> None:
 def test_boolean_options_reject_non_booleans(generator, spec: dict) -> None:
     with pytest.raises(ValueError, match="must be a boolean"):
         generator.prepare(spec)
+
+
+@pytest.mark.parametrize(
+    "fmt",
+    ["%Y-%m-%d %f", "%Y-%m-%d %S", "%Y-%m-%d %M", "%Y-%m-%d %H", "%Y-%m-%d", "%Y-%m-%d %I %p"],
+)
+def test_partial_time_formats_pass_their_own_strict_proof(fmt: str) -> None:
+    """Omitted components must widen the proof hull, not force midnight (REL-024)."""
+    bound = "2024-01-01T12:34:56.123456"
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {"x": {"type": "date", "minValue": bound, "maxValue": bound, "format": fmt}},
+    }
+
+    assert len(list(api.generate(config, seed=1, proof_mode="all"))) == 1
+
+
+def test_partial_time_format_still_rejects_an_out_of_range_date() -> None:
+    """Widening for omitted components must not make the interval check vacuous."""
+    from ton.generators.base import PreparationContext
+    from ton.generators.date import DateGenerator
+
+    generator = DateGenerator()
+    prepared = generator.prepare(
+        {
+            "minValue": "2024-01-01T00:00:00",
+            "maxValue": "2024-01-01T23:59:59.999999",
+            "format": "%Y-%m-%d %f",
+        },
+        PreparationContext({}),
+    )
+
+    assert generator.prove(prepared, TransformResult("2024-01-01 123456")).ok
+    assert not generator.prove(prepared, TransformResult("2024-06-09 123456")).ok

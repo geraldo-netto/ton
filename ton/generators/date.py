@@ -207,16 +207,38 @@ def _align_proof_timezone(moment: datetime, bound: datetime) -> datetime:
 
 
 def _proof_resolution(tokens: tuple[FormatToken, ...]) -> timedelta:
+    """Return how far past the parsed moment the rendered text can reach.
+
+    ``strptime`` fills every omitted component with its minimum, so the
+    parsed moment is the earliest datetime the text can denote. Each
+    omitted component independently widens the hull to the latest such
+    datetime -- including components *larger* than the smallest one
+    present, which a resolution keyed on the smallest present unit missed:
+    ``%Y-%m-%d %f`` parsed as midnight and rejected its own output
+    (REL-024). The hull is a sound over-approximation, so a value the
+    format genuinely allows is never rejected.
+    """
     directives = {text for is_directive, text in tokens if is_directive}
-    if "f" in directives:
+    complete_time = bool(directives & {"X", "c"})
+    span = timedelta(0)
+    span += _hour_span(directives, complete_time=complete_time)
+    if not (complete_time or "M" in directives):
+        span += timedelta(minutes=59)
+    if not (complete_time or "S" in directives):
+        span += timedelta(seconds=59)
+    if "f" not in directives:
+        span += timedelta(microseconds=999_999)
+    return span
+
+
+def _hour_span(directives: set[str], *, complete_time: bool) -> timedelta:
+    """Return the hour component's uncertainty for a rendered value."""
+    if complete_time or "H" in directives:
         return timedelta(0)
-    if directives & {"S", "X", "c"}:
-        return timedelta(microseconds=999_999)
-    if "M" in directives:
-        return timedelta(seconds=59, microseconds=999_999)
-    if directives & {"H", "I", "p"}:
-        return timedelta(minutes=59, seconds=59, microseconds=999_999)
-    return timedelta(days=1, microseconds=-1)
+    if {"I", "p"} <= directives:
+        return timedelta(0)
+    # ``%I`` without ``%p`` renders 13:00 and 01:00 identically.
+    return timedelta(hours=12) if "I" in directives else timedelta(hours=23)
 
 
 def _has_complete_date(tokens: tuple[FormatToken, ...]) -> bool:

@@ -1,11 +1,10 @@
 """Registry mapping JSON ``type`` discriminators to Generator instances.
 
 The default registry is sourced from the explicit allowlist
-``ton.generators.BUILTIN_GENERATOR_CLASSES`` (ARCH-005). Walking
-``Generator.__subclasses__()`` is still exposed via
-:func:`discover_generator_classes` for callers that want full
-introspection, but the default registry no longer picks up in-process
-test fixtures or unrelated third-party subclasses.
+``ton.generators.BUILTIN_GENERATOR_CLASSES`` (ARCH-005).
+:func:`discover_generator_classes` walks ``Generator.__subclasses__()``
+but returns only classes on that allowlist, so neither it nor the registry
+picks up in-process test fixtures or unrelated third-party subclasses.
 
 Construction goes through :func:`make_registry` so callers can request
 only the type names they need (PERF-012); calling it without arguments

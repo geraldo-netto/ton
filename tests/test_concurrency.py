@@ -11,6 +11,7 @@ from random import Random
 import pytest
 
 from ton import concurrency
+from ton._config import ConfigError
 from ton._engine import Engine
 from ton.concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write_shard
 from ton.generators import _regex_parse as rx
@@ -339,3 +340,23 @@ def test_prepared_regex_engine_survives_a_spawn_round_trip() -> None:
 def test_repeat_sentinel_identity_survives_pickling() -> None:
     """Enum members pickle by name, so ``is`` comparisons stay valid (CONC-007)."""
     assert pickle.loads(pickle.dumps(rx.MAXREPEAT)) is rx.MAXREPEAT
+
+
+def test_fork_engine_rejects_a_fractional_sequence_start() -> None:
+    """Workers must apply the generator's numeric rules, not int() (CONC-004)."""
+    config = {"rows": 2, "format": "$x$", "types": {"x": {"type": "sequence", "start": 1.5}}}
+
+    with pytest.raises(ValueError, match="sequence 'start' must be an integer"):
+        fork_engine(config, parent_seed=1, worker_id=0, workers=2)
+
+
+@pytest.mark.parametrize("helper", ["fork_engine", "write_shard"])
+def test_worker_helpers_reject_a_boolean_row_count(tmp_path: Path, helper: str) -> None:
+    """rows: true was silently coerced to one row (CONC-004)."""
+    config = {"rows": True, "format": "$x$", "types": {"x": {"type": "string", "values": ["a"]}}}
+
+    with pytest.raises(ConfigError, match="non-negative integer"):
+        if helper == "fork_engine":
+            fork_engine(config, parent_seed=1, worker_id=0, workers=1)
+        else:
+            write_shard(config, str(tmp_path / "shard.txt"), parent_seed=1, worker_id=0, workers=1)

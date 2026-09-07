@@ -43,8 +43,9 @@ import struct
 from collections.abc import Mapping
 from copy import deepcopy
 from random import Random
-from typing import Any
+from typing import Any, cast
 
+from ._config import validate_structure
 from ._engine import Engine, EngineOptions
 from ._logging import LogEvent
 from ._logging import logger as _logger
@@ -55,6 +56,7 @@ from ._template import parse
 from ._transforms import Transform
 from ._validation import Validator
 from .generators import Generator
+from .generators.base import coerce_int
 
 _UINT64_MODULUS = 1 << 64
 
@@ -119,12 +121,14 @@ def fork_engine(
     engine as ``seed`` so proof/provenance records are attributable to
     the worker (CONC-001).
     """
-    seed = derive_seed(parent_seed, worker_id)
-    rng = Random(seed)
-    total_rows = int(config["rows"])
-    worker_rows = int(total_rows if rows is None else rows)
     if rows is not None and workers is None:
         raise ValueError("workers is required when rows overrides a worker shard")
+    seed = derive_seed(parent_seed, worker_id)
+    rng = Random(seed)
+    # Validate the caller's config before deriving offsets: coercing first
+    # let workers accept values ordinary generation rejects (CONC-004).
+    total_rows = validated_total_rows(config)
+    worker_rows = total_rows if rows is None else rows
     offset = worker_id * worker_rows
     if workers is not None:
         offset = _chunk_offset(total_rows, workers, worker_id)
@@ -171,7 +175,7 @@ def write_shard(
     encoding: str = "utf-8",
 ) -> int:
     """Stream one deterministic worker shard to ``path`` in bounded memory."""
-    rows = chunk_rows(int(config["rows"]), workers, worker_id)
+    rows = chunk_rows(validated_total_rows(config), workers, worker_id)
     engine = fork_engine(
         config,
         parent_seed=parent_seed,
@@ -185,6 +189,17 @@ def write_shard(
             stream.write(f"{row}\n")
             written += 1
     return written
+
+
+def validated_total_rows(config: Mapping[str, Any]) -> int:
+    """Return ``config['rows']`` after the ordinary structural validation.
+
+    Worker helpers used to call ``int()`` on the raw value, which silently
+    accepted ``rows: true`` as one row where direct generation rejects it
+    (CONC-004).
+    """
+    validate_structure(config)
+    return cast(int, config["rows"])
 
 
 def _chunk_offset(total_rows: int, workers: int, worker_id: int) -> int:
@@ -208,12 +223,14 @@ def _offset_sequence_spec(value: Any, offset: int) -> None:
     if isinstance(value, dict):
         type_name = runtime_type_name(value.get("type"))
         if type_name == "sequence":
-            start = int(value.get("start", 0))
-            step = int(value.get("step", 1))
+            # Use the generator's own numeric rule so a worker never renders
+            # a spec ordinary generation would reject (CONC-004).
+            start = coerce_int(value, "start", type_name="sequence", default=0)
+            step = coerce_int(value, "step", type_name="sequence", default=1)
             value["start"] = start + offset * step
             return
         if type_name == "sequence_of":
-            count = int(value.get("count", 0))
+            count = coerce_int(value, "count", type_name="sequence_of", default=0)
             _offset_sequence_spec(value.get("spec"), offset * count)
             return
         for nested in value.values():

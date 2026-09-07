@@ -317,7 +317,7 @@ one-argument `prepare(spec)` contract remains supported for existing plugins.
 my_type = "my_pkg.generators:MyGenerator"
 
 [project.entry-points."ton.transforms"]
-my_ns.my_transform = "my_pkg.transforms:MyTransform"
+"my_ns.my_transform" = "my_pkg.transforms:MyTransform"
 ```
 
 `build_extension_catalog` is the canonical loading API; it returns a namespaced `ExtensionCatalog` exposing `generators()`, `transforms()`, and `validators()`:

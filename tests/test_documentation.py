@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 import pytest
+import tomllib
 
 from ton import api
 from ton._registry import make_registry
@@ -105,3 +106,14 @@ def test_documented_builtin_type_count_matches_the_catalog() -> None:
     count = len(make_registry())
 
     assert f"{words[count]} built-in types." in README
+
+
+def test_documented_entry_point_table_parses_to_flat_names() -> None:
+    """A namespaced entry-point key must be quoted or TOML nests it (DOC-007)."""
+    block = README.split("[project.entry-points.", 1)[1]
+    toml_text = "[project.entry-points." + block.split("```", 1)[0]
+
+    parsed = tomllib.loads(toml_text)["project"]["entry-points"]
+
+    assert parsed["ton.transforms"] == {"my_ns.my_transform": "my_pkg.transforms:MyTransform"}
+    assert parsed["ton.generators"] == {"my_type": "my_pkg.generators:MyGenerator"}

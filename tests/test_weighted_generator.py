@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from math import isfinite
 from random import Random
 
 import pytest
@@ -54,10 +55,22 @@ def test_weighted_rejects_non_finite_weights(weight: float) -> None:
         generator.prepare(_choices(weight, 1), PreparationContext(default_registry()))
 
 
-def test_weighted_rejects_non_finite_total() -> None:
+def test_weighted_accepts_finite_weights_whose_raw_sum_would_overflow() -> None:
+    """Finite representable weights must not be rejected for their sum (SCALE-008)."""
     generator = WeightedGenerator()
-    with pytest.raises(ValueError, match="total must be finite"):
-        generator.prepare(_choices(1e308, 1e308), PreparationContext(default_registry()))
+
+    prepared = generator.prepare(_choices(1e308, 1e308), PreparationContext(default_registry()))
+
+    assert all(isfinite(bound) for bound in prepared.cum_weights)
+    counts = Counter(generator.generate(prepared, Random(seed)) for seed in range(400))
+    assert set(counts) == {"v0", "v1"}
+    assert abs(counts["v0"] - counts["v1"]) < 120
+
+
+def test_weighted_still_rejects_weights_that_are_all_zero() -> None:
+    generator = WeightedGenerator()
+    with pytest.raises(ValueError, match="must sum to a positive number"):
+        generator.prepare(_choices(0, 0), PreparationContext(default_registry()))
 
 
 @pytest.mark.parametrize(

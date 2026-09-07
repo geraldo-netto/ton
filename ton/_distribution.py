@@ -122,22 +122,35 @@ def coerce_weight(value: Any, location: str) -> float:
 
 
 def validate_weights(weights: Sequence[float], label: str) -> None:
+    """Reject weights that cannot define a proportional distribution.
+
+    Only the inputs themselves are checked. Rejecting a set because its
+    *sum* overflowed turned away finite, representable weights such as
+    [1e308, 1e308], contrary to proportional-weight behavior (SCALE-008);
+    accumulation is scaled instead, so the total never overflows.
+    """
     if not all(isfinite(weight) for weight in weights):
         raise ValueError(f"{label} 'weights' must be finite")
     if any(weight < 0 for weight in weights):
         raise ValueError(f"{label} 'weights' must be non-negative")
-    total = sum(weights)
-    if not isfinite(total):
-        raise ValueError(f"{label} 'weights' total must be finite")
-    if total <= 0:
+    if not any(weight > 0 for weight in weights):
         raise ValueError(f"{label} 'weights' must sum to a positive number")
 
 
 def cumulative_weights(weights: Sequence[float]) -> tuple[float, ...]:
+    """Accumulate ``weights`` scaled by the largest of them.
+
+    Scaling keeps every partial sum finite for any finite input while
+    preserving the ratios that define the distribution -- summing raw
+    weights overflowed to infinity for values near the float maximum
+    (SCALE-008). ``validate_weights`` runs first, so the maximum is
+    positive.
+    """
+    scale = max(weights)
     total = 0.0
     cumulative: list[float] = []
     for weight in weights:
-        total += weight
+        total += weight / scale
         cumulative.append(total)
     return tuple(cumulative)
 

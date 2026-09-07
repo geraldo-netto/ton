@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import isfinite
 from random import Random
 from typing import Any
 
@@ -196,3 +197,25 @@ def test_distribution_transform_rejects_zero_total_weight() -> None:
         assert "positive number" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_distribution_accepts_finite_weights_whose_raw_sum_would_overflow() -> None:
+    """The distribution transform shares the scaled accumulation (SCALE-008)."""
+    transform = DistributionTransform()
+
+    prepared = transform.prepare(
+        {
+            "type": "distribution",
+            "choices": [
+                {"weight": 1e308, "spec": {"type": "string", "values": ["a"]}},
+                {"weight": 1e308, "spec": {"type": "string", "values": ["b"]}},
+            ],
+        },
+        PreparationContext(default_registry()),
+    )
+
+    assert all(isfinite(bound) for bound in prepared.cum_weights)
+    drawn = {
+        transform.apply(prepared, TransformResult("src"), Random(seed)).value for seed in range(40)
+    }
+    assert drawn == {"a", "b"}

@@ -522,6 +522,10 @@ class Engine:
             before = result
             try:
                 result = prepared.transform.apply(prepared.prepared, before, self._rng)
+            except ValidationError:
+                # A nested pipeline's validator rejecting a value is a validation
+                # outcome, not a transform crash; surface it like a root validator.
+                raise
             except Exception as exc:
                 self._raise_pipeline_error(
                     TransformExecutionError,

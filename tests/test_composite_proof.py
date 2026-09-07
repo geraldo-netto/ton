@@ -10,6 +10,7 @@ import pytest
 from ton._engine import Engine, ProofError
 from ton._proof import ProofResult
 from ton._transforms import BaseTransform, TransformProof, TransformResult
+from ton._validation import ValidationError
 from ton.generators import Generator
 from ton.generators.base import (
     ChildPipelineGenerator,
@@ -50,6 +51,17 @@ class _RejectTransform(BaseTransform):
     def prove(self, prepared, before, after):
         del prepared, before, after
         return TransformProof(ok=False, reason="nested transform rejects")
+
+
+class _SuffixTransform(BaseTransform):
+    """Marks the value so a skipped candidate transform is visible."""
+
+    type_name = "suffix"
+    config_keys = frozenset()
+
+    def apply(self, prepared: Any, value: TransformResult, rng: Random) -> TransformResult:
+        del prepared, rng
+        return TransformResult(value.value + "!")
 
 
 def _registry() -> dict[str, Generator]:
@@ -165,26 +177,26 @@ def test_weighted_legacy_prove_membership() -> None:
 
 def test_distribution_transform_prove_accepts_and_rejects() -> None:
     transform = DistributionTransform()
-    ok_spec = transform.prepare_composite(
+    ok_spec = transform.prepare(
         {
             "choices": [
                 {"weight": 1, "spec": {"type": "string", "values": ["a"]}},
                 {"weight": 1, "spec": {"type": "string", "values": ["b"]}},
             ]
         },
-        _registry(),
+        _context(),
     )
     before = TransformResult("src")
     assert transform.prove(ok_spec, before, TransformResult("a")).ok
 
-    bad_spec = transform.prepare_composite(
+    bad_spec = transform.prepare(
         {
             "choices": [
                 {"weight": 1, "spec": {"type": "reject"}},
                 {"weight": 1, "spec": {"type": "reject"}},
             ]
         },
-        _registry(),
+        _context(),
     )
     assert not transform.prove(bad_spec, before, TransformResult("x")).ok
 
@@ -219,3 +231,74 @@ def test_sequence_of_prove_checks_each_element() -> None:
     proof = reject_gen.prove(reject_prepared, TransformResult("x-x"))
     assert not proof.ok
     assert "sequence_of element failed" in proof.reason
+
+
+def test_root_transform_candidates_run_their_own_pipeline() -> None:
+    """A root distribution candidate's transforms and validators must run (REL-020)."""
+    engine = Engine(
+        {
+            "rows": 1,
+            "format": "$x$",
+            "types": {
+                "x": {
+                    "type": "string",
+                    "values": ["root-src"],
+                    "transforms": [
+                        {
+                            "type": "distribution",
+                            "choices": [
+                                {
+                                    "weight": 1,
+                                    "spec": {
+                                        "type": "string",
+                                        "values": ["cand"],
+                                        "transforms": [{"type": "suffix"}],
+                                    },
+                                },
+                                {"weight": 0, "spec": {"type": "string", "values": ["other"]}},
+                            ],
+                        }
+                    ],
+                }
+            },
+        },
+        transforms={"distribution": DistributionTransform(), "suffix": _SuffixTransform()},
+    )
+
+    assert list(engine) == ["cand!"]
+
+
+def test_root_transform_candidate_validators_reject_like_root_validators() -> None:
+    """A nested validator failure is a ValidationError, not a transform crash (REL-020)."""
+    engine = Engine(
+        {
+            "rows": 1,
+            "format": "$x$",
+            "types": {
+                "x": {
+                    "type": "string",
+                    "values": ["src"],
+                    "transforms": [
+                        {
+                            "type": "distribution",
+                            "choices": [
+                                {
+                                    "weight": 1,
+                                    "spec": {
+                                        "type": "string",
+                                        "values": [""],
+                                        "validators": ["non_empty"],
+                                    },
+                                },
+                                {"weight": 0, "spec": {"type": "string", "values": ["other"]}},
+                            ],
+                        }
+                    ],
+                }
+            },
+        },
+        transforms={"distribution": DistributionTransform()},
+    )
+
+    with pytest.raises(ValidationError, match="Nested value failed validator"):
+        list(engine)

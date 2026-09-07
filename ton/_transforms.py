@@ -70,15 +70,21 @@ class Transform(Protocol):
     config_keys: ClassVar[frozenset[str] | None]
     requires_source: ClassVar[bool]
 
-    def prepare(self, spec: Mapping[str, Any]) -> Any:
-        """Validate and normalize a raw transform spec."""
-
-    def prepare_composite(
+    def nested_specs(
         self,
         spec: Mapping[str, Any],
-        registry: Mapping[str, Any],
-    ) -> Any:
-        """Validate specs that need access to data-type registrations."""
+    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        """Declare generator-bearing config locations for lazy discovery."""
+        raise NotImplementedError  # pragma: no cover
+
+    def prepare(self, spec: Mapping[str, Any], context: Any) -> Any:
+        """Validate and normalize a raw transform spec.
+
+        ``context`` is the engine's :class:`PreparationContext`; composite
+        transforms resolve nested type specs with ``context.prepare_child``
+        so children get the same registry and pipeline services as the
+        parent field (REL-020).
+        """
 
     def apply(
         self,
@@ -115,20 +121,9 @@ class BaseTransform:
         del spec
         return ()
 
-    def prepare(self, spec: Mapping[str, Any]) -> Any:
+    def prepare(self, spec: Mapping[str, Any], context: Any) -> Any:
+        del context
         return spec
-
-    def prepare_composite(
-        self,
-        spec: Mapping[str, Any],
-        registry: Mapping[str, Any],
-    ) -> Any:
-        del registry
-        return self.prepare(spec)
-
-    def prepare_with_context(self, spec: Mapping[str, Any], context: Any) -> Any:
-        """Prepare a composite transform with nested-pipeline services."""
-        return self.prepare_composite(spec, context.registry)
 
     def apply(
         self,

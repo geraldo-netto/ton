@@ -8,7 +8,6 @@ from typing import Any, ClassVar
 
 from .._distribution import WeightedChoiceSet, prepare_distribution
 from .._transforms import BaseTransform, TransformCapabilities, TransformProof, TransformResult
-from ..generators import Generator
 from ..generators.base import PreparationContext
 
 
@@ -33,19 +32,7 @@ class DistributionTransform(BaseTransform):
             if isinstance(choice, Mapping) and isinstance(choice.get("spec"), Mapping)
         )
 
-    def prepare_composite(
-        self,
-        spec: Mapping[str, Any],
-        registry: Mapping[str, Generator],
-    ) -> WeightedChoiceSet:
-        return prepare_distribution(
-            spec,
-            registry,
-            label="distribution",
-            min_choices=2,
-        )
-
-    def prepare_with_context(
+    def prepare(
         self,
         spec: Mapping[str, Any],
         context: PreparationContext,

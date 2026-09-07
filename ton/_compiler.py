@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
@@ -163,10 +163,10 @@ class EngineCompiler:
             transform = self.transforms.get(normalize_reference(reference)) or self.transforms.get(
                 reference
             )
-            nested_specs = getattr(transform, "nested_specs", None)
-            if callable(nested_specs):
-                declared = cast(Any, nested_specs)(transform_spec)
-                children.extend(child for _location, child in declared)
+            if transform is not None:
+                children.extend(
+                    child for _location, child in transform.nested_specs(transform_spec)
+                )
         return tuple(children)
 
     def _validate(self) -> None:
@@ -192,7 +192,7 @@ class EngineCompiler:
             try:
                 self._validate_generator_keys(f"types.{type_key}", spec, generator)
                 transforms, is_paired, uses_source = self._prepare_transforms(
-                    type_key, spec, generator
+                    type_key, spec, generator, context
                 )
                 prepared[type_key] = PreparedField(
                     generator=generator,
@@ -280,7 +280,7 @@ class EngineCompiler:
         type_key: str,
         spec: Mapping[str, Any],
         generator: Generator,
-        context: PreparationContext | None = None,
+        context: PreparationContext,
     ) -> tuple[tuple[PreparedTransform, ...], bool, bool]:
         transform_specs = self._transform_specs(type_key, spec)
         resolved = [
@@ -321,7 +321,7 @@ class EngineCompiler:
             prepared.append(
                 PreparedTransform(
                     transform,
-                    self._prepare_transform(transform, transform_spec, context),
+                    transform.prepare(transform_spec, context),
                 )
             )
             _logger.info(
@@ -354,17 +354,6 @@ class EngineCompiler:
                     "with a string 'type' field"
                 )
         return raw
-
-    def _prepare_transform(
-        self,
-        transform: Transform,
-        spec: Mapping[str, Any],
-        context: PreparationContext | None,
-    ) -> Any:
-        prepare_with_context = getattr(transform, "prepare_with_context", None)
-        if context is not None and callable(prepare_with_context):
-            return prepare_with_context(spec, context)
-        return transform.prepare_composite(spec, self.registry)
 
     def _resolve_transform(self, type_key: str, reference: str) -> Transform:
         normalized = normalize_reference(reference)

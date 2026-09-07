@@ -13,6 +13,7 @@ from ton._transforms import (
     TransformResult,
     fold_paired_capabilities,
 )
+from ton.generators.base import PreparationContext
 from ton.transforms import DistributionTransform
 
 
@@ -60,7 +61,7 @@ def test_transform_result_reports_pairing() -> None:
 
 def test_base_transform_prepare_and_prove_defaults() -> None:
     transform = EchoTransform()
-    prepared = transform.prepare({"type": "echo"})
+    prepared = transform.prepare({"type": "echo"}, None)
     result = transform.apply(prepared, TransformResult("x"), Random(0))
 
     assert result.value == "x"
@@ -69,7 +70,7 @@ def test_base_transform_prepare_and_prove_defaults() -> None:
 
 def test_distribution_transform_chooses_prepared_candidate() -> None:
     transform = DistributionTransform()
-    prepared = transform.prepare_composite(
+    prepared = transform.prepare(
         {
             "type": "distribution",
             "choices": [
@@ -77,7 +78,7 @@ def test_distribution_transform_chooses_prepared_candidate() -> None:
                 {"weight": 1, "spec": {"type": "string", "values": ["always"]}},
             ],
         },
-        default_registry(),
+        PreparationContext(default_registry()),
     )
 
     assert prepared.cum_weights == (0.0, 1.0)
@@ -101,14 +102,14 @@ def test_distribution_transform_requires_two_choices() -> None:
     transform = DistributionTransform()
 
     try:
-        transform.prepare_composite(
+        transform.prepare(
             {
                 "type": "distribution",
                 "choices": [
                     {"spec": {"type": "string", "values": ["only"]}},
                 ],
             },
-            default_registry(),
+            PreparationContext(default_registry()),
         )
     except ValueError as exc:
         assert "at least 2" in str(exc)
@@ -120,7 +121,7 @@ def test_distribution_transform_rejects_negative_weight() -> None:
     transform = DistributionTransform()
 
     try:
-        transform.prepare_composite(
+        transform.prepare(
             {
                 "type": "distribution",
                 "choices": [
@@ -128,7 +129,7 @@ def test_distribution_transform_rejects_negative_weight() -> None:
                     {"weight": 2, "spec": {"type": "string", "values": ["ok"]}},
                 ],
             },
-            default_registry(),
+            PreparationContext(default_registry()),
         )
     except ValueError as exc:
         assert "non-negative" in str(exc)
@@ -140,7 +141,7 @@ def test_distribution_transform_rejects_boolean_weight_with_path() -> None:
     transform = DistributionTransform()
 
     try:
-        transform.prepare_composite(
+        transform.prepare(
             {
                 "type": "distribution",
                 "choices": [
@@ -148,7 +149,7 @@ def test_distribution_transform_rejects_boolean_weight_with_path() -> None:
                     {"weight": 1, "spec": {"type": "string", "values": ["ok"]}},
                 ],
             },
-            default_registry(),
+            PreparationContext(default_registry()),
         )
     except ValueError as exc:
         assert "choices[0].weight" in str(exc)
@@ -160,7 +161,7 @@ def test_distribution_transform_rejects_unknown_choice_key() -> None:
     transform = DistributionTransform()
 
     try:
-        transform.prepare_composite(
+        transform.prepare(
             {
                 "type": "distribution",
                 "choices": [
@@ -168,7 +169,7 @@ def test_distribution_transform_rejects_unknown_choice_key() -> None:
                     {"spec": {"type": "string", "values": ["ok"]}},
                 ],
             },
-            default_registry(),
+            PreparationContext(default_registry()),
         )
     except ValueError as exc:
         assert "distribution.choices[0].extra" in str(exc)
@@ -181,7 +182,7 @@ def test_distribution_transform_rejects_zero_total_weight() -> None:
     transform = DistributionTransform()
 
     try:
-        transform.prepare_composite(
+        transform.prepare(
             {
                 "type": "distribution",
                 "choices": [
@@ -189,7 +190,7 @@ def test_distribution_transform_rejects_zero_total_weight() -> None:
                     {"weight": 0, "spec": {"type": "string", "values": ["b"]}},
                 ],
             },
-            default_registry(),
+            PreparationContext(default_registry()),
         )
     except ValueError as exc:
         assert "positive number" in str(exc)

@@ -19,11 +19,12 @@ import inspect
 import re
 import threading
 from collections import Counter
-from collections.abc import Collection, Iterable, Iterator, Mapping
+from collections.abc import Collection, Iterable, Iterator, Mapping, MutableMapping
 from copy import deepcopy
 from dataclasses import dataclass
 from importlib.metadata import entry_points
 from typing import Any, TypeVar
+from weakref import WeakKeyDictionary
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
@@ -365,7 +366,7 @@ def _load_catalog_candidate(
         plugin = ep.load()()
         namespace, name = _entry_point_namespace_name(ep.name, kind, plugin)
         _validate_entry_point_plugin(kind, plugin)
-        _stamp_plugin_dist(plugin, ep)
+        _record_plugin_dist(plugin, ep)
         _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
     except Exception as exc:  # noqa: BLE001 - per-entry failure isolation
         _log_entry_point_failed(ep, exc)
@@ -680,17 +681,27 @@ def _safe_entry_point_dist(ep: object) -> tuple[str | None, str | None]:
     )
 
 
-def _stamp_plugin_dist(plugin: Any, ep: object) -> None:
-    """Record the providing distribution on the plugin instance (OBS-001).
+#: Provider metadata per plugin class, for ``Engine.provenance`` (OBS-001).
+#: Assigning attributes to the instance instead raised FrozenInstanceError or
+#: AttributeError for frozen dataclass and slotted implementations that
+#: satisfy the public protocols, and the failure silently skipped the plugin
+#: (PLUG-005). The class survives the catalog's deep copies, so provenance is
+#: looked up rather than carried on the object.
+_PLUGIN_PROVENANCE: MutableMapping[type, tuple[str | None, str | None]] = WeakKeyDictionary()
 
-    ``Engine.provenance`` reads these attributes to attribute a
-    plugin-provided data type back to its package/version. Built-in
-    generators never carry them, so provenance reports ``None`` for core
-    types.
+
+def _record_plugin_dist(plugin: Any, ep: object) -> None:
+    """Associate a plugin's class with the distribution that provided it."""
+    _PLUGIN_PROVENANCE[type(plugin)] = _safe_entry_point_dist(ep)
+
+
+def plugin_provenance(plugin: Any) -> tuple[str | None, str | None]:
+    """Return ``(package, version)`` for ``plugin``, or ``(None, None)``.
+
+    Built-ins were never registered from an entry point, so they report
+    ``None`` -- the same answer the stamped attributes used to give.
     """
-    name, version = _safe_entry_point_dist(ep)
-    plugin._ton_plugin_package = name
-    plugin._ton_plugin_version = version
+    return _PLUGIN_PROVENANCE.get(type(plugin), (None, None))
 
 
 def _entry_point_dist(ep: object) -> tuple[str | None, str | None]:

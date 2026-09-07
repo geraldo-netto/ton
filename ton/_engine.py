@@ -26,6 +26,7 @@ from ._proof import (
     _trace_enabled,
 )
 from ._proofcheck import ProofChecker, ProofFailureSink, ProofHookError
+from ._registry import plugin_provenance
 from ._transforms import Transform, TransformResult
 from ._validation import ValidationError, Validator
 from .generators import Generator
@@ -322,6 +323,7 @@ class Engine:
             field = self._plan.prepared[type_key]
             generator = field.generator
             failures = self._proof.failure_counts.get(type_key, 0)
+            plugin_package, plugin_version = plugin_provenance(generator)
             records.append(
                 ProvenanceRecord(
                     type_key=type_key,
@@ -330,8 +332,8 @@ class Engine:
                     proof_mode=self._proof.mode,
                     proof_sample_rate=self._proof.sample_rate,
                     proof_failures=failures,
-                    plugin_package=getattr(generator, "_ton_plugin_package", None),
-                    plugin_version=getattr(generator, "_ton_plugin_version", None),
+                    plugin_package=plugin_package,
+                    plugin_version=plugin_version,
                 )
             )
         return tuple(records)

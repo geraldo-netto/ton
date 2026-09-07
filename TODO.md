@@ -37,7 +37,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| PLUG-005 | open | medium | medium | Plugin extensibility: `_stamp_plugin_dist` writes attributes onto entry-point instances, although the validator/transform protocols do not require mutability. Confirmed: frozen/slotted protocol implementations register manually but fail exact entry-point loading during metadata stamping. Approved direction: keep distribution provenance in catalog registration metadata, not plugin attributes. Carry that metadata through catalog snapshots into `Engine.provenance`; moving storage alone must not silently drop attribution. Acceptance: frozen and slotted validators/transforms load, mutable generators retain package/version provenance, and copied catalog views keep their existing isolation semantics. Coordinate transform fixtures with REL-020. |
 | PLUG-007 | open | medium | small | Plugin extensibility/decoupling: `ton.api` is documented as the supported facade but does not export `TransformResult`, `TransformProof`, `TransformCapabilities`, `ProofResult`, or `PreparationContext`. Confirmed all five are absent. Approved direction: export these contract types and document their roles. Acceptance: a plugin implemented entirely using facade imports can register, prepare, transform, and prove; align its signatures with REL-020/PLUG-008. No additional compatibility facade or alias layer. |
 
 ### CLI / option integrity

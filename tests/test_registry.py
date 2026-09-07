@@ -7,6 +7,7 @@ import logging
 import subprocess
 import sys
 import threading
+from dataclasses import dataclass
 from random import Random
 from types import SimpleNamespace
 from typing import Any, ClassVar
@@ -26,6 +27,7 @@ from ton._registry import (
     default_registry,
     discover_generator_classes,
     normalize_reference,
+    plugin_provenance,
     resolve_reference,
     runtime_type_name,
 )
@@ -414,8 +416,7 @@ def test_entry_point_logs_and_provenance_sanitize_distribution_metadata(
         for value in metadata
     )
     plugin = catalog.get_data_type("acme.custom")
-    assert plugin._ton_plugin_package == "safe?forged"
-    assert plugin._ton_plugin_version == "1?forged"
+    assert plugin_provenance(plugin) == ("safe?forged", "1?forged")
 
 
 def test_catalog_entry_points_honor_allowlist() -> None:
@@ -661,14 +662,14 @@ def test_catalog_entry_points_skip_wrong_generator_kind() -> None:
     assert "acme.bad" not in catalog.list_data_types()
 
 
-def test_catalog_entry_point_metadata_failure_is_transactional() -> None:
+def test_entry_point_plugins_need_not_accept_attribute_assignment() -> None:
+    """Provenance must not require a mutable instance (PLUG-005)."""
+
     class ReadOnlyGenerator(Generator):
         type_name = "readonly"
 
         def __setattr__(self, name: str, value: Any) -> None:
-            if name.startswith("_ton_plugin_"):
-                raise AttributeError("read-only metadata")
-            super().__setattr__(name, value)
+            raise AttributeError("read-only")
 
         def generate(self, prepared: Any, rng: Random) -> str:
             del prepared, rng
@@ -678,6 +679,7 @@ def test_catalog_entry_point_metadata_failure_is_transactional() -> None:
     ep.name = "acme.readonly"
     ep.value = "pkg:ReadOnlyGenerator"
     ep.load.return_value = ReadOnlyGenerator
+    ep.dist = SimpleNamespace(name="acme-plugins", version="2")
 
     def _entry_points(group: str):
         return [ep] if group == "ton.generators" else []
@@ -685,7 +687,8 @@ def test_catalog_entry_point_metadata_failure_is_transactional() -> None:
     with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
         catalog = catalog_with_entry_points()
 
-    assert "acme.readonly" not in catalog.list_data_types()
+    assert "acme.readonly" in catalog.list_data_types()
+    assert plugin_provenance(catalog.get_data_type("acme.readonly")) == ("acme-plugins", "2")
 
 
 def test_catalog_entry_point_without_namespace_uses_plugin_namespace() -> None:
@@ -710,3 +713,67 @@ def test_entry_point_loading_has_one_public_entry() -> None:
     """build_extension_catalog is the only plugin-loading API (PLUG-006)."""
     assert not hasattr(api, "build_registry")
     assert not hasattr(_registry_module, "registry_with_entry_points")
+
+
+@pytest.mark.parametrize("shape", ["frozen", "slotted"])
+def test_immutable_protocol_validators_load_from_entry_points(shape: str) -> None:
+    """Frozen and slotted implementations satisfy the protocol, so they must load."""
+
+    @dataclass(frozen=True)
+    class FrozenValidator:
+        type_name: str = "frozen_ok"
+
+        def validate(self, value: str) -> bool:
+            return bool(value)
+
+    class SlottedValidator:
+        __slots__ = ()
+        type_name = "slotted_ok"
+
+        def validate(self, value: str) -> bool:
+            return bool(value)
+
+    implementation = FrozenValidator if shape == "frozen" else SlottedValidator
+    ep = mock.Mock()
+    ep.name = f"acme.{shape}"
+    ep.value = "pkg:Validator"
+    ep.load.return_value = implementation
+    ep.dist = SimpleNamespace(name="acme-plugins", version="3")
+
+    def _entry_points(group: str):
+        return [ep] if group == "ton.validators" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points()
+
+    assert f"acme.{shape}" in catalog.list_validators()
+    assert plugin_provenance(catalog.validators()[f"acme.{shape}"]) == ("acme-plugins", "3")
+
+
+def test_exact_selector_for_an_immutable_plugin_is_satisfied() -> None:
+    """An immutable plugin must not fail an exact entry-point selector (PLUG-005)."""
+
+    @dataclass(frozen=True)
+    class FrozenValidator:
+        type_name: str = "frozen_selector"
+
+        def validate(self, value: str) -> bool:
+            return bool(value)
+
+    ep = mock.Mock()
+    ep.name = "acme.frozen_selector"
+    ep.value = "pkg:Validator"
+    ep.load.return_value = FrozenValidator
+    ep.dist = SimpleNamespace(name="acme-plugins", version="3")
+
+    def _entry_points(group: str):
+        return [ep] if group == "ton.validators" else []
+
+    with mock.patch("ton._registry.entry_points", side_effect=_entry_points):
+        catalog = catalog_with_entry_points(
+            allowed_selectors={
+                EntryPointSelector("ton.validators", "acme-plugins", "acme.frozen_selector")
+            }
+        )
+
+    assert "acme.frozen_selector" in catalog.list_validators()

@@ -10,6 +10,7 @@ import pytest
 import tomllib
 
 from ton import api
+from ton._engine import TemplateError
 from ton._registry import make_registry
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -117,3 +118,18 @@ def test_documented_entry_point_table_parses_to_flat_names() -> None:
 
     assert parsed["ton.transforms"] == {"my_ns.my_transform": "my_pkg.transforms:MyTransform"}
     assert parsed["ton.generators"] == {"my_type": "my_pkg.generators:MyGenerator"}
+
+
+def test_documented_decimal_sampling_matches_the_implementation() -> None:
+    """The README describes fixed-point sampling, including its rejection (DOC-002)."""
+    section = README.split("#### `decimal`", 1)[1].split("#### ", 1)[0]
+    assert "fixed-point" in section
+    assert "rejected" in section
+
+    inward = {"type": "decimal", "minValue": 0.01, "maxValue": 0.02, "decimals": 1}
+    with pytest.raises(TemplateError, match="no value representable"):
+        list(api.generate({"rows": 1, "format": "$x$", "types": {"x": inward}}))
+
+    singleton = {"type": "decimal", "minValue": 0.5, "maxValue": 0.5, "decimals": 1}
+    config = {"rows": 3, "format": "$x$", "types": {"x": singleton}}
+    assert list(api.generate(config, seed=1, proof_mode="all")) == ["0.5"] * 3

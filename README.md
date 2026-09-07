@@ -458,7 +458,11 @@ Unpadded with negatives:
 
 #### `decimal`
 
-Uniform float in `[minValue, maxValue]`, rounded and formatted to exactly `decimals` digits after the decimal point.
+Uniform fixed-point value in `[minValue, maxValue]`, formatted to exactly `decimals` digits
+after the decimal point. TON draws uniformly from the representable values at that scale —
+every emitted value is one of them, so no rounding moves a draw outside the bounds. A range
+containing no representable value (for example `0.01`–`0.02` with `decimals: 1`) is rejected
+during preparation rather than silently widened.
 
 | field         | type    | description                                  |
 |---------------|---------|----------------------------------------------|

@@ -20,7 +20,7 @@ import pytest
 from ton import api
 from ton._engine import Engine
 from ton._registry import make_registry
-from ton.concurrency import derive_rng, fork_engine
+from ton.concurrency import chunk_rows, derive_rng, fork_engine
 
 pytestmark = pytest.mark.fuzz
 
@@ -112,34 +112,41 @@ def test_cli_resume_from_matches_truncated_full_run(write_config, tmp_path: Path
 
 
 def test_fork_engine_workers_yield_disjoint_streams_when_partitioned() -> None:
+    """One unoffset config, partitioned across workers, covers exactly one range.
+
+    Supplying start=worker_id*rows_per_worker applied a second manual offset
+    on top of the automatic one, which ton.generators.sequence explicitly
+    forbids -- and made the check pass whether or not automatic offsetting
+    happened at all (CONC-006). The shared config and exact expected ranges
+    below fail if the offsets are removed.
+    """
     workers = 4
-    rows_per_worker = 50
-    chunks: list[list[str]] = []
-    for wid in range(workers):
-        config = {
-            "rows": rows_per_worker,
-            "format": "$id$",
-            "types": {
-                "id": {
-                    "type": "sequence",
-                    "start": wid * rows_per_worker,
-                    "step": 1,
-                }
-            },
-        }
-        chunks.append(
-            list(
-                fork_engine(
-                    config,
-                    parent_seed=42,
-                    worker_id=wid,
-                    workers=workers,
-                    rows=rows_per_worker,
-                )
+    total_rows = 200
+    rows_per_worker = total_rows // workers
+    config = {
+        "rows": total_rows,
+        "format": "$id$",
+        "types": {"id": {"type": "sequence", "start": 0, "step": 1}},
+    }
+
+    chunks = [
+        list(
+            fork_engine(
+                config,
+                parent_seed=42,
+                worker_id=wid,
+                workers=workers,
+                rows=chunk_rows(total_rows, workers, wid),
             )
         )
+        for wid in range(workers)
+    ]
+
+    for wid, chunk in enumerate(chunks):
+        start = wid * rows_per_worker
+        assert chunk == [str(value) for value in range(start, start + rows_per_worker)]
     flattened = [row for chunk in chunks for row in chunk]
-    assert len(set(flattened)) == workers * rows_per_worker
+    assert flattened == [str(value) for value in range(total_rows)]
 
 
 @pytest.mark.parametrize("seed_pair", [(1, 1), (42, 42), (99, 99)])

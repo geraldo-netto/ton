@@ -25,7 +25,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| CONC-006 | open | low | small | Concurrency/test integrity: `test_fork_engine_workers_yield_disjoint_streams_when_partitioned` creates different configs with manual starts and gives each config only 50 total rows while requesting four 50-row shards. It contradicts automatic-offset guidance and can pass if automatic offsets disappear. Approved direction: use one unoffset 200-row config, derive each worker's 50-row share, and assert exact consecutive ranges for workers 0–3 plus the complete combined range. A disjointness-only assertion is insufficient. |
 
 ### Architecture / modularity / SOLID
 

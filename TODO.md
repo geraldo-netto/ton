@@ -14,7 +14,6 @@ DOC-003/004/005 share one executable README-example helper: introduce it once an
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| REL-027 | open | medium | small | Reliability/correctness / CLI option integrity: `open_output_path` and `write_shard` expose raw `UnicodeEncodeError`; only CLI `_stream` translates it. Confirmed: an ASCII shard containing `é` raises the raw exception and correctly rolls back its regular-file stage. Approved direction: normalize output encoding failures at shared output boundaries with `OutputEncodingError` and accurate encoding metadata. Acceptance: direct output contexts and shards expose the domain error and retain regular-file rollback; FIFO remains a direct stream. When relocating `_stream` handling, preserve CLI stdout translation too—stdout bypasses `open_output_path`. Cover writes and output finalization without reclassifying unrelated pipeline failures. |
 
 ### Scalability
 

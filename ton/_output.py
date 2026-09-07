@@ -7,11 +7,11 @@ import os
 import stat
 import tempfile
 import time
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from math import isfinite
-from typing import TextIO, cast
+from typing import Any, TextIO, cast
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
@@ -335,6 +335,33 @@ def _windows_process_is_running(pid: int) -> bool | None:  # pragma: no cover - 
         close_handle(handle)
 
 
+class EncodingNormalizingStream:
+    """Proxy a text stream so codec failures surface as ``OutputEncodingError``.
+
+    Normalizing here means every writer through :func:`open_output_path` --
+    the CLI, :func:`ton.concurrency.write_shard`, and library callers -- gets
+    the documented output-domain error instead of a raw ``UnicodeEncodeError``
+    (REL-027). The error propagates out of the enclosing context manager, so
+    atomic publication still rolls back.
+    """
+
+    def __init__(self, stream: TextIO) -> None:
+        self._stream = stream
+
+    def write(self, text: str) -> int:
+        try:
+            return self._stream.write(text)
+        except UnicodeEncodeError as exc:
+            raise OutputEncodingError(self._stream.encoding or "unknown", exc.reason) from exc
+
+    def writelines(self, lines: Iterable[str]) -> None:
+        for line in lines:
+            self.write(line)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._stream, name)
+
+
 @contextmanager
 def open_output_path(
     path: str,
@@ -345,7 +372,7 @@ def open_output_path(
     """Open a validated path with FIFO or atomic regular-file semantics."""
     if validate_output_target(path, no_clobber=no_clobber):
         with _open_fifo(path, encoding=encoding) as stream:
-            yield stream
+            yield cast(TextIO, EncodingNormalizingStream(stream))
         return
     with atomic_output(
         path,
@@ -353,7 +380,7 @@ def open_output_path(
         mode=target_mode(path),
         no_clobber=no_clobber,
     ) as stream:
-        yield stream
+        yield cast(TextIO, EncodingNormalizingStream(stream))
 
 
 @contextmanager

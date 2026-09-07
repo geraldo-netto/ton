@@ -627,3 +627,47 @@ def test_output_encoding_error_carries_codec_and_field_context() -> None:
 def test_in_memory_generation_uses_structural_validation(config: dict) -> None:
     with pytest.raises(api.ConfigError):
         list(api.generate(config))
+
+
+@pytest.mark.parametrize("writer", ["open_output_path", "write_shard"])
+def test_encoding_failures_normalize_at_the_output_boundary(tmp_path: Path, writer: str) -> None:
+    """Raw UnicodeEncodeError must not escape the public output API (REL-027)."""
+    target = tmp_path / "rows.txt"
+    config = {"rows": 2, "format": "$x$", "types": {"x": {"type": "string", "values": ["é"]}}}
+
+    with pytest.raises(api.OutputEncodingError) as excinfo:
+        if writer == "open_output_path":
+            with api.open_output_path(str(target), encoding="ascii") as stream:
+                stream.write("é")
+        else:
+            api.write_shard(
+                config, str(target), parent_seed=1, worker_id=0, workers=1, encoding="ascii"
+            )
+
+    assert excinfo.value.encoding == "ascii"
+    assert not target.exists()
+
+
+def test_writelines_is_normalized_like_write(tmp_path: Path) -> None:
+    """writelines must not bypass the boundary via attribute forwarding (REL-027)."""
+    target = tmp_path / "rows.txt"
+
+    with (
+        pytest.raises(api.OutputEncodingError) as excinfo,
+        api.open_output_path(str(target), encoding="ascii") as stream,
+    ):
+        stream.writelines(["ok\n", "é\n"])
+
+    assert excinfo.value.encoding == "ascii"
+    assert not target.exists()
+
+
+def test_output_stream_still_exposes_the_underlying_attributes(tmp_path: Path) -> None:
+    """The proxy forwards everything it does not normalize."""
+    target = tmp_path / "rows.txt"
+
+    with api.open_output_path(str(target), encoding="utf-8") as stream:
+        assert stream.encoding == "utf-8"
+        stream.writelines(["a\n", "b\n"])
+
+    assert target.read_text(encoding="utf-8") == "a\nb\n"

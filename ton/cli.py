@@ -11,12 +11,12 @@ import time
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TextIO, TypeVar
+from typing import TextIO, TypeVar, cast
 
 from . import __version__, api
 from ._logging import terminal_failure_fields
 from ._output import (
-    OutputEncodingError,
+    EncodingNormalizingStream,
     OutputPublishedError,
     PartialOutputCommitError,
     open_output_path,
@@ -569,8 +569,10 @@ def _open_output(
     encoding: str = "utf-8",
 ) -> Iterator[TextIO]:
     if path is None:
+        # stdout bypasses open_output_path, so apply the same normalization
+        # here rather than leaving one writer with raw codec errors (REL-027).
         with _reconfigured_stdout(encoding) as stream:
-            yield stream
+            yield cast(TextIO, EncodingNormalizingStream(stream))
         return
     with open_output_path(path, no_clobber=no_clobber, encoding=encoding) as stream:
         yield stream
@@ -653,10 +655,8 @@ def _stream(
         count += 1
         if count <= resume_from:
             continue
-        try:
-            stream.write(f"{row}\n")
-        except UnicodeEncodeError as exc:
-            raise OutputEncodingError(stream.encoding or "unknown", exc.reason) from exc
+        # open_output_path normalizes codec failures to OutputEncodingError.
+        stream.write(f"{row}\n")
         write_state.rows_written += 1
         if write_state.rows_written % flush_at == 0:
             # Block-buffered streams (e.g. files) rely on the interpreter

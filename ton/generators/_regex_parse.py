@@ -208,9 +208,9 @@ class _Parser:
         if match is None:
             return None  # a bare '{' is a literal, handled as an atom
         if not match.group(1) and match.group(2) is None:
-            return None
-        if not match.group(1) and match.group(3) == "":
-            return None
+            return None  # '{}' has no comma: re treats it as literal text
+        # '{,}' omits both bounds, which re reads as '{0,}' -- an unbounded
+        # repeat, not literal text (REL-025).
         lo = int(match.group(1) or 0)
         if match.group(2) is None:
             hi: Any = lo

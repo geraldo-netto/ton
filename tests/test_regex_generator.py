@@ -115,10 +115,10 @@ def test_vendored_parser_matches_reference(pattern: str) -> None:
 
 
 def test_bare_brace_is_literal() -> None:
-    # '{' not forming a valid quantifier is a literal char.
+    # '{' not forming a valid quantifier is a literal char. '{,}' is not one
+    # of these: re reads it as '{0,}', so it is a repeat (REL-025).
     assert _draw("a{") == "a{"
     assert _draw("a{}") == "a{}"
-    assert _draw("a{,}") == "a{,}"
 
 
 def test_open_lower_bound_quantifier_matches_python_semantics() -> None:
@@ -275,3 +275,24 @@ def test_invalid_pattern_is_still_rejected_during_preparation() -> None:
 
     with pytest.raises(TemplateError, match="not a valid regex"):
         list(api.generate(config))
+
+
+@pytest.mark.parametrize("pattern", ["a{,}", "a{}", "a{,3}", "a{2,}", "a{2}"])
+def test_brace_forms_generate_values_the_pattern_matches(pattern: str) -> None:
+    """Every accepted brace form must emit values re agrees with (REL-025)."""
+    config = {"rows": 8, "format": "$x$", "types": {"x": {"type": "regex", "pattern": pattern}}}
+
+    rows = list(api.generate(config, seed=3, proof_mode="all"))
+
+    assert rows
+    assert all(re.fullmatch(pattern, row) for row in rows)
+
+
+def test_open_ended_brace_is_an_unbounded_repeat_not_literal_text() -> None:
+    """'{,}' is re's '{0,}'; TON used to emit the literal text 'a{,}' (REL-025)."""
+    config = {"rows": 12, "format": "$x$", "types": {"x": {"type": "regex", "pattern": "a{,}"}}}
+
+    rows = list(api.generate(config, seed=3, proof_mode="all"))
+
+    assert set(rows) <= {"", "a", "aa", "aaa", "aaaa", "aaaaa", "aaaaaa"}
+    assert "a{,}" not in rows

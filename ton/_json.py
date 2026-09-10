@@ -7,6 +7,8 @@ from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from typing import Any
 
+from .generators.base import int_to_str
+
 
 def iter_json(value: Any, *, sort_keys: bool = False) -> Iterator[str]:
     """Stream JSON tokens without converting decimal numbers to binary floats."""
@@ -54,6 +56,8 @@ def _container_tokens(value: Any, sort_keys: bool) -> Iterator[tuple[bool, Any]]
 
 
 def _scalar(value: Any) -> str:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return int_to_str(value)
     if isinstance(value, Decimal):
         if not value.is_finite():
             raise ValueError("Non-finite Decimal is not a JSON number")

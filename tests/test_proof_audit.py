@@ -477,3 +477,28 @@ def test_exact_json_encoder_rejects_nonfinite_decimal(value) -> None:
 
     with pytest.raises(ValueError, match="Non-finite Decimal"):
         list(iter_json(value))
+
+
+@pytest.mark.parametrize("sign", [-1, 1])
+def test_audit_writes_arbitrary_integer_fields_and_seed(sign) -> None:
+    """SCALE-013: reports and fingerprints preserve huge integers without global changes."""
+    import hashlib
+    import sys
+    from dataclasses import replace
+
+    from ton.generators.base import str_to_int
+
+    before = sys.get_int_max_str_digits()
+    digits = ("-" if sign < 0 else "") + "1" + "0" * 4300
+    bound = sign * 10**4300
+    stream = io.StringIO()
+    writer = ProofAuditWriter(stream)
+    failure = replace(_failure(), seed=bound, row=bound, spec={"bound": bound})
+    writer(failure)
+    writer(failure)
+    records = [json.loads(line, parse_int=str_to_int) for line in stream.getvalue().splitlines()]
+    assert records[0]["spec"]["bound"] == records[0]["row"] == records[0]["seed"] == bound
+    expected = "sha256:" + hashlib.sha256(('{"bound":' + digits + "}").encode()).hexdigest()
+    assert records[0]["spec_ref"] == records[1]["spec_ref"] == expected
+    assert records[1]["spec"] is None
+    assert sys.get_int_max_str_digits() == before

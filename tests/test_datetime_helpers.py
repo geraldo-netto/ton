@@ -2,8 +2,30 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from random import Random
+
+import pytest
+
 from ton.generators._datetime import _parse_iso
+from ton.generators.date import DateGenerator
 from ton.generators.timestamp_unix import TimestampUnixGenerator
+
+
+@pytest.mark.parametrize("second", [58, 59])
+def test_full_date_span_upper_draw_stays_in_bounds(second) -> None:
+    """REL-044: rounding a centuries-long span must never add a second."""
+
+    class UpperEndpoint(Random):
+        def randint(self, a, b):
+            return b
+
+    maximum = f"9999-12-31T23:59:{second}.999999"
+    generator = DateGenerator()
+    prepared = generator.prepare({"minValue": "0001-01-01", "maxValue": maximum})
+    value = generator.generate(prepared, UpperEndpoint())
+    assert datetime.fromisoformat(value) <= datetime.fromisoformat(maximum)
+    assert value == f"9999-12-31 23:59:{second}"
 
 
 def test_parse_iso_accepts_uppercase_and_lowercase_zulu() -> None:

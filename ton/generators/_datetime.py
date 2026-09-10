@@ -38,7 +38,8 @@ def parse_iso_bounds(
 
 def duration_seconds(lo: datetime, hi: datetime) -> int:
     """Return the whole-second span between ``lo`` and ``hi``."""
-    return int((hi - lo).total_seconds())
+    delta = hi - lo
+    return delta.days * 86_400 + delta.seconds
 
 
 def uniform_offset_seconds(rng: Random, span: int) -> int:

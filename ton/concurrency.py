@@ -46,7 +46,7 @@ from random import Random
 from typing import Any, cast
 
 from ._config import validate_structure
-from ._engine import Engine, EngineOptions
+from ._engine import Engine, EngineOptions, TemplateError
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._output import open_output_path
@@ -235,27 +235,49 @@ def _offset_sequences(
         occurrences[token.type_key] = occurrences.get(token.type_key, 0) + 1
     for type_key, spec in copied.get("types", {}).items():
         _offset_sequence_spec(
-            spec, offset * occurrences.get(type_key, 0), generators, transform_registry
+            spec,
+            offset * occurrences.get(type_key, 0),
+            generators,
+            transform_registry,
+            path=f"types.{type_key}",
         )
     return copied
 
 
 def _offset_sequence_spec(
-    value: Any, offset: int, registry: Mapping[str, Generator], transforms: Mapping[str, Transform]
+    value: Any,
+    offset: int,
+    registry: Mapping[str, Generator],
+    transforms: Mapping[str, Transform],
+    *,
+    path: str,
 ) -> None:
     """Visit only declared generator children, preserving opaque plugin metadata (CONC-018)."""
-    pending = [(value, offset)]
+    pending = [(value, offset, path, False)]
+    active: set[int] = set()
     while pending:
-        spec, child_offset = pending.pop()
+        spec, child_offset, child_path, ready = pending.pop()
+        if ready:
+            active.remove(id(spec))
+            continue
+        if id(spec) in active:
+            raise TemplateError(f"Cyclic generator specification at {child_path}")
+        active.add(id(spec))
+        pending.append((spec, child_offset, child_path, True))
         uses_source, children = _transform_sequence_children(spec, child_offset, transforms)
         reference = spec.get("type")
         generator = resolve_reference(registry, reference) if isinstance(reference, str) else None
         if generator is not None and uses_source:
             children.extend(_offset_source_spec(spec, child_offset, generator))
-        pending.extend(children)
+        pending.extend(
+            (child, amount, f"{child_path}.{location}", False)
+            for location, child, amount in children
+        )
 
 
-def _offset_source_spec(value: Any, offset: int, generator: Generator) -> list[tuple[Any, int]]:
+def _offset_source_spec(
+    value: Any, offset: int, generator: Generator
+) -> list[tuple[str, Any, int]]:
     """Apply built-in sequence semantics to the effective generator implementation."""
     if isinstance(generator, SequenceGenerator):
         start = coerce_int(value, "start", type_name="sequence", default=0)
@@ -263,14 +285,14 @@ def _offset_source_spec(value: Any, offset: int, generator: Generator) -> list[t
         value["start"] = start + offset * step
     if isinstance(generator, SequenceOfGenerator):
         offset *= coerce_int(value, "count", type_name="sequence_of", default=0)
-    return [(child, offset) for _location, child in generator.nested_specs(value)]
+    return [(location, child, offset) for location, child in generator.nested_specs(value)]
 
 
 def _transform_sequence_children(
     value: Mapping[str, Any], offset: int, registry: Mapping[str, Transform]
-) -> tuple[bool, list[tuple[Any, int]]]:
+) -> tuple[bool, list[tuple[str, Any, int]]]:
     uses_source = True
-    children: list[tuple[Any, int]] = []
+    children: list[tuple[str, Any, int]] = []
     specs = value.get("transforms", [])
     if not isinstance(specs, list):
         return uses_source, children
@@ -281,5 +303,8 @@ def _transform_sequence_children(
         if transform is not None:
             if index == 0:
                 uses_source = transform.requires_source
-            children.extend((child, offset) for _location, child in transform.nested_specs(spec))
+            children.extend(
+                (f"transforms[{index}].{location}", child, offset)
+                for location, child in transform.nested_specs(spec)
+            )
     return uses_source, children

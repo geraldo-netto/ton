@@ -14,7 +14,6 @@
 |---|---|---|---|---|
 | CONC-019 | open | high | medium | Concurrency: make sequence offsets occurrence-specific in `ton/concurrency.py::_offset_sequences` / `_offset_sequence_spec`. If `types.a` and `types.b` share one sequence mapping, worker 1 of two for four rows produces `4/4, 5/5` instead of `2/2, 3/3`, because the alias-preserving snapshot is offset twice. Add permanent shared-root and shared-child regressions, including different occurrence counts and an unchanged caller config; isolate offset state by configuration occurrence. |
 | CONC-020 | open | medium | small | Concurrency: make proof-traced string values reconstructible in `ton/generators/base.py::DrawnValue` and `_GeneratedChildValue`. `deepcopy` and pickle round-trips call their multi-argument `__new__` with only the string, raising `TypeError`; `proven_draws` explicitly promises preserved ownership. Add permanent round-trip tests for plain and transformed composite draws and retained audit failures, verifying proof ownership and rejection survive serialization. |
-| CONC-021 | open | high | small | Concurrency: detect active-path cycles while traversing declared children in `ton/concurrency.py::_offset_sequence_spec`. A `oneOf` whose sole choice is itself raises a contextual `TemplateError` through `Engine.from_config`, but `fork_engine` loops indefinitely before compilation (reproduced with a two-second subprocess timeout). Add a permanent subprocess regression for generator and transform cycles, retaining support for acyclic shared specs. |
 
 ### Architecture / modularity / SOLID
 

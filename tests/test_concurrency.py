@@ -512,6 +512,50 @@ def test_worker_owned_children_retain_transform_validation(transforms) -> None:
         fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=1)
 
 
+@pytest.mark.parametrize("transform", [False, True])
+def test_worker_rejects_declared_cycles_without_hanging(transform) -> None:
+    """CONC-021: generator and transform cycles fail before worker compilation hangs."""
+    import subprocess
+    import sys
+
+    program = """
+from ton import api
+import sys
+field = {"type": "oneOf", "choices": []}
+location = "types.x.choices[0]"
+if sys.argv[1] == "True":
+    field = {"type": "string", "values": ["x"]}
+    field["transforms"] = [{"type": "distribution", "choices": [
+        {"spec": field}, {"spec": {"type": "string", "values": ["y"]}},
+    ]}]
+    location = "types.x.transforms[0].choices[0].spec"
+else:
+    field["choices"].append(field)
+config = {"rows": 1, "format": "$x$", "types": {"x": field}}
+for build in [lambda: api.Engine.from_config(config),
+              lambda: api.fork_engine(config, parent_seed=0, worker_id=0)]:
+    try:
+        build()
+    except api.TemplateError as exc:
+        assert "Cyclic" in str(exc) and location in str(exc), str(exc)
+    else:
+        raise AssertionError("cycle accepted")
+print("ok")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", program, str(transform)], capture_output=True, text=True, timeout=3
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"
+
+    # Once the bounded probe proves termination, exercise the same boundary in-process.
+    field = {"type": "oneOf", "choices": []}
+    field["choices"].append(field)
+    config = {"rows": 1, "format": "$x$", "types": {"x": field}}
+    with pytest.raises(ValueError, match="Cyclic.*types.x.choices"):
+        fork_engine(config, parent_seed=0, worker_id=0)
+
+
 def test_fork_engine_deep_config_in_a_fresh_process() -> None:
     """SCALE-011: worker copying/traversal must not depend on prior recursion-limit changes."""
     import subprocess

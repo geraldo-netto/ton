@@ -35,9 +35,10 @@ Typical use::
 
     # Opt into third-party entry points when you trust the installed packages:
     catalog = api.build_extension_catalog(include_entry_points=True)
-    for row in api.generate(config_dict, registry=catalog.generators(),
-                            transforms=catalog.transforms(),
-                            validators=catalog.validators()):
+    snapshot = catalog.snapshot()
+    for row in api.generate(config_dict, registry=snapshot.generators,
+                            transforms=snapshot.transforms,
+                            validators=snapshot.validators):
         ...
 """
 
@@ -74,7 +75,12 @@ from ._output import (
 from ._proof import ProofFailure, ProofResult, ProvenanceRecord
 from ._proofcheck import ProofFailureSink
 from ._references import RegistryError, normalize_reference
-from ._registry import EntryPointSelector, ExtensionCatalog, catalog_with_entry_points
+from ._registry import (
+    CatalogSnapshot,
+    EntryPointSelector,
+    ExtensionCatalog,
+    catalog_with_entry_points,
+)
 from ._registry import (
     build_extension_catalog as _build_extension_catalog,
 )
@@ -89,6 +95,7 @@ from ._validation import ValidationError, Validator
 from .concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write_shard
 
 __all__ = [
+    "CatalogSnapshot",
     "ConfigError",
     "Engine",
     "EngineOptions",

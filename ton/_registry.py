@@ -100,6 +100,15 @@ class RegisteredExtensions[T](dict[str, T]):
         return RegisteredExtensions(self, self.records)
 
 
+@dataclass(frozen=True)
+class CatalogSnapshot:
+    """One isolated extension graph, with dependencies shared across all kinds."""
+
+    generators: Mapping[str, Generator]
+    transforms: Mapping[str, Transform]
+    validators: Mapping[str, Validator]
+
+
 class ExtensionCatalog:
     """Namespaced catalog for data types, transforms, and validators."""
 
@@ -158,15 +167,26 @@ class ExtensionCatalog:
         # so aliases still share one instance within an Engine while separate
         # Engine builds never share mutable generator state.
         with self._lock:
-            return self._registry_view("data_type", "generators", self._generators)
+            return deepcopy(self._registry_view("data_type", "generators", self._generators))
 
     def transforms(self) -> dict[str, Transform]:
         with self._lock:
-            return self._registry_view("transform", "transforms", self._transforms)
+            return deepcopy(self._registry_view("transform", "transforms", self._transforms))
 
     def validators(self) -> dict[str, Any]:
         with self._lock:
-            return self._registry_view("validator", "validators", self._validators)
+            return deepcopy(self._registry_view("validator", "validators", self._validators))
+
+    def snapshot(self) -> CatalogSnapshot:
+        """Clone all kinds atomically, preserving aliases and shared dependencies."""
+        with self._lock:
+            return deepcopy(
+                CatalogSnapshot(
+                    self._registry_view("data_type", "generators", self._generators),
+                    self._registry_view("transform", "transforms", self._transforms),
+                    self._registry_view("validator", "validators", self._validators),
+                )
+            )
 
     def _registry_view[T](
         self, kind: str, key: str, store: Mapping[str, Mapping[str, T]]
@@ -177,7 +197,7 @@ class ExtensionCatalog:
             for (record_kind, reference), provider in self._providers.items()
             if record_kind == kind
         }
-        return deepcopy(RegisteredExtensions(values, records))
+        return RegisteredExtensions(values, records)
 
     def list_data_types(self) -> tuple[str, ...]:
         with self._lock:

@@ -534,10 +534,10 @@ def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine
     transforms = None
     validators = None
     if args.entry_points or args.entry_point_allowlist:
-        catalog = _catalog_from_args(args)
-        registry = catalog.generators()
-        transforms = catalog.transforms()
-        validators = catalog.validators()
+        snapshot = _catalog_from_args(args).snapshot()
+        registry = snapshot.generators
+        transforms = snapshot.transforms
+        validators = snapshot.validators
     # Pass only --seed; from_config derives the RNG from it so the
     # Random(seed)-or-Random() idiom lives solely in the engine (DEC-002).
     return Engine.from_options(

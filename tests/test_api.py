@@ -22,6 +22,7 @@ from ton._proof import ProofResult
 from ton._transforms import TransformResult
 
 EXPECTED_PUBLIC_API = {
+    "CatalogSnapshot",
     "ConfigError",
     "Engine",
     "EngineOptions",

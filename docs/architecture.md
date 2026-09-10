@@ -48,6 +48,9 @@ Entry-point names may be qualified (`acme.customer_id`) or unqualified
 Catalog registrations are prototypes. Each registry snapshot deep-copies
 generators, transforms, and validators, preserving qualified/bare aliases
 within that snapshot while isolating mutable extension state between Engines.
+Use `catalog.snapshot()` to obtain all three kinds under one lock with a shared
+copy memo, preserving dependencies between a generator, transform, and validator.
+Its `CatalogSnapshot` exposes `generators`, `transforms`, and `validators` mappings.
 
 ## Generation Pipeline
 

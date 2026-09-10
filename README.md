@@ -355,17 +355,20 @@ my_type = "my_pkg.generators:MyGenerator"
 
 ```python
 catalog = api.build_extension_catalog(include_entry_points=True)
+snapshot = catalog.snapshot()
 for row in api.generate(config_dict,
-                        registry=catalog.generators(),
-                        transforms=catalog.transforms(),
-                        validators=catalog.validators()):
+                        registry=snapshot.generators,
+                        transforms=snapshot.transforms,
+                        validators=snapshot.validators):
     ...
 ```
 
 `ExtensionCatalog` treats registered generator instances as prototypes. Each
 `catalog.generators()` call returns fresh deep-copied instances, so reusing a
 catalog across Engines does not share generator state. Generator attributes
-must therefore support `copy.deepcopy`.
+must therefore support `copy.deepcopy`. Use `catalog.snapshot()` when combining
+generators, transforms, and validators: it clones all three kinds atomically and
+preserves dependencies shared between them within that snapshot.
 
 Plugins implement their protocols entirely against `ton.api`: alongside `Generator`
 and `PairedGenerator`, the facade exports the contract types a transform, validator,

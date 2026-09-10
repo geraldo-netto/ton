@@ -71,15 +71,13 @@ def validate_with_catalog(data: Mapping[str, Any], catalog: ExtensionCatalog) ->
     config as valid and the real run fails (CLI-001).
     """
     validate_structure(data)
-    generators = catalog.generators()
-    transforms = catalog.transforms()
-    validators = catalog.validators()
+    snapshot = catalog.snapshot()
     try:
         compile_plan(
             data,
-            registry=generators,
-            transforms=transforms,
-            validators=validators,
+            registry=snapshot.generators,
+            transforms=snapshot.transforms,
+            validators=snapshot.validators,
             prepare_all_fields=True,
         )
     except TemplateError as exc:

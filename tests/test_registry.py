@@ -878,13 +878,14 @@ def test_provider_provenance_is_scoped_to_each_registration() -> None:
     first = api.Engine(config, registry=load("first-provider").generators())
     assert first.provenance[0].plugin_package == "first-provider"
     second_catalog = load("second-provider")
-    second = api.Engine(config, registry=second_catalog.generators())
+    second = api.Engine(config, registry=second_catalog.snapshot().generators)
     assert first.provenance[0].plugin_package == "first-provider"
     assert second.provenance[0].plugin_package == "second-provider"
     core = {"rows": 1, "format": "$x$", "types": {"x": {"type": "string", "values": ["x"]}}}
     assert api.Engine(core).provenance[0].plugin_package is None
     assert (
-        api.Engine(core, registry=second_catalog.generators()).provenance[0].plugin_package is None
+        api.Engine(core, registry=second_catalog.snapshot().generators).provenance[0].plugin_package
+        is None
     )
     restored = pickle.loads(pickle.dumps(first))
     assert restored.provenance == first.provenance

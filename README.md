@@ -946,7 +946,9 @@ Omar Patel
 
 #### `email`
 
-`<given>.<family>@<domain>`, lowercased.
+`<given>.<family>@<domain>`. The local part (`<given>.<family>`) is lowercased;
+configured domains preserve their spelling and case. For example,
+`domains: ["EXAMPLE.COM"]` produces addresses ending in `@EXAMPLE.COM`.
 
 | field     | type     | description                                                              |
 |-----------|----------|--------------------------------------------------------------------------|

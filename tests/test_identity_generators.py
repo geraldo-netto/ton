@@ -80,6 +80,8 @@ def test_email_custom_domains_generate_provable_values(domain) -> None:
     rows = list(api.generate(config, seed=7))
     assert rows == list(api.generate(config, seed=7, proof_mode="all"))
     assert all(row.endswith("@" + domain) and row.count("@") == 1 for row in rows)
+    # DOC-040: normalization applies only to the local part.
+    assert all(row.partition("@")[0].islower() for row in rows)
 
 
 def test_email_proof_reuses_precomputed_name_sets(monkeypatch) -> None:

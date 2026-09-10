@@ -665,3 +665,69 @@ def test_partial_time_format_still_rejects_an_out_of_range_date() -> None:
 
     assert generator.prove(prepared, TransformResult("2024-01-01 123456")).ok
     assert not generator.prove(prepared, TransformResult("2024-06-09 123456")).ok
+
+
+@pytest.mark.parametrize(
+    "fmt, good, bad",
+    [
+        ("%Y-%m-%d %f", "2024-01-01 123456", "2024-01-01 000001"),
+        ("%S", "56", "01"),
+        ("%M", "34", "01"),
+        ("%I", "12", "01"),
+        ("%p", "PM", "AM"),
+        ("%f", "123456", "000001"),
+        ("%m-%d", "01-01", "02-29"),
+        ("%Y %Y", "2024 2024", "2024 2025"),
+    ],
+)
+def test_date_proof_checks_exact_components_in_singleton_ranges(fmt, good, bad) -> None:
+    """REL-024: missing components must not fill gaps in a convex time hull."""
+    generator = DateGenerator()
+    bound = "2024-01-01T12:34:56.123456"
+    prepared = generator.prepare({"minValue": bound, "maxValue": bound, "format": fmt})
+    assert generator.prove(prepared, TransformResult(good)).ok
+    assert not generator.prove(prepared, TransformResult(bad)).ok
+
+
+@pytest.mark.parametrize(
+    "fmt",
+    ["%S", "%M", "%I %p", "%f", "%m-%d", "%Y-%m-%d %S", "%c", "%x %X", "%Y %j %U %W %w", "%Y %Y"],
+)
+def test_date_proof_matches_enumerated_short_interval(fmt) -> None:
+    """REL-024: compare component proof against an independent finite time oracle."""
+    from datetime import timedelta
+
+    generator = DateGenerator()
+    lo = datetime(2024, 2, 28, 23, 59, 58, 123456)
+    hi = lo + timedelta(seconds=4)
+    prepared = generator.prepare(
+        {"minValue": lo.isoformat(), "maxValue": hi.isoformat(), "format": fmt}
+    )
+    possible = {(lo + timedelta(seconds=i)).strftime(fmt) for i in range(5)}
+    for offset in range(-5, 10):
+        candidate = (lo + timedelta(seconds=offset)).strftime(fmt)
+        assert generator.prove(prepared, TransformResult(candidate)).ok == (candidate in possible)
+
+
+def test_date_component_proof_normalizes_different_bound_offsets() -> None:
+    """REL-024: compare represented local clock components in the source timezone."""
+    generator = DateGenerator()
+    prepared = generator.prepare(
+        {
+            "minValue": "2024-01-01T12:30:00+02:00",
+            "maxValue": "2024-01-01T11:00:00+00:00",
+            "format": "%H:%M",
+        }
+    )
+    assert generator.prove(prepared, TransformResult("12:45")).ok
+    assert generator.prove(prepared, TransformResult("13:00")).ok
+    assert not generator.prove(prepared, TransformResult("11:00")).ok
+
+
+def test_date_proof_rejects_a_different_rendered_timezone() -> None:
+    """REL-024: represented timezone components must agree with generated local time."""
+    generator = DateGenerator()
+    bound = "2024-01-01T12:00:00+02:00"
+    prepared = generator.prepare({"minValue": bound, "maxValue": bound, "format": "%z %Z"})
+    assert generator.prove(prepared, TransformResult("+0200 UTC+02:00")).ok
+    assert not generator.prove(prepared, TransformResult("+0100 UTC+01:00")).ok

@@ -6,7 +6,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| REL-024 | open | medium | medium | Reliability/correctness: `generators.date._proof_resolution` replaces exact formatted-component constraints with a contiguous time span. For singleton `2024-01-01T12:34:56.123456`, proof accepts `2024-01-01 000001` under `%Y-%m-%d %f`, and `01` under `%S` or `%M`; none can be produced from that range. The approved fix required negative component cases as well as removal of false failures. Resolve by checking whether a timestamp within bounds has every represented component, without accepting gaps in a convex range. |
 
 ### Scalability
 

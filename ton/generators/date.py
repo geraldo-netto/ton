@@ -17,8 +17,9 @@ Spec fields::
 
 from __future__ import annotations
 
+import calendar
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from random import Random
@@ -102,7 +103,6 @@ class DateSpec:
     fmt: str
     format_tokens: tuple[FormatToken, ...]
     value_pattern: re.Pattern[str]
-    proof_format: str | None
 
 
 class DateGenerator(Generator):
@@ -121,7 +121,6 @@ class DateGenerator(Generator):
             fmt=fmt,
             format_tokens=format_tokens,
             value_pattern=_compile_pattern(format_tokens),
-            proof_format=_proof_parseable_format(lo, fmt, format_tokens),
         )
 
     def generate(self, prepared: DateSpec, rng: Random) -> str:
@@ -130,22 +129,14 @@ class DateGenerator(Generator):
         return "".join(_format_token(moment, token) for token in prepared.format_tokens)
 
     def prove(self, prepared: DateSpec, result: TransformResult) -> ProofResult:
-        if prepared.value_pattern.fullmatch(result.value) is None:
+        match = prepared.value_pattern.fullmatch(result.value)
+        if match is None:
             return proof_result(False, "value does not match the date format")
-        if prepared.proof_format is None:
-            return proof_result(True, "")
-        try:
-            moment = datetime.strptime(result.value, prepared.proof_format)
-        except ValueError:
-            return proof_result(False, "value is not a valid calendar date")
-        moment = _align_proof_timezone(moment, prepared.lo)
-        if _render(moment, prepared.format_tokens) != result.value:
-            return proof_result(False, "value has inconsistent date components")
-        if _has_complete_date(prepared.format_tokens):
-            interval_end = moment + _proof_resolution(prepared.format_tokens)
-            if interval_end < prepared.lo or moment > prepared.hi:
-                return proof_result(False, "value is outside the configured date interval")
-        return proof_result(True, "")
+        constraints = _component_constraints(prepared.format_tokens, match.groups())
+        return proof_result(
+            constraints is not None and _matches_interval(prepared, constraints),
+            "value has inconsistent date components or is outside the configured date interval",
+        )
 
 
 def _tokenize_format(fmt: Any) -> tuple[FormatToken, ...]:
@@ -174,7 +165,7 @@ def _compile_pattern(tokens: tuple[FormatToken, ...]) -> re.Pattern[str]:
         _DIRECTIVE_PATTERNS[text] if is_directive else re.escape(text)
         for is_directive, text in tokens
     ]
-    return re.compile("".join(parts))
+    return re.compile("".join(f"({part})" for part in parts), re.ASCII)
 
 
 def _format_token(moment: datetime, token: FormatToken) -> str:
@@ -182,73 +173,124 @@ def _format_token(moment: datetime, token: FormatToken) -> str:
     return _format_directive(moment, text) if is_directive else text
 
 
-def _render(moment: datetime, tokens: tuple[FormatToken, ...]) -> str:
-    return "".join(_format_token(moment, token) for token in tokens)
+def _component_constraints(
+    tokens: tuple[FormatToken, ...], values: tuple[str, ...]
+) -> dict[str, str] | None:
+    constraints: dict[str, str] = {}
+    for (directive, token), value in zip(tokens, values, strict=True):
+        if not directive or token == "%":
+            continue
+        for key, component in _expand_component(token, value):
+            if key in constraints and constraints[key] != component:
+                return None
+            constraints[key] = component
+    return constraints
 
 
-def _proof_parseable_format(
-    sample_moment: datetime,
-    fmt: str,
-    tokens: tuple[FormatToken, ...],
-) -> str | None:
-    sample = _render(sample_moment, tokens)
-    try:
-        parsed = datetime.strptime(sample, fmt)
-    except (re.error, ValueError):
-        return None
-    parsed = _align_proof_timezone(parsed, sample_moment)
-    return fmt if _render(parsed, tokens) == sample else None
+def _expand_component(token: str, value: str) -> tuple[tuple[str, str], ...]:
+    if token == "X":
+        return tuple(zip("HMS", value.split(":"), strict=True))
+    if token == "x":
+        return tuple(zip("mdy", value.split("/"), strict=True))
+    if token == "c":
+        weekday, month, day, clock, year = value.split()
+        return (
+            ("a", weekday),
+            ("b", month),
+            ("d", day.zfill(2)),
+            ("Y", year),
+            *_expand_component("X", clock),
+        )
+    return ((token, value),)
 
 
-def _align_proof_timezone(moment: datetime, bound: datetime) -> datetime:
-    if moment.tzinfo is None and bound.tzinfo is not None:
-        return moment.replace(tzinfo=bound.tzinfo)
-    return moment
-
-
-def _proof_resolution(tokens: tuple[FormatToken, ...]) -> timedelta:
-    """Return how far past the parsed moment the rendered text can reach.
-
-    ``strptime`` fills every omitted component with its minimum, so the
-    parsed moment is the earliest datetime the text can denote. Each
-    omitted component independently widens the hull to the latest such
-    datetime -- including components *larger* than the smallest one
-    present, which a resolution keyed on the smallest present unit missed:
-    ``%Y-%m-%d %f`` parsed as midnight and rejected its own output
-    (REL-024). The hull is a sound over-approximation, so a value the
-    format genuinely allows is never rejected.
-    """
-    directives = {text for is_directive, text in tokens if is_directive}
-    complete_time = bool(directives & {"X", "c"})
-    span = timedelta(0)
-    span += _hour_span(directives, complete_time=complete_time)
-    if not (complete_time or "M" in directives):
-        span += timedelta(minutes=59)
-    if not (complete_time or "S" in directives):
-        span += timedelta(seconds=59)
-    if "f" not in directives:
-        span += timedelta(microseconds=999_999)
-    return span
-
-
-def _hour_span(directives: set[str], *, complete_time: bool) -> timedelta:
-    """Return the hour component's uncertainty for a rendered value."""
-    if complete_time or "H" in directives:
-        return timedelta(0)
-    if {"I", "p"} <= directives:
-        return timedelta(0)
-    # ``%I`` without ``%p`` renders 13:00 and 01:00 identically.
-    return timedelta(hours=12) if "I" in directives else timedelta(hours=23)
-
-
-def _has_complete_date(tokens: tuple[FormatToken, ...]) -> bool:
-    directives = {text for is_directive, text in tokens if is_directive}
-    if directives & {"c", "x"}:
-        return True
-    has_year = bool(directives & {"Y", "y"})
-    return has_year and (
-        "j" in directives or ("d" in directives and bool(directives & {"m", "b", "B"}))
+def _components_match(moment: datetime, constraints: dict[str, str], keys: str) -> bool:
+    return all(
+        _format_directive(moment, key) == constraints[key] for key in keys if key in constraints
     )
+
+
+def _matching_dates(prepared: DateSpec, constraints: dict[str, str]) -> Iterator[datetime]:
+    lo, hi = prepared.lo, prepared.hi
+    if lo.tzinfo is not None:
+        hi = hi.astimezone(lo.tzinfo)
+    for year in range(lo.year, hi.year + 1):
+        moment = datetime(year, 1, 1, tzinfo=lo.tzinfo)
+        if not _components_match(moment, constraints, "Yy"):
+            continue
+        for month in range(1, 13):
+            moment = moment.replace(month=month)
+            if not _components_match(moment, constraints, "mbB"):
+                continue
+            for day in range(1, calendar.monthrange(year, month)[1] + 1):
+                candidate = moment.replace(day=day)
+                if lo.date() <= candidate.date() <= hi.date() and _components_match(
+                    candidate, constraints, "daAjUwW"
+                ):
+                    yield candidate
+
+
+def _matches_interval(prepared: DateSpec, constraints: dict[str, str]) -> bool:
+    if not _components_match(prepared.lo, constraints, "zZ"):
+        return False
+    hours = [
+        hour
+        for hour in range(24)
+        if _components_match(prepared.lo.replace(hour=hour), constraints, "HIp")
+    ]
+    minutes = [
+        minute
+        for minute in range(60)
+        if _components_match(prepared.lo.replace(minute=minute), constraints, "M")
+    ]
+    seconds = [
+        second
+        for second in range(60)
+        if _components_match(prepared.lo.replace(second=second), constraints, "S")
+    ]
+    microsecond = int(constraints["f"]) if "f" in constraints else None
+    return any(
+        _time_in_bounds(day, prepared, hours, minutes, seconds, microsecond)
+        for day in _matching_dates(prepared, constraints)
+    )
+
+
+def _time_in_bounds(
+    day: datetime,
+    prepared: DateSpec,
+    hours: list[int],
+    minutes: list[int],
+    seconds: list[int],
+    microsecond: int | None,
+) -> bool:
+    lo = max(day, prepared.lo)
+    bound = prepared.hi.astimezone(day.tzinfo) if day.tzinfo is not None else prepared.hi
+    hi = min(day.replace(hour=23, minute=59, second=59, microsecond=999999), bound)
+    for hour in hours:
+        if not lo.hour <= hour <= hi.hour:
+            continue
+        first_minute = lo.minute if hour == lo.hour else 0
+        last_minute = hi.minute if hour == hi.hour else 59
+        for minute in minutes:
+            if not first_minute <= minute <= last_minute:
+                continue
+            if _second_in_bounds(
+                day.replace(hour=hour, minute=minute), lo, hi, seconds, microsecond
+            ):
+                return True
+    return False
+
+
+def _second_in_bounds(
+    moment: datetime, lo: datetime, hi: datetime, seconds: list[int], microsecond: int | None
+) -> bool:
+    for second in seconds:
+        candidate = moment.replace(second=second, microsecond=microsecond or 0)
+        if microsecond is None and candidate.replace(microsecond=lo.microsecond) == lo:
+            candidate = lo
+        if lo <= candidate <= hi:
+            return True
+    return False
 
 
 def _format_directive(moment: datetime, directive: str) -> str:

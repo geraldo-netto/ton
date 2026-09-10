@@ -15,10 +15,9 @@ provenance fields remain visible.
 from __future__ import annotations
 
 import hashlib
-import json
-from decimal import Decimal
 from typing import TextIO
 
+from ._json import iter_json
 from ._proof import ProofFailure
 
 PROOF_AUDIT_SCHEMA = "ton.proof-audit/v2"
@@ -58,10 +57,7 @@ class ProofAuditWriter:
             "spec": failure.spec if emit_spec else None,
         }
         try:
-            self._stream.write(
-                json.dumps(payload, ensure_ascii=True, separators=(",", ":"), default=_json_default)
-                + "\n"
-            )
+            self._stream.write("".join(iter_json(payload)) + "\n")
         except OSError as exc:
             raise ProofAuditWriteError(str(exc)) from exc
         if spec_ref is not None:
@@ -78,22 +74,8 @@ class ProofAuditWriter:
         return reference
 
 
-def _json_default(value: object) -> str:
-    """Serialize values JSON has no exact type for.
-
-    Decimal config bounds are kept exact from loading through generation and
-    audit (CFG-007). JSON has no exact decimal number, so they are written in
-    their canonical string form, which round-trips through ``Decimal``
-    without the precision loss a binary float would reintroduce.
-    """
-    if isinstance(value, Decimal):
-        return str(value)
-    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
-
-
 def _spec_reference(spec: object) -> str:
-    canonical = json.dumps(
-        spec, ensure_ascii=True, sort_keys=True, separators=(",", ":"), default=_json_default
-    )
-    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    return f"sha256:{digest}"
+    digest = hashlib.sha256()
+    for token in iter_json(spec, sort_keys=True):
+        digest.update(token.encode("utf-8"))
+    return f"sha256:{digest.hexdigest()}"

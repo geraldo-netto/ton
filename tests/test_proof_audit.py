@@ -72,6 +72,22 @@ def test_proof_audit_writer_emits_clear_json_line() -> None:
     assert stream.getvalue().endswith("\n")
 
 
+@pytest.mark.parametrize("number", ["0.10000000000000001", "-1.2300", "1e1000", "0.00000001"])
+def test_audit_decimal_tokens_preserve_numeric_type_and_fingerprint(number) -> None:
+    """CFG-007: both report payloads and fingerprints retain exact numeric syntax."""
+    import hashlib
+    from dataclasses import replace
+
+    value = Decimal(number)
+    stream = io.StringIO()
+    ProofAuditWriter(stream)(replace(_failure(), spec={"value": value}))
+    record = json.loads(stream.getvalue(), parse_float=Decimal)
+    assert isinstance(record["spec"]["value"], (int, Decimal))
+    assert record["spec"]["value"] == value
+    canonical = '{"value":' + str(value) + "}"
+    assert record["spec_ref"] == "sha256:" + hashlib.sha256(canonical.encode()).hexdigest()
+
+
 def test_proof_audit_writer_uses_failure_redaction_state() -> None:
     stream = io.StringIO()
 
@@ -379,11 +395,11 @@ def test_proof_checker_preserves_existing_sink_error() -> None:
 
 def test_audit_serialization_still_rejects_unsupported_objects() -> None:
     """Decimal support must not silently serialize anything else (CFG-007)."""
-    from ton._proofaudit import _json_default
+    from ton._json import iter_json
 
-    assert _json_default(Decimal("0.5")) == "0.5"
+    assert "".join(iter_json(Decimal("0.5"))) == "0.5"
     with pytest.raises(TypeError, match="not JSON serializable"):
-        _json_default(object())
+        list(iter_json(object()))
 
 
 def _rejecting_engine(values: list[str]):
@@ -439,3 +455,25 @@ def test_sink_mutation_cannot_reach_the_engine_snapshot() -> None:
 
     assert seen
     assert engine._plan.types["x"]["values"] == ["a"]
+
+
+def test_exact_json_encoder_handles_containers_and_shared_values() -> None:
+    """CFG-007: exact tokens retain ordinary JSON escaping and container semantics."""
+    from ton._json import iter_json
+
+    shared = {'quoted"\n': [True, False, None, 1.5, 3]}
+    value = [shared, shared, (), {}, {2: "integer key"}]
+    encoded = "".join(iter_json(value))
+    assert json.loads(encoded) == json.loads(json.dumps(value))
+    assert "".join(iter_json({"b": 1, "a": 2}, sort_keys=True)) == '{"a":2,"b":1}'
+    value.append(value)
+    with pytest.raises(ValueError, match="Circular reference"):
+        list(iter_json(value))
+
+
+@pytest.mark.parametrize("value", [Decimal("NaN"), Decimal("Infinity"), Decimal("-Infinity")])
+def test_exact_json_encoder_rejects_nonfinite_decimal(value) -> None:
+    from ton._json import iter_json
+
+    with pytest.raises(ValueError, match="Non-finite Decimal"):
+        list(iter_json(value))

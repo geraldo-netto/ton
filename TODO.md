@@ -43,7 +43,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| CFG-007 | open | medium | medium | Configuration precision/audit-format: the approved contract preserves numeric JSON syntax through audit serialization, but `_proofaudit._json_default` returns `str(Decimal(...))`; a numeric bound `0.10000000000000001` becomes a quoted string in the report. Its docstring incorrectly treats JSON numbers as inherently binary floats. Resolve with exact numeric JSON serialization for both payloads and fingerprint input, without float conversion or a replacement precision cap. Test decoded types and exact values, not just matching text. |
 
 ### Observability
 

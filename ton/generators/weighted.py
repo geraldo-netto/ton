@@ -86,9 +86,10 @@ class WeightedGenerator(Generator):
 
     def prove(self, prepared: WeightedSpec, result: TransformResult) -> ProofResult:
         # Recurse into the child that was drawn (REL-001, REL-022).
-        if prepared.distribution.accepts(result):
+        proof = prepared.distribution.prove(result)
+        if proof.ok:
             return ProofResult(ok=True)
-        detail = prepared.distribution.rejection(result)
+        detail = proof.reason
         reason = "no weighted choice accepts the value"
         return ProofResult(ok=False, reason=f"{reason}: {detail}" if detail else reason)
 

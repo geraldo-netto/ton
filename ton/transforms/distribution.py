@@ -63,8 +63,9 @@ class DistributionTransform(BaseTransform):
         # apply() discards the source value and emits a child draw, so the
         # emitted value -- not the source -- is what must be proven (REL-001).
         del before
-        if prepared.accepts(after):
+        proof = prepared.prove(after)
+        if proof.ok:
             return TransformProof(ok=True)
-        detail = prepared.rejection(after)
+        detail = proof.reason
         reason = "no distribution choice accepts the value"
         return TransformProof(ok=False, reason=f"{reason}: {detail}" if detail else reason)

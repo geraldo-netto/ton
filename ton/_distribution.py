@@ -9,6 +9,7 @@ from math import isfinite
 from random import Random
 from typing import TYPE_CHECKING, Any, cast
 
+from ._proof import ProofResult
 from ._speckeys import require_known_keys
 
 _CHOICE_KEYS = frozenset(("weight", "spec"))
@@ -38,31 +39,20 @@ class WeightedChoiceSet:
         generator, prepared = self.children[index]
         return drawn(generator, prepared, cast(str, generator.generate(prepared, rng)))
 
-    def accepts(self, result: Any) -> bool:
-        """Whether ``result`` satisfies the child that produced it.
-
-        Asking every child instead let a permissive sibling mask the selected
-        child's failed proof (REL-022); the any-child rule survives only for
-        values this choice set did not draw.
-        """
+    def prove(self, result: Any) -> ProofResult:
+        """Evaluate each selected child once and carry its original rejection (REL-038)."""
         from .generators.base import proven_draws
 
         draws = proven_draws(result, self.children)
         if draws is not None:
-            return all(
-                draw.generator.prove(draw.prepared, _as_result(draw.value)).ok for draw in draws
-            )
-        return any(generator.prove(prepared, result).ok for generator, prepared in self.children)
-
-    def rejection(self, result: Any) -> str:
-        """Return the selected child's failure reason, when it recorded one."""
-        from .generators.base import proven_draws
-
-        for draw in proven_draws(result, self.children) or ():
-            proof = draw.generator.prove(draw.prepared, _as_result(draw.value))
-            if not proof.ok and proof.reason:
-                return proof.reason
-        return ""
+            for draw in draws:
+                proof = draw.generator.prove(draw.prepared, _as_result(draw.value))
+                if not proof.ok:
+                    return proof
+            return ProofResult(True)
+        return ProofResult(
+            any(generator.prove(prepared, result).ok for generator, prepared in self.children)
+        )
 
 
 def prepare_distribution(

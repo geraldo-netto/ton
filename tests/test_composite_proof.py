@@ -74,6 +74,45 @@ def _registry() -> dict[str, Generator]:
     return reg
 
 
+@pytest.mark.parametrize("mode", ["all", "audit"])
+@pytest.mark.parametrize("kind", ["weighted", "distribution"])
+def test_selected_child_rejection_is_evaluated_once(mode, kind) -> None:
+    """REL-038: preserve the first rejection even when a second call would raise."""
+    calls = []
+
+    class RejectOnce(_RejectGenerator):
+        def prove(self, prepared, result):
+            calls.append(result.value)
+            if len(calls) > 1:
+                raise RuntimeError("proof called twice")
+            return ProofResult(False, "original rejection")
+
+    choices = [
+        {"spec": {"type": "reject"}, "weight": 1},
+        {"spec": {"type": "permissive"}, "weight": 0},
+    ]
+    field = {"type": "weighted", "choices": choices}
+    if kind == "distribution":
+        field = {
+            "type": "string",
+            "values": ["source"],
+            "transforms": [{"type": "distribution", "choices": choices}],
+        }
+    registry = _registry()
+    registry["reject"] = RejectOnce()
+    engine = Engine(
+        {"rows": 1, "format": "$x$", "types": {"x": field}}, registry=registry, proof_mode=mode
+    )
+    if mode == "all":
+        with pytest.raises(ProofError, match="original rejection"):
+            list(engine)
+    else:
+        assert list(engine) == ["x"]
+        assert len(engine.proof_failures) == 1
+        assert engine.proof_failures[0].reason.endswith("original rejection")
+    assert calls == ["x"]
+
+
 def _context() -> PreparationContext:
     return PreparationContext(_registry())
 

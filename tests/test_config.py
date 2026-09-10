@@ -860,3 +860,18 @@ def test_transform_aliases_resolve_and_discover_children(kind, qualified_referen
     config = {"rows": 2, "format": "$x$", "types": {"x": field}}
     transforms = {key: api.build_extension_catalog().get_transform(kind)}
     assert list(api.generate(config, transforms=transforms, proof_mode="all")) == [expected] * 2
+
+
+@pytest.mark.parametrize("reference", ["non_empty", "core.non_empty"])
+@pytest.mark.parametrize("key", ["non_empty", "core.non_empty"])
+@pytest.mark.parametrize("nested", [False, True])
+def test_validator_aliases_preserve_validation(reference, key, nested):
+    """CFG-028: either alias resolves through either registry spelling and still rejects."""
+    validators = {key: api.build_extension_catalog().validators()["non_empty"]}
+    field = {"type": "string", "values": ["ok"], "validators": [reference]}
+    spec = {"type": "oneOf", "choices": [field]} if nested else field
+    config = {"rows": 1, "format": "$x$", "types": {"x": spec}}
+    assert list(api.generate(config, validators=validators)) == ["ok"]
+    field["values"] = [""]
+    with pytest.raises(api.ValidationError, match="non_empty"):
+        list(api.generate(config, validators=validators))

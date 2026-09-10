@@ -17,7 +17,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| CFG-028 | open | medium | small | Configuration discoverability: resolve validator core aliases in `ton/_compiler.py::_resolve_validators`. `validators=["core.non_empty"]` fails with `validators={"non_empty": NonEmptyValidator()}`. Use the shared reference resolver and add a permanent test covering both spellings with bare-only and qualified-only registries. |
 | CFG-029 | open | medium | small | Configuration discoverability: reject the bcrypt-only `rounds` option for other algorithms in `ton/generators/hash.py::HashGenerator.prepare`, as already done for `cache`. `algorithm="sha256", rounds="invalid"` currently validates and silently ignores the option. Add direct, catalog-validation, and CLI regressions for irrelevant rounds before fixing. |
 | CFG-030 | open | medium | small | Configuration discoverability: preserve the owning field path for choice-wrapper errors in `ton/_distribution.py::_prepare_choice`. A misspelled weight inside `types.outer.choices[0].choices[0]` reports only `weighted.choices[0].weigth`, losing the parent path promised by README diagnostics. Build the location from `PreparationContext.path`; add permanent nested weighted and distribution-transform regressions asserting the complete path and suggestion. |
 

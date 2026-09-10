@@ -434,8 +434,7 @@ class EngineCompiler:
         if any(not isinstance(reference, str) for reference in references):
             raise TemplateError(f"Validator references for variable {type_key!r} must be strings")
         for reference in references:
-            normalized = normalize_reference(reference)
-            validator = self.validators.get(normalized) or self.validators.get(reference)
+            validator = resolve_reference(self.validators, reference)
             if validator is None:
                 raise TemplateError(
                     f"Unknown validator {reference!r} for variable {type_key!r}. "

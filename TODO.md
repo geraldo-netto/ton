@@ -20,7 +20,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| PERF-040 | open | medium | small | Performance: `generators.base.proven_draws` rebuilds a set containing every candidate's generator/prepared identities on every proof, even though the selected branch is recorded. Proving one selected child among 1,000 candidates performs 2,002 identity lookups and allocates a 1,000-entry set per row. Precompute ownership membership during preparation or tag draws with their owning composite. Verify proof work scales with selected draws rather than the entire choice pool. |
 | PERF-039 | open | medium | medium | Performance: the approved composite-proof cost requirement excludes trace allocation in proof-off and unsampled rows, but `drawn`, `WeightedChoiceSet.choose`, and `SequenceOfGenerator.generate` unconditionally create DrawnValue/ChildDraw records. Three rows containing 100 sequence children allocate 300 ChildDraw records in off, sample, and all modes alike. Resolve row-scoped trace collection for every composite, including those without child pipelines, and preserve validators, RNG draws, and output. Verify allocation counts on off and unsampled rows. |
 
 ### Concurrency

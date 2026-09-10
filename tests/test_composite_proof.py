@@ -394,6 +394,30 @@ def test_one_of_ignores_draw_tags_from_another_composite() -> None:
     assert not gen.prove(other, TransformResult("not-a-choice")).ok
 
 
+@pytest.mark.parametrize("size", [1, 1000])
+@pytest.mark.parametrize("kind", ["oneOf", "weighted"])
+def test_composite_proof_work_depends_only_on_selected_draws(monkeypatch, size, kind) -> None:
+    """PERF-040: proving a selected child must not revisit its whole candidate pool."""
+    from ton.generators import base
+
+    child = {"type": "string", "values": ["x"]}
+    choices = [child if kind == "oneOf" else {"spec": child} for _ in range(size)]
+    engine = Engine(
+        {"rows": 1, "format": "$x$", "types": {"x": {"type": kind, "choices": choices}}}
+    )
+    field = engine._plan.prepared["x"]
+    value = field.generator.generate(field.source_prepared, Random(0))
+    calls = []
+
+    def counted_id(obj):
+        calls.append(obj)
+        return id(obj)
+
+    monkeypatch.setattr(base, "id", counted_id, raising=False)
+    assert field.generator.prove(field.source_prepared, TransformResult(value)).ok
+    assert len(calls) <= 2
+
+
 @pytest.mark.parametrize(
     ("field", "extra_transforms"),
     [

@@ -78,12 +78,13 @@ class SequenceOfGenerator(Generator):
         return DrawnValue(
             prepared.separator.join(parts),
             tuple(ChildDraw(child_gen, child_prepared, part) for part in parts),
+            prepared,
         )
 
     def prove(self, prepared: SequenceOfSpec, result: TransformResult) -> ProofResult:
         # Elements TON generated carry their own draws, so every element is
         # proven even with an empty or ambiguous separator (REL-023).
-        draws = proven_draws(result, (prepared.child,))
+        draws = proven_draws(result, prepared)
         if draws is not None:
             return prove_draws(draws, "sequence_of element")
         # A value TON did not generate here can only be split heuristically:

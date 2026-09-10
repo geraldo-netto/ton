@@ -184,32 +184,28 @@ class DrawnValue(str):
     """
 
     draws: tuple[ChildDraw, ...]
+    owner: object
 
-    def __new__(cls, value: str, draws: tuple[ChildDraw, ...]) -> DrawnValue:
+    def __new__(cls, value: str, draws: tuple[ChildDraw, ...], owner: object) -> DrawnValue:
         instance = super().__new__(cls, value)
         instance.draws = draws
+        instance.owner = owner
         return instance
 
 
-def drawn(generator: Generator, prepared: Any, value: str) -> DrawnValue:
+def drawn(generator: Generator, prepared: Any, value: str, owner: object) -> DrawnValue:
     """Tag ``value`` with the single child draw that produced it."""
-    return DrawnValue(value, (ChildDraw(generator, prepared, value),))
+    return DrawnValue(value, (ChildDraw(generator, prepared, value),), owner)
 
 
-def proven_draws(
-    result: TransformResult,
-    children: tuple[tuple[Generator, Any], ...],
-) -> tuple[ChildDraw, ...] | None:
-    """Return the recorded draws when they all name one of ``children``.
+def proven_draws(result: TransformResult, owner: object) -> tuple[ChildDraw, ...] | None:
+    """Return draws belonging to this prepared composite in constant time (PERF-040).
 
-    ``None`` means the value did not come from this composite (an external
-    or re-derived value), so the caller keeps its permissive fallback.
+    External or re-derived values retain the composite's ordinary fallback.
+    Ownership is carried by the value, so pickle/deepcopy preserve the relationship.
     """
     value = result.value
-    if not isinstance(value, DrawnValue) or not value.draws:
-        return None
-    known = {(id(generator), id(prepared)) for generator, prepared in children}
-    if any((id(draw.generator), id(draw.prepared)) not in known for draw in value.draws):
+    if not isinstance(value, DrawnValue) or value.owner is not owner:
         return None
     return value.draws
 

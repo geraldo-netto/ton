@@ -68,12 +68,12 @@ class OneOfGenerator(Generator):
 
     def generate(self, prepared: OneOfSpec, rng: Random) -> str:
         child_gen, child_prepared = rng.choice(prepared.children)
-        return drawn(child_gen, child_prepared, child_gen.generate(child_prepared, rng))
+        return drawn(child_gen, child_prepared, child_gen.generate(child_prepared, rng), prepared)
 
     def prove(self, prepared: OneOfSpec, result: TransformResult) -> ProofResult:
         # Prove the branch that actually ran. Asking every child instead let a
         # permissive sibling mask the selected child's failure (REL-021).
-        draws = proven_draws(result, prepared.children)
+        draws = proven_draws(result, prepared)
         if draws is not None:
             return prove_draws(draws, "oneOf choice")
         # A value TON did not draw here (external or re-derived): it is valid

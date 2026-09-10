@@ -37,13 +37,13 @@ class WeightedChoiceSet:
 
         index = weighted_index(self.cum_weights, rng)
         generator, prepared = self.children[index]
-        return drawn(generator, prepared, cast(str, generator.generate(prepared, rng)))
+        return drawn(generator, prepared, cast(str, generator.generate(prepared, rng)), self)
 
     def prove(self, result: Any) -> ProofResult:
         """Evaluate each selected child once and carry its original rejection (REL-038)."""
         from .generators.base import proven_draws
 
-        draws = proven_draws(result, self.children)
+        draws = proven_draws(result, self)
         if draws is not None:
             for draw in draws:
                 proof = draw.generator.prove(draw.prepared, _as_result(draw.value))

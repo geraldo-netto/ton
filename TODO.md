@@ -45,7 +45,6 @@
 | id | status | severity | effort | description |
 |---|---|---|---|---|
 | CONC-023 | open | medium | medium | Concurrency: stop interpreting every plugin child-location string as a dotted/indexed traversal path in `ton/concurrency.py::_replace_owned_child`. A declared child stored under the literal key `dotted.key` generates `0, 1` through the ordinary engine but `fork_engine` raises `KeyError('dotted')`. Use an unambiguous ownership/location representation shared with compilation; add permanent direct/worker parity regressions for literal dots and brackets while preserving metadata isolation. |
-| CONC-024 | open | medium | small | Concurrency: restrict `_offset_sequences` to fields referenced by the template, matching lazy engine compilation. With a referenced string field and an unused sequence whose `start` is `bad`, ordinary generation succeeds but `fork_engine` raises during offset coercion even when the unused field has zero occurrences. Add permanent regressions for unused malformed sequences and unused cyclic composites, while retaining validation of referenced fields. |
 
 ## Blocked / Deferred
 

@@ -234,10 +234,10 @@ def _offset_sequences(
     occurrences: dict[str, int] = {}
     for token in parse(str(copied.get("format", ""))):
         occurrences[token.type_key] = occurrences.get(token.type_key, 0) + 1
-    for type_key, spec in copied.get("types", {}).items():
+    for type_key, count in occurrences.items():
         copied["types"][type_key] = _offset_sequence_spec(
-            spec,
-            offset * occurrences.get(type_key, 0),
+            copied["types"][type_key],
+            offset * count,
             generators,
             transform_registry,
             path=f"types.{type_key}",

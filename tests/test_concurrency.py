@@ -606,3 +606,26 @@ print("ok")
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "ok"
+
+
+@pytest.mark.parametrize("unused_kind", ["sequence", "cycle"])
+def test_workers_ignore_unused_malformed_fields(unused_kind):
+    """CONC-024: only template-referenced fields participate in worker offsets."""
+    unused = {"type": "sequence", "start": "bad"}
+    if unused_kind == "cycle":
+        unused = {"type": "oneOf", "choices": []}
+        unused["choices"].append(unused)
+    config = {
+        "rows": 2,
+        "format": "$x$",
+        "types": {"x": {"type": "string", "values": ["x"]}, "unused": unused},
+    }
+    assert list(Engine.from_config(config)) == ["x", "x"]
+    assert list(fork_engine(config, parent_seed=1, worker_id=0)) == ["x", "x"]
+    config["format"] = "$unused$"
+    for build in [
+        lambda: Engine.from_config(config),
+        lambda: fork_engine(config, parent_seed=1, worker_id=0),
+    ]:
+        with pytest.raises(ValueError):
+            build()

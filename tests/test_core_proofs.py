@@ -155,3 +155,33 @@ def test_integer_proof_requires_canonical_unpadded_digits(value) -> None:
     prepared = generator.prepare({"minValue": -9, "maxValue": 9})
     assert generator.prove(prepared, TransformResult("1")).ok
     assert not generator.prove(prepared, TransformResult(value)).ok
+
+
+@pytest.mark.parametrize(
+    "value", ["1.0e0", "1.0_0", "1.00 ", " 1.000", "+1.000", "01.000", "١.٠٠٠"]
+)
+def test_decimal_proof_requires_fixed_point_digits(value) -> None:
+    """REL-052: parseable decimal values need not have the generated syntax."""
+    generator = DecimalGenerator()
+    prepared = generator.prepare({"minValue": 1, "maxValue": 1, "decimals": 3})
+    assert generator.prove(prepared, TransformResult("1.000")).ok
+    assert not generator.prove(prepared, TransformResult(value)).ok
+
+
+@pytest.mark.parametrize("padding", [False, True])
+@pytest.mark.parametrize("scale", [0, 3])
+def test_decimal_proof_validates_boundaries_and_padding(padding, scale) -> None:
+    """REL-052: exact signs, scale and padding survive negative/cross-zero bounds."""
+    generator = DecimalGenerator()
+    prepared = generator.prepare(
+        {"minValue": -99, "maxValue": 99, "decimals": scale, "padWithZero": padding}
+    )
+    for whole in ["-99", "-1", "0", "1", "99"]:
+        value = whole + (".000" if scale else "")
+        expected = value.zfill(7 if scale else 3) if padding else value
+        assert generator.prove(prepared, TransformResult(expected)).ok
+        assert not generator.prove(prepared, TransformResult(" " + expected[1:])).ok
+    for value in ["-100", "100", "-0"]:
+        rendered = value + (".000" if scale else "")
+        rendered = rendered.zfill(7 if scale else 3) if padding else rendered
+        assert not generator.prove(prepared, TransformResult(rendered)).ok

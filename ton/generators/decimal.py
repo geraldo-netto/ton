@@ -91,18 +91,16 @@ class DecimalGenerator(Generator):
         return value
 
     def prove(self, prepared: DecimalSpec, result: TransformResult) -> ProofResult:
-        expected_fraction = result.value.lstrip("-0").partition(".")[2]
         try:
             value = Decimal(result.value)
         except InvalidOperation:
             return proof_result(False, "value is not decimal")
-        width_ok = not prepared.pad_width or len(result.value) == prepared.pad_width
+        if not value.is_finite() or not prepared.min_value <= value <= prepared.max_value:
+            return proof_result(False, "decimal value is outside its bounds")
+        canonical = value.copy_abs() if value.is_zero() else value
+        expected = pad_with_zero(format(canonical, f".{prepared.decimals}f"), prepared.pad_width)
         return proof_result(
-            value.is_finite()
-            and prepared.min_value <= value <= prepared.max_value
-            and len(expected_fraction) == prepared.decimals
-            and (prepared.decimals != 0 or value == value.to_integral_value())
-            and width_ok,
+            result.value == expected,
             "decimal value is outside its bounds, scale, or padding contract",
         )
 

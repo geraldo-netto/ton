@@ -242,8 +242,9 @@ def _run_inner(args: argparse.Namespace) -> int:
         result = _map_config_errors(lambda: _print_namespaces(args))
         return result if isinstance(result, int) else 0
     if args.config is None:
-        print("ton: config path is required", file=sys.stderr)
-        return 1
+        return _fail_before_generation(
+            "validation", 1, ValueError("config path is required"), "ton: config path is required"
+        )
     if args.validate:
         return _validate_config(args)
     built = _prepare_engine(args)
@@ -255,15 +256,15 @@ def _run_inner(args: argparse.Namespace) -> int:
 
 def _validate_proof_report_args(args: argparse.Namespace) -> int | None:
     if args.proof_report is not None and args.proof_check != "audit":
-        print("ton: --proof-report requires --proof-check=audit", file=sys.stderr)
-        return 2
+        message = "ton: --proof-report requires --proof-check=audit"
+        return _fail_before_generation("validation", 2, ValueError(message), message)
     if (
         args.proof_report is not None
         and args.output is not None
         and _same_output_target(args.proof_report, args.output)
     ):
-        print("ton: --proof-report and --output must use different paths", file=sys.stderr)
-        return 2
+        message = "ton: --proof-report and --output must use different paths"
+        return _fail_before_generation("validation", 2, ValueError(message), message)
     return None
 
 

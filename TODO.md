@@ -51,7 +51,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| OBS-009 | open | medium | small | Observability: config exceptions now produce a terminal failure event, but `cli._run_inner` returns before that handling when the config argument is missing or proof-report options conflict. With a working events logger, `cli.main([])` exits 1 and invalid proof-report combinations exit 2, both with zero `cli_failed` events. Complete the promised terminal event coverage for these post-parse early returns, with zero row counts and exactly one failure event. |
 
 ### Platform
 

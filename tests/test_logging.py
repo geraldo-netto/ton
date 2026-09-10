@@ -297,3 +297,22 @@ def test_pre_generation_failures_emit_one_terminal_record(
     assert records[0].rows_written == 0
     assert records[0].total_rows == 0
     assert records[0].error_type == error_type
+
+
+@pytest.mark.parametrize(
+    "args, code",
+    [
+        ([], 1),
+        (["--proof-report", "report.jsonl"], 2),
+        (["--proof-check", "audit", "--proof-report", "same", "--output", "same"], 2),
+    ],
+)
+def test_post_parse_option_failures_emit_one_terminal_record(caplog, args, code) -> None:
+    """OBS-009: post-parse early returns have exactly one terminal event."""
+    with caplog.at_level(logging.ERROR, logger="ton"):
+        assert main(args) == code
+    failures = [r for r in caplog.records if getattr(r, "event", None) == "cli_failed"]
+    assert len(failures) == 1
+    assert failures[0].exit_code == code
+    assert failures[0].rows_written == failures[0].total_rows == 0
+    assert failures[0].error_category == "validation"

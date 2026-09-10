@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from random import Random
 
 import pytest
@@ -326,3 +328,123 @@ def test_unterminated_class_is_still_rejected() -> None:
 
     with pytest.raises(TemplateError, match="unterminated character set"):
         list(api.generate(config))
+
+
+_UNICODE_BRACES = [
+    "{١}",
+    "{٠}",
+    "{２}",
+    "{२}",
+    "{1２}",
+    "{١2}",
+    "{١,٢}",
+    "{1,٢}",
+    "{١,2}",
+    "{,٢}",
+    "{١,}",
+    "{٢,١}",
+    "{２,1}",
+]
+
+
+@pytest.mark.parametrize("braces", _UNICODE_BRACES)
+@pytest.mark.parametrize("proof_mode", ["off", "sample", "all", "audit"])
+def test_unicode_brace_digits_generate_literal_text(braces: str, proof_mode: str) -> None:
+    """Unicode repeat-like forms are literal text in Python regex (REL-040)."""
+    pattern = "a" + braces
+    config = {"rows": 4, "format": "$x$", "types": {"x": {"type": "regex", "pattern": pattern}}}
+    api.validate_config(config)
+
+    rows = list(api.generate(config, seed=1, proof_mode=proof_mode, proof_sample_rate=2))
+
+    assert rows == [pattern] * config["rows"]
+    assert all(re.fullmatch(pattern, row) is not None for row in rows)
+
+
+@pytest.mark.parametrize("braces", _UNICODE_BRACES)
+@pytest.mark.parametrize(
+    "candidate", ["literal", "empty", "one", "two", "twelve", "newline", "ascii"]
+)
+def test_unicode_brace_proof_agrees_with_python_for_positive_and_negative_values(
+    braces: str, candidate: str
+) -> None:
+    """An AST proof must not certify the same parser mistake (REL-040)."""
+    pattern = "a" + braces
+    values = {
+        "literal": pattern,
+        "empty": "",
+        "one": "a",
+        "two": "aa",
+        "twelve": "a" * 12,
+        "newline": pattern + "\n",
+        "ascii": "a{1}",
+    }
+    value = values[candidate]
+    expected = re.fullmatch(pattern, value) is not None
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": pattern})
+
+    assert generator.prove(prepared, TransformResult(value)).ok is expected
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "^(ab|cd){٢}$",
+        "a{١}b{2}",
+        "a{١}{2}",
+        "a{١}?",
+        "a{١}+?",
+        "(?:a{١}){2,3}",
+        "(?:a{١}|b{２}){1,3}",
+        "[ab]{١,2}",
+        "a{1,٢}b{1,2}",
+        r"a\{١\}",
+        "١{2}",
+        "[١２]{2}",
+    ],
+)
+def test_unicode_braces_compose_with_supported_regex_constructs(pattern: str) -> None:
+    """Literal braces must leave following quantifiers attached correctly (REL-040)."""
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": pattern})
+    matcher = re.compile(pattern)
+    for seed in range(32):
+        value = generator.generate(prepared, Random(seed))
+        assert matcher.fullmatch(value) is not None, (pattern, seed, value)
+        for candidate in (value, value + "!", "", "a", "aa", "ab", "cd"):
+            expected = matcher.fullmatch(candidate) is not None
+            assert generator.prove(prepared, TransformResult(candidate)).ok is expected
+
+
+@pytest.mark.parametrize("braces", ["{0}", "{2}", "{02}", "{0,0}", "{1,3}", "{,2}", "{2,}", "{,}"])
+def test_ascii_brace_counts_keep_their_repeat_semantics(braces: str) -> None:
+    """Restricting count digits must preserve every ASCII repeat form (REL-040)."""
+    pattern = "a" + braces
+    generator = RegexGenerator()
+    prepared = generator.prepare({"pattern": pattern})
+    for seed in range(16):
+        value = generator.generate(prepared, Random(seed))
+        assert re.fullmatch(pattern, value) is not None
+    for value in ["a" * count for count in range(8)] + [pattern, "b", "a\n"]:
+        assert generator.prove(prepared, TransformResult(value)).ok is (
+            re.fullmatch(pattern, value) is not None
+        )
+
+
+@pytest.mark.parametrize("braces", _UNICODE_BRACES)
+@pytest.mark.parametrize("ensure_ascii", [False, True])
+def test_unicode_brace_literals_survive_json_loading(
+    braces: str, ensure_ascii: bool, tmp_path: Path
+) -> None:
+    """Raw and JSON-escaped Unicode use the same grammar (REL-040)."""
+    pattern = "a" + braces
+    config = {"rows": 2, "format": "$x$", "types": {"x": {"type": "regex", "pattern": pattern}}}
+    path = tmp_path / "unicode-regex.json"
+    path.write_text(json.dumps(config, ensure_ascii=ensure_ascii), encoding="utf-8")
+
+    api.validate_config(api.load_config(str(path)))
+    rows = list(api.generate_from_file(str(path), seed=1, proof_mode="all"))
+
+    assert rows == [pattern, pattern]
+    assert all(re.fullmatch(pattern, row) is not None for row in rows)

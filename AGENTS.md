@@ -18,11 +18,26 @@ File define expected behavior + usage model for AI agents in this repo.
 ## Rules
 
 - No assume. No hide confusion. Surface tradeoffs, ask user when unclear.
-- Report every contradiction encountered, of any kind, to the user and record each
-  as a separate `blocked` item in `TODO.md`. Include the conflicting statements or
-  behaviors, their sources, the impact, and the decision or change needed to resolve
-  the contradiction. This applies to instructions, requirements, code, tests,
-  configuration, documentation, and any other source. Never silently omit a contradiction.
+- Report bugs and contradictions encountered to the user and record each independently
+  actionable finding in `TODO.md`. Include the expected and actual behavior or conflicting
+  statements, their sources, the impact, and the correction or decision needed. This
+  applies to instructions, requirements, code, tests, configuration, documentation,
+  and any other source. Never silently omit a contradiction.
+- Classify TODO status by readiness to proceed:
+  - `open`: the next required work can proceed under the established requirements.
+    A known bug with clear expected behavior belongs here.
+  - `in_progress`: that actionable work is actively being performed.
+  - `blocked`: progress requires an unavailable decision, dependency, prerequisite,
+    environment, or access. State the blocked action, the specific missing requirement
+    (including a prerequisite TODO id when applicable), and the exact unblocking condition.
+  - `deferred`: work is intentionally postponed; record the reason or revisit condition.
+
+  A code/test/documentation mismatch does not itself block a fix. Severity, complexity,
+  and possible collateral effects determine effort, review, and regression coverage;
+  they do not by themselves justify `blocked`. Conflicting requirements block only when
+  instruction priority and existing decisions cannot establish the required behavior.
+  Keep independent work actionable; split blocked verification from an implementable
+  fix or test when those parts can proceed independently.
 - Write minimum code that solve problem. No speculative or unneeded changes.
 - Compatibility is not a goal: we can freely change everything. Remove legacy layers,
   shims, deprecated paths, signature sniffing, and alternate spec forms instead of

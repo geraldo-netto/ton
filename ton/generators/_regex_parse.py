@@ -109,7 +109,8 @@ _CONTROL_ESCAPES = {
     "a": "\a",
     "0": "\0",
 }
-_BRACE_RE = re.compile(r"\{(\d*)(,(\d*))?\}")
+# Python repeat counts use ASCII digits; Unicode digits remain literals (REL-040).
+_BRACE_RE = re.compile(r"\{([0-9]*)(,([0-9]*))?\}")
 Node = tuple[Any, Any]
 
 

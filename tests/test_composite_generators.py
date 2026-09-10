@@ -621,3 +621,33 @@ def test_engine_total_rows_property() -> None:
     assert engine.total_rows == 17
     rng = Random()
     del rng  # placate unused-warning lint on the Random import elsewhere
+
+
+@pytest.mark.parametrize("key", ["child", "item[0]", "", "'quoted'"])
+def test_plugin_child_preparation_keeps_distinct_occurrences(key):
+    """PLUG-023: diagnostic path spellings cannot identify prepared children."""
+
+    class Branch(Generator):
+        type_name = "branch"
+
+        def nested_specs(self, spec):
+            return tuple(((name,), child) for name, child in spec.items() if name != "type")
+
+        def prepare(self, spec, context=None):
+            return tuple(
+                context.prepare_child(self.type_name, location, child)
+                for location, child in self.nested_specs(spec)
+            )
+
+        def generate(self, prepared, rng):
+            return "/".join(generator.generate(child, rng) for generator, child in prepared)
+
+    registry = api.build_extension_catalog().generators()
+    registry["branch"] = Branch()
+    field = {
+        "type": "branch",
+        "a": {"type": "branch", key: {"type": "string", "values": ["nested"]}},
+        "a." + key: {"type": "string", "values": ["literal"]},
+    }
+    config = {"rows": 2, "format": "$x$", "types": {"x": field}}
+    assert list(api.generate(config, registry=registry, proof_mode="all")) == ["nested/literal"] * 2

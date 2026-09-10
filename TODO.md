@@ -22,12 +22,6 @@
 |---|---|---|---|---|
 | SCALE-017 | open | medium | medium | Scalability: remove the JSON decoder's nesting ceiling from `ton/_config.py::load`. A valid zero-row config containing 5,000 nested oneOf wrappers fails with `RecursionError` in `json.load`, although downstream snapshots and composite compilation use iterative traversal. Add a permanent fresh-process file-loading regression and use stack-safe parsing without changing the process recursion limit or imposing a depth cap. |
 
-### Plugin extensibility
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| PLUG-023 | open | high | medium | Plugin extensibility: make child-preparation cache keys unambiguous in `ton/_compiler.py::_prepare_child` / `_preparation_order`. A plugin declaring both `a` (a wrapper owning `child`) and the literal key `a.child` maps both children to the same flattened path. A reproduced config expecting `nested/literal` emits `nested/nested`, even with all proofs enabled. Preserve distinct configuration occurrences; add a permanent plugin regression for colliding dotted/index-like keys before fixing. |
-
 ### Architecture / modularity / SOLID
 
 | id | status | severity | effort | description |

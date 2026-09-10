@@ -78,7 +78,7 @@ class EngineCompiler:
         # changed an already-recorded audit failure (ARCH-006).
         self.types: Mapping[str, Mapping[str, Any]] = snapshot_spec(config["types"])
         self.rows = int(config["rows"])
-        self._child_prepared: dict[str, tuple[Generator, Any]] = {}
+        self._child_prepared: dict[SpecPath, tuple[Generator, Any]] = {}
         self.tokens = tuple(parse(self.template))
         self.field_keys = (
             tuple(self.types)
@@ -233,8 +233,8 @@ class EngineCompiler:
         return prepared
 
     def _preparation_order(
-        self, path: str, spec: Mapping[str, Any], generator: Generator
-    ) -> Iterator[tuple[str, Mapping[str, Any], Generator]]:
+        self, path: SpecPath, spec: Mapping[str, Any], generator: Generator
+    ) -> Iterator[tuple[SpecPath, Mapping[str, Any], Generator]]:
         pending = [(path, spec, generator, False)]
         active: set[int] = set()
         while pending:
@@ -244,7 +244,9 @@ class EngineCompiler:
                 yield child_path, child_spec, child
                 continue
             if id(child_spec) in active:
-                raise TemplateError(f"Cyclic generator specification at types.{child_path}")
+                raise TemplateError(
+                    f"Cyclic generator specification at types.{format_spec_path(child_path)}"
+                )
             active.add(id(child_spec))
             pending.append((child_path, child_spec, child, True))
             nested = (*child.nested_specs(child_spec), *self._transform_child_specs(child_spec))
@@ -258,11 +260,12 @@ class EngineCompiler:
         self, path: str, spec: Mapping[str, Any], generator: Generator
     ) -> PreparedField:
         field: PreparedField | None = None
-        for child_path, child_spec, child in self._preparation_order(path, spec, generator):
+        for child_path, child_spec, child in self._preparation_order((path,), spec, generator):
             context = PreparationContext(self.registry, self._prepare_child, path=child_path)
-            self._validate_generator_keys(f"types.{child_path}", child_spec, child)
+            label = format_spec_path(child_path)
+            self._validate_generator_keys(f"types.{label}", child_spec, child)
             transforms, is_paired, uses_source = self._prepare_transforms(
-                child_path, child_spec, child, context
+                label, child_spec, child, context
             )
             field = PreparedField(
                 generator=child,
@@ -271,10 +274,10 @@ class EngineCompiler:
                 is_paired=is_paired,
                 source_is_paired=bool(child.is_paired and uses_source),
                 uses_source=uses_source,
-                validators=self._resolve_validators(child_path, child_spec),
+                validators=self._resolve_validators(label, child_spec),
                 provider=plugin_provenance(self.registry, child_spec["type"]),
             )
-            if child_path != path:
+            if child_path != (path,):
                 self._child_prepared[child_path] = self._as_child(field)
         assert field is not None
         return field
@@ -298,11 +301,13 @@ class EngineCompiler:
         location: SpecPath,
         nested_spec: Any,
     ) -> tuple[Generator, Any]:
-        child_path = ".".join((context.path, format_spec_path(location)))
+        child_path = context.path + location
         if child_path in self._child_prepared:
             return self._child_prepared[child_path]
         resolve_child_spec(parent_type, location, nested_spec, self.registry)
-        raise ValueError(f"Child at types.{child_path} must be declared by nested_specs")
+        raise ValueError(
+            f"Child at types.{format_spec_path(child_path)} must be declared by nested_specs"
+        )
 
     def _validate_id_references(self, prepared: Mapping[str, PreparedField]) -> None:
         for token in self.tokens:
@@ -324,9 +329,9 @@ class EngineCompiler:
 
     def _resolved_children(
         self,
-        path: str,
+        path: SpecPath,
         nested: Iterable[tuple[SpecPath, Mapping[str, Any]]],
-    ) -> Iterator[tuple[str, Mapping[str, Any], Generator]]:
+    ) -> Iterator[tuple[SpecPath, Mapping[str, Any], Generator]]:
         """Pair each declared child spec with its registered generator."""
         for location, nested_spec in nested:
             reference = nested_spec.get("type")
@@ -334,7 +339,7 @@ class EngineCompiler:
                 continue
             child = resolve_reference(self.registry, reference)
             if child is not None:
-                yield f"{path}.{format_spec_path(location)}", nested_spec, child
+                yield path + location, nested_spec, child
 
     def _prepare_transforms(
         self,
@@ -383,7 +388,7 @@ class EngineCompiler:
                 PreparedTransform(
                     transform,
                     transform.prepare(
-                        transform_spec, replace(context, path=f"{type_key}.transforms[{index}]")
+                        transform_spec, replace(context, path=(*context.path, "transforms", index))
                     ),
                 )
             )

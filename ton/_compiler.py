@@ -300,8 +300,8 @@ class EngineCompiler:
         child_path = ".".join((context.path, location.strip("'")))
         if child_path in self._child_prepared:
             return self._child_prepared[child_path]
-        child = resolve_child_spec(parent_type, location, nested_spec, self.registry)
-        return self._as_child(self._prepare_tree(child_path, nested_spec, child))
+        resolve_child_spec(parent_type, location, nested_spec, self.registry)
+        raise ValueError(f"Child at types.{child_path} must be declared by nested_specs")
 
     def _validate_id_references(self, prepared: Mapping[str, PreparedField]) -> None:
         for token in self.tokens:

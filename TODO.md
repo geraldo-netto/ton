@@ -6,6 +6,7 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
+| REL-050 | open | low | small | Reliability/correctness: correct `tests/test_registry.py::EXPECTED_TYPES` and `test_make_registry_covers_every_expected_type`. The list omits two composites and the subset assertion/comment still describe removed live-subclass discovery. Assert the exact built-in catalog, including `oneOf` and `sequence_of`, so unexpected registrations cannot pass unnoticed. |
 | REL-047 | open | medium | medium | Reliability/correctness: preserve nested validator exception attribution across `ton/generators/base.py::ChildPipelineGenerator._generate_steps` and `ton/_engine.py::_generate_source`. A validator raising `RuntimeError` yields `ValidatorExecutionError` at the root but `GeneratorExecutionError` naming `OneOfGenerator` when the same field is nested. Add permanent root/nested regressions asserting the validator error type, reference, row log context, and CLI exit 3; preserve ordinary validator rejection as `ValidationError`. |
 
 ### Concurrency
@@ -13,12 +14,6 @@
 | id | status | severity | effort | description |
 |---|---|---|---|---|
 | CONC-020 | open | medium | small | Concurrency: make proof-traced string values reconstructible in `ton/generators/base.py::DrawnValue` and `_GeneratedChildValue`. `deepcopy` and pickle round-trips call their multi-argument `__new__` with only the string, raising `TypeError`; `proven_draws` explicitly promises preserved ownership. Add permanent round-trip tests for plain and transformed composite draws and retained audit failures, verifying proof ownership and rejection survive serialization. |
-
-### Architecture / modularity / SOLID
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| ARCH-023 | open | medium | small | Architecture/modularity/SOLID: remove the unused recursive `Generator.nested_types` / `_nested_type_names` discovery path in `ton/generators/base.py` and update its fixtures in `tests/test_composite_generators.py`. The hook is documented there as the extension discovery contract, but the compiler and worker traversal consult only `nested_specs`; the legacy plugin test passes because it supplies a full registry. Use the canonical ownership declaration and retain a regression that a declared plugin child is prepared and receives worker sequence offsets. |
 
 ## Blocked / Deferred
 

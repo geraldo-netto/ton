@@ -111,18 +111,6 @@ class Generator(ABC):
             "build an Engine instead of calling prepare() directly"
         )
 
-    def nested_types(self, spec: Mapping[str, Any]) -> tuple[str, ...]:
-        """Return direct child generator references declared by ``spec``.
-
-        Composite extensions override this discovery hook so lazy registry
-        construction does not need to infer generator references from
-        arbitrary nested mappings.
-        """
-        names: list[str] = []
-        for _location, nested_spec in self.nested_specs(spec):
-            names.extend(self._nested_type_names(nested_spec))
-        return tuple(names)
-
     def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
         """Return ``(location, spec)`` pairs owned as nested generators.
 
@@ -132,22 +120,6 @@ class Generator(ABC):
         """
         del spec
         return ()
-
-    @staticmethod
-    def _nested_type_names(specs: Any) -> tuple[str, ...]:
-        """Collect type references below a composite-owned spec subtree."""
-        names: list[str] = []
-        values = specs if isinstance(specs, list) else [specs]
-        for value in values:
-            if not isinstance(value, Mapping):
-                continue
-            type_name = value.get("type")
-            if isinstance(type_name, str):
-                names.append(type_name)
-            for nested in value.values():
-                if isinstance(nested, (Mapping, list)):
-                    names.extend(Generator._nested_type_names(nested))
-        return tuple(names)
 
     @abstractmethod
     def generate(self, prepared: Any, rng: Random) -> str:

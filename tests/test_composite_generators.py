@@ -436,22 +436,25 @@ def test_preparation_context_resolves_children_through_shared_registry() -> None
     assert generator.generate(prepared, Random(0)) == "x"
 
 
-def test_generator_nested_type_hook_defaults_empty_and_is_extensible() -> None:
+def test_generator_nested_spec_hook_defaults_empty_and_is_extensible() -> None:
     class Composite(Generator):
         type_name = "composite"
 
-        def nested_types(self, spec):
-            return tuple(spec["children"])
+        def nested_specs(self, spec):
+            return tuple(
+                (f"children[{index}]", child) for index, child in enumerate(spec["children"])
+            )
 
         def generate(self, prepared, rng):
             return ""
 
-    assert Generator.nested_types(Composite(), {}) == ()
-    assert Composite().nested_types({"children": ["string", "integer"]}) == (
-        "string",
-        "integer",
+    assert Generator.nested_specs(Composite(), {}) == ()
+    assert Composite().nested_specs({"children": [{"type": "string"}, {"type": "integer"}]}) == (
+        ("children[0]", {"type": "string"}),
+        ("children[1]", {"type": "integer"}),
     )
-    assert Generator._nested_type_names([None, {"type": "string"}]) == ("string",)
+    assert not hasattr(Generator, "nested_types")
+    assert not hasattr(Generator, "_nested_type_names")
 
 
 @pytest.mark.parametrize(
@@ -460,20 +463,50 @@ def test_generator_nested_type_hook_defaults_empty_and_is_extensible() -> None:
         (
             OneOfGenerator(),
             {"choices": [{"type": "string"}, {"type": "sequence_of", "spec": {"type": "char"}}]},
-            ("string", "sequence_of", "char"),
+            (
+                ("choices[0]", {"type": "string"}),
+                ("choices[1]", {"type": "sequence_of", "spec": {"type": "char"}}),
+            ),
         ),
         (
             SequenceOfGenerator(),
             {"spec": {"type": "oneOf", "choices": [{"type": "integer"}]}},
-            ("oneOf", "integer"),
+            (("spec", {"type": "oneOf", "choices": [{"type": "integer"}]}),),
         ),
     ],
 )
-def test_builtin_composites_declare_transitive_nested_types(generator, spec, expected) -> None:
-    assert generator.nested_types(spec) == expected
+def test_builtin_composites_declare_direct_owned_specs(generator, spec, expected) -> None:
+    assert generator.nested_specs(spec) == expected
+
+
+def test_plugin_composite_must_declare_prepared_children() -> None:
+    """ARCH-023: compilation cannot silently accept children worker traversal cannot see."""
+
+    class Undeclared(Generator):
+        type_name = "undeclared"
+
+        def prepare(self, spec, context=None):
+            return context.prepare_child(self.type_name, "child", spec["child"])
+
+        def generate(self, prepared, rng):
+            return prepared[0].generate(prepared[1], rng)
+
+    registry = api.build_extension_catalog().generators()
+    registry["undeclared"] = Undeclared()
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {
+            "x": {"type": "undeclared", "child": {"type": "sequence"}},
+        },
+    }
+    with pytest.raises(TemplateError, match="types.x.child.*nested_specs"):
+        Engine(config, registry=registry)
 
 
 def test_plugin_composite_uses_public_preparation_context() -> None:
+    """ARCH-023: declared plugin children prepare and receive worker sequence offsets."""
+
     class Wrapper(Generator):
         type_name = "wrapper"
 
@@ -481,8 +514,8 @@ def test_plugin_composite_uses_public_preparation_context() -> None:
             assert context is not None
             return context.prepare_child("wrapper", "'child'", spec["child"])
 
-        def nested_types(self, spec):
-            return self._nested_type_names(spec["child"])
+        def nested_specs(self, spec):
+            return (("child", spec["child"]),)
 
         def generate(self, prepared, rng):
             generator, child = prepared
@@ -491,17 +524,21 @@ def test_plugin_composite_uses_public_preparation_context() -> None:
     registry = api.build_extension_catalog().generators()
     registry["wrapper"] = Wrapper()
     config = {
-        "rows": 1,
+        "rows": 4,
         "format": "$value$",
         "types": {
             "value": {
                 "type": "wrapper",
-                "child": {"type": "string", "values": ["x"]},
+                "child": {"type": "sequence"},
             }
         },
     }
 
-    assert list(Engine(config, registry=registry)) == ["[x]"]
+    assert list(Engine(config, registry=registry)) == ["[0]", "[1]", "[2]", "[3]"]
+    worker = api.fork_engine(
+        config, registry=registry, parent_seed=0, worker_id=1, workers=2, rows=2
+    )
+    assert list(worker) == ["[2]", "[3]"]
 
 
 # ---------------------------------------------------------------------------

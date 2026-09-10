@@ -37,6 +37,7 @@ class PreparedField:
     source_is_paired: bool = False
     uses_source: bool = True
     validators: tuple[Any, ...] = ()
+    provider: tuple[str | None, str | None] = (None, None)
 
     @cached_property
     def is_direct(self) -> bool:

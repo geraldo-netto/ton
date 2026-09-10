@@ -26,7 +26,6 @@ from ._proof import (
     _trace_enabled,
 )
 from ._proofcheck import ProofChecker, ProofFailureSink, ProofHookError
-from ._registry import plugin_provenance
 from ._transforms import Transform, TransformResult
 from ._validation import ValidationError, Validator
 from .generators import Generator
@@ -323,7 +322,7 @@ class Engine:
             field = self._plan.prepared[type_key]
             generator = field.generator
             failures = self._proof.failure_counts.get(type_key, 0)
-            plugin_package, plugin_version = plugin_provenance(generator)
+            plugin_package, plugin_version = field.provider
             records.append(
                 ProvenanceRecord(
                     type_key=type_key,

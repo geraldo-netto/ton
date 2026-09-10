@@ -11,11 +11,13 @@ from ._logging import logger as _logger
 from ._proof import PreparedField, PreparedTransform
 from ._recursion import NestingTooDeepError, ensure_depth_headroom
 from ._registry import (
+    RegisteredExtensions,
     RegistryError,
     default_transforms,
     default_validators,
     make_registry,
     normalize_reference,
+    plugin_provenance,
     runtime_type_name,
 )
 from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
@@ -143,7 +145,7 @@ class EngineCompiler:
         self, registry: Mapping[str, Generator] | None
     ) -> Mapping[str, Generator]:
         if registry is not None:
-            return dict(registry)
+            return registry.copy() if isinstance(registry, RegisteredExtensions) else dict(registry)
         root_specs: list[Mapping[str, Any]] = []
         for type_key in self.field_keys:
             spec = self.types.get(type_key)
@@ -235,6 +237,7 @@ class EngineCompiler:
                     source_is_paired=bool(generator.is_paired and uses_source),
                     uses_source=uses_source,
                     validators=self._resolve_validators(type_key, spec),
+                    provider=plugin_provenance(self.registry, spec["type"]),
                 )
             except Exception as exc:  # noqa: BLE001
                 _logger.warning(

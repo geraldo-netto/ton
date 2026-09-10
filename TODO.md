@@ -34,7 +34,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| PLUG-005 | open | medium | medium | Plugin extensibility/provenance: `_registry._PLUGIN_PROVENANCE` stores provider data globally by plugin class instead of the approved catalog registration record. Loading the same generator class from a second provider changes `Engine.provenance` on an already-built first engine; an entry point returning `StringGenerator` also labels unrelated built-in string engines with that provider. Resolve with registration-scoped metadata carried through catalog snapshots and process serialization, while retaining support for frozen/slotted plugins. Test two providers sharing a class and untouched core registrations. |
 
 ### Configuration discoverability
 

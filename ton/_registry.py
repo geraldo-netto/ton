@@ -17,12 +17,11 @@ import inspect
 import re
 import threading
 from collections import Counter
-from collections.abc import Collection, Iterable, Iterator, Mapping, MutableMapping
+from collections.abc import Collection, Iterable, Iterator, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from importlib.metadata import entry_points
 from typing import Any
-from weakref import WeakKeyDictionary
 
 from ._logging import LogEvent
 from ._logging import logger as _logger
@@ -86,6 +85,26 @@ class EntryPointSelector:
         return f"{self.group}:{self.distribution}:{self.name}"
 
 
+@dataclass(frozen=True)
+class Registration[T]:
+    """Provider metadata belongs to one catalog registration, never to a plugin class."""
+
+    extension: T
+    package: str | None
+    version: str | None
+
+
+class RegisteredExtensions[T](dict[str, T]):
+    """Mutable registry view carrying independently owned registration records."""
+
+    def __init__(self, values: Mapping[str, T], records: Mapping[str, Registration[T]]) -> None:
+        super().__init__(values)
+        self.records = dict(records)
+
+    def copy(self) -> RegisteredExtensions[T]:
+        return RegisteredExtensions(self, self.records)
+
+
 class ExtensionCatalog:
     """Namespaced catalog for data types, transforms, and validators."""
 
@@ -101,6 +120,7 @@ class ExtensionCatalog:
         }
         self._transforms: dict[str, dict[str, Transform]] = {CORE_NAMESPACE: dict(transforms or {})}
         self._validators: dict[str, dict[str, Any]] = {CORE_NAMESPACE: dict(validators or {})}
+        self._providers: dict[tuple[str, str], tuple[str | None, str | None]] = {}
         self._lock = threading.RLock()
         # Flattened views are rebuilt only when a registration mutates a
         # store (PERF-003); catalog reads during config validation hit
@@ -143,15 +163,26 @@ class ExtensionCatalog:
         # so aliases still share one instance within an Engine while separate
         # Engine builds never share mutable generator state.
         with self._lock:
-            return deepcopy(self._flattened("generators", self._generators))
+            return self._registry_view("data_type", "generators", self._generators)
 
     def transforms(self) -> dict[str, Transform]:
         with self._lock:
-            return deepcopy(self._flattened("transforms", self._transforms))
+            return self._registry_view("transform", "transforms", self._transforms)
 
     def validators(self) -> dict[str, Any]:
         with self._lock:
-            return deepcopy(self._flattened("validators", self._validators))
+            return self._registry_view("validator", "validators", self._validators)
+
+    def _registry_view[T](
+        self, kind: str, key: str, store: Mapping[str, Mapping[str, T]]
+    ) -> RegisteredExtensions[T]:
+        values = self._flattened(key, store)
+        records = {
+            reference: Registration(values[reference], *provider)
+            for (record_kind, reference), provider in self._providers.items()
+            if record_kind == kind
+        }
+        return deepcopy(RegisteredExtensions(values, records))
 
     def list_data_types(self) -> tuple[str, ...]:
         with self._lock:
@@ -363,8 +394,8 @@ def _load_catalog_candidate(
         plugin = ep.load()()
         namespace, name = _entry_point_namespace_name(ep.name, kind, plugin)
         _validate_entry_point_plugin(kind, plugin)
-        _record_plugin_dist(plugin, ep)
         _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
+        catalog._providers[kind, f"{namespace}.{name}"] = _safe_entry_point_dist(ep)
     except Exception as exc:  # noqa: BLE001 - per-entry failure isolation
         _log_entry_point_failed(ep, exc)
         return False, _explicit_entry_point_failure(
@@ -671,27 +702,13 @@ def _safe_entry_point_dist(ep: object) -> tuple[str | None, str | None]:
     )
 
 
-#: Provider metadata per plugin class, for ``Engine.provenance`` (OBS-001).
-#: Assigning attributes to the instance instead raised FrozenInstanceError or
-#: AttributeError for frozen dataclass and slotted implementations that
-#: satisfy the public protocols, and the failure silently skipped the plugin
-#: (PLUG-005). The class survives the catalog's deep copies, so provenance is
-#: looked up rather than carried on the object.
-_PLUGIN_PROVENANCE: MutableMapping[type, tuple[str | None, str | None]] = WeakKeyDictionary()
-
-
-def _record_plugin_dist(plugin: Any, ep: object) -> None:
-    """Associate a plugin's class with the distribution that provided it."""
-    _PLUGIN_PROVENANCE[type(plugin)] = _safe_entry_point_dist(ep)
-
-
-def plugin_provenance(plugin: Any) -> tuple[str | None, str | None]:
-    """Return ``(package, version)`` for ``plugin``, or ``(None, None)``.
-
-    Built-ins were never registered from an entry point, so they report
-    ``None`` -- the same answer the stamped attributes used to give.
-    """
-    return _PLUGIN_PROVENANCE.get(type(plugin), (None, None))
+def plugin_provenance(registry: Mapping[str, Any], reference: str) -> tuple[str | None, str | None]:
+    """Read provider metadata from an unchanged registration in this registry view."""
+    if isinstance(registry, RegisteredExtensions):
+        record = registry.records.get(normalize_reference(reference))
+        if record is not None and resolve_reference(registry, reference) is record.extension:
+            return record.package, record.version
+    return None, None
 
 
 def _entry_point_dist(ep: object) -> tuple[str | None, str | None]:

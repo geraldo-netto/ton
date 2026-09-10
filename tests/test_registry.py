@@ -415,8 +415,7 @@ def test_entry_point_logs_and_provenance_sanitize_distribution_metadata(
         value is None or (value.isascii() and "\n" not in value and "\r" not in value)
         for value in metadata
     )
-    plugin = catalog.get_data_type("acme.custom")
-    assert plugin_provenance(plugin) == ("safe?forged", "1?forged")
+    assert plugin_provenance(catalog.generators(), "acme.custom") == ("safe?forged", "1?forged")
 
 
 def test_catalog_entry_points_honor_allowlist() -> None:
@@ -688,7 +687,7 @@ def test_entry_point_plugins_need_not_accept_attribute_assignment() -> None:
         catalog = catalog_with_entry_points()
 
     assert "acme.readonly" in catalog.list_data_types()
-    assert plugin_provenance(catalog.get_data_type("acme.readonly")) == ("acme-plugins", "2")
+    assert plugin_provenance(catalog.generators(), "acme.readonly") == ("acme-plugins", "2")
 
 
 def test_catalog_entry_point_without_namespace_uses_plugin_namespace() -> None:
@@ -747,7 +746,7 @@ def test_immutable_protocol_validators_load_from_entry_points(shape: str) -> Non
         catalog = catalog_with_entry_points()
 
     assert f"acme.{shape}" in catalog.list_validators()
-    assert plugin_provenance(catalog.validators()[f"acme.{shape}"]) == ("acme-plugins", "3")
+    assert plugin_provenance(catalog.validators(), f"acme.{shape}") == ("acme-plugins", "3")
 
 
 def test_exact_selector_for_an_immutable_plugin_is_satisfied() -> None:
@@ -777,3 +776,52 @@ def test_exact_selector_for_an_immutable_plugin_is_satisfied() -> None:
         )
 
     assert "acme.frozen_selector" in catalog.list_validators()
+
+
+def test_provider_provenance_is_scoped_to_each_registration() -> None:
+    """PLUG-005: sharing a class cannot relabel prior engines or core registrations."""
+    import pickle
+
+    from ton.generators.string import StringGenerator
+
+    def load(provider):
+        ep = mock.Mock()
+        ep.name = "acme.shared"
+        ep.value = "pkg:StringGenerator"
+        ep.dist = SimpleNamespace(name=provider, version="1")
+        ep.load.return_value = StringGenerator
+        with mock.patch(
+            "ton._registry.entry_points",
+            side_effect=lambda group: [ep] if group == "ton.generators" else [],
+        ):
+            return catalog_with_entry_points()
+
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "acme.shared", "values": ["x"]}}}
+    first = api.Engine(config, registry=load("first-provider").generators())
+    assert first.provenance[0].plugin_package == "first-provider"
+    second_catalog = load("second-provider")
+    second = api.Engine(config, registry=second_catalog.generators())
+    assert first.provenance[0].plugin_package == "first-provider"
+    assert second.provenance[0].plugin_package == "second-provider"
+    core = {"rows": 1, "format": "$x$", "types": {"x": {"type": "string", "values": ["x"]}}}
+    assert api.Engine(core).provenance[0].plugin_package is None
+    assert (
+        api.Engine(core, registry=second_catalog.generators()).provenance[0].plugin_package is None
+    )
+    restored = pickle.loads(pickle.dumps(first))
+    assert restored.provenance == first.provenance
+    assert list(restored) == ["x"]
+
+
+def test_replacing_a_registry_value_does_not_inherit_provider_metadata() -> None:
+    """PLUG-005: mutable registry views keep provenance tied to the registered instance."""
+    from ton._registry import RegisteredExtensions, Registration
+    from ton.generators.string import StringGenerator
+
+    original = StringGenerator()
+    registry = RegisteredExtensions(
+        {"acme.value": original}, {"acme.value": Registration(original, "provider", "2")}
+    )
+    assert plugin_provenance(registry, "acme.value") == ("provider", "2")
+    registry["acme.value"] = StringGenerator()
+    assert plugin_provenance(registry, "acme.value") == (None, None)

@@ -37,12 +37,13 @@ from random import Random
 from typing import Any, ClassVar, cast
 
 from .._proof import PreparedTransform, ProofResult, TransformStep, _trace_enabled
+from .._specpath import SpecPath, format_spec_path
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
 from .._validation import ValidationError, validate_with_reference
 
 ChildPreparer = Callable[
-    ["PreparationContext", str, str, Any],
+    ["PreparationContext", str, SpecPath, Any],
     tuple["Generator", Any],
 ]
 
@@ -58,7 +59,7 @@ class PreparationContext:
     def prepare_child(
         self,
         parent_type: str,
-        location: str,
+        location: SpecPath,
         nested_spec: Any,
     ) -> tuple[Generator, Any]:
         if self.child_preparer is not None:
@@ -111,9 +112,13 @@ class Generator(ABC):
             "build an Engine instead of calling prepare() directly"
         )
 
-    def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    def nested_specs(
+        self, spec: Mapping[str, Any]
+    ) -> tuple[tuple[SpecPath, Mapping[str, Any]], ...]:
         """Return ``(location, spec)`` pairs owned as nested generators.
 
+        Locations are tuples of literal mapping keys and list indices, such
+        as ``("choices", 0, "spec")``. Pass the same location to prepare_child.
         Composite extensions override this hook to declare only their real
         generator-bearing config locations. Ordinary plugin metadata is not
         interpreted as a generator merely because it contains ``type``.
@@ -487,7 +492,7 @@ def require_min_le_max(type_name: str, lo: Any, hi: Any) -> None:
 
 def prepare_child_spec(
     parent_type: str,
-    location: str,
+    location: SpecPath,
     nested_spec: Any,
     registry: Mapping[str, Generator],
     context: PreparationContext | None = None,
@@ -509,20 +514,21 @@ def prepare_child_spec(
 
 
 def resolve_child_spec(
-    parent_type: str, location: str, nested_spec: Any, registry: Mapping[str, Generator]
+    parent_type: str, location: SpecPath, nested_spec: Any, registry: Mapping[str, Generator]
 ) -> Generator:
     """Resolve and validate a child before iterative preparation schedules it."""
+    label = repr(format_spec_path(location))
     if not isinstance(nested_spec, Mapping) or "type" not in nested_spec:
-        raise ValueError(f"{parent_type} {location} must be an object with a 'type' field")
+        raise ValueError(f"{parent_type} {label} must be an object with a 'type' field")
     from .._registry import resolve_reference
 
     nested_type = str(nested_spec["type"])
     child = resolve_reference(registry, nested_type)
     if child is None:
-        raise ValueError(f"{parent_type} {location} references unknown type {nested_type!r}")
+        raise ValueError(f"{parent_type} {label} references unknown type {nested_type!r}")
     if child.is_paired:
         raise ValueError(
-            f"{parent_type} {location} uses paired type {nested_type!r}; "
+            f"{parent_type} {label} uses paired type {nested_type!r}; "
             "paired generators cannot be nested inside a composite generator "
             "(the [id] half would be unreachable)"
         )

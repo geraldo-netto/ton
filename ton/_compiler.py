@@ -21,6 +21,7 @@ from ._registry import (
     runtime_type_name,
 )
 from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
+from ._specpath import SpecPath, format_spec_path
 from ._specsnapshot import snapshot_spec
 from ._template import Token, parse, split_segments
 from ._transforms import Transform, fold_paired_capabilities
@@ -168,8 +169,8 @@ class EngineCompiler:
     def _transform_child_specs(
         self,
         field_spec: Mapping[str, Any],
-    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
-        children: list[tuple[str, Mapping[str, Any]]] = []
+    ) -> tuple[tuple[SpecPath, Mapping[str, Any]], ...]:
+        children: list[tuple[SpecPath, Mapping[str, Any]]] = []
         transforms = field_spec.get("transforms", [])
         if not isinstance(transforms, list):
             return ()
@@ -182,7 +183,7 @@ class EngineCompiler:
             transform = resolve_reference(self.transforms, reference)
             if transform is not None:
                 children.extend(
-                    (f"transforms[{index}].{location}", child)
+                    (("transforms", index, *location), child)
                     for location, child in transform.nested_specs(transform_spec)
                 )
         return tuple(children)
@@ -294,10 +295,10 @@ class EngineCompiler:
         self,
         context: PreparationContext,
         parent_type: str,
-        location: str,
+        location: SpecPath,
         nested_spec: Any,
     ) -> tuple[Generator, Any]:
-        child_path = ".".join((context.path, location.strip("'")))
+        child_path = ".".join((context.path, format_spec_path(location)))
         if child_path in self._child_prepared:
             return self._child_prepared[child_path]
         resolve_child_spec(parent_type, location, nested_spec, self.registry)
@@ -324,7 +325,7 @@ class EngineCompiler:
     def _resolved_children(
         self,
         path: str,
-        nested: Iterable[tuple[str, Mapping[str, Any]]],
+        nested: Iterable[tuple[SpecPath, Mapping[str, Any]]],
     ) -> Iterator[tuple[str, Mapping[str, Any], Generator]]:
         """Pair each declared child spec with its registered generator."""
         for location, nested_spec in nested:
@@ -333,7 +334,7 @@ class EngineCompiler:
                 continue
             child = resolve_reference(self.registry, reference)
             if child is not None:
-                yield f"{path}.{location}", nested_spec, child
+                yield f"{path}.{format_spec_path(location)}", nested_spec, child
 
     def _prepare_transforms(
         self,

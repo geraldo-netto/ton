@@ -412,17 +412,17 @@ def test_sequence_of_can_nest_other_composites() -> None:
 
 def test_prepare_child_spec_rejects_non_mapping() -> None:
     with pytest.raises(ValueError, match="must be an object"):
-        prepare_child_spec("custom", "'spec'", "not-a-mapping", {})
+        prepare_child_spec("custom", ("spec",), "not-a-mapping", {})
 
 
 def test_prepare_child_spec_rejects_missing_type_field() -> None:
     with pytest.raises(ValueError, match="must be an object"):
-        prepare_child_spec("custom", "'spec'", {"values": ["x"]}, {})
+        prepare_child_spec("custom", ("spec",), {"values": ["x"]}, {})
 
 
 def test_prepare_child_spec_rejects_unknown_type() -> None:
     with pytest.raises(ValueError, match="unknown type"):
-        prepare_child_spec("custom", "'spec'", {"type": "nope"}, {})
+        prepare_child_spec("custom", ("spec",), {"type": "nope"}, {})
 
 
 def test_preparation_context_resolves_children_through_shared_registry() -> None:
@@ -430,7 +430,7 @@ def test_preparation_context_resolves_children_through_shared_registry() -> None
     context = PreparationContext(registry)
 
     generator, prepared = context.prepare_child(
-        "custom", "'spec'", {"type": "string", "values": ["x"]}
+        "custom", ("spec",), {"type": "string", "values": ["x"]}
     )
 
     assert generator.generate(prepared, Random(0)) == "x"
@@ -442,7 +442,7 @@ def test_generator_nested_spec_hook_defaults_empty_and_is_extensible() -> None:
 
         def nested_specs(self, spec):
             return tuple(
-                (f"children[{index}]", child) for index, child in enumerate(spec["children"])
+                (("children", index), child) for index, child in enumerate(spec["children"])
             )
 
         def generate(self, prepared, rng):
@@ -450,8 +450,8 @@ def test_generator_nested_spec_hook_defaults_empty_and_is_extensible() -> None:
 
     assert Generator.nested_specs(Composite(), {}) == ()
     assert Composite().nested_specs({"children": [{"type": "string"}, {"type": "integer"}]}) == (
-        ("children[0]", {"type": "string"}),
-        ("children[1]", {"type": "integer"}),
+        (("children", 0), {"type": "string"}),
+        (("children", 1), {"type": "integer"}),
     )
     assert not hasattr(Generator, "nested_types")
     assert not hasattr(Generator, "_nested_type_names")
@@ -464,14 +464,14 @@ def test_generator_nested_spec_hook_defaults_empty_and_is_extensible() -> None:
             OneOfGenerator(),
             {"choices": [{"type": "string"}, {"type": "sequence_of", "spec": {"type": "char"}}]},
             (
-                ("choices[0]", {"type": "string"}),
-                ("choices[1]", {"type": "sequence_of", "spec": {"type": "char"}}),
+                (("choices", 0), {"type": "string"}),
+                (("choices", 1), {"type": "sequence_of", "spec": {"type": "char"}}),
             ),
         ),
         (
             SequenceOfGenerator(),
             {"spec": {"type": "oneOf", "choices": [{"type": "integer"}]}},
-            (("spec", {"type": "oneOf", "choices": [{"type": "integer"}]}),),
+            ((("spec",), {"type": "oneOf", "choices": [{"type": "integer"}]}),),
         ),
     ],
 )
@@ -486,7 +486,7 @@ def test_plugin_composite_must_declare_prepared_children() -> None:
         type_name = "undeclared"
 
         def prepare(self, spec, context=None):
-            return context.prepare_child(self.type_name, "child", spec["child"])
+            return context.prepare_child(self.type_name, ("child",), spec["child"])
 
         def generate(self, prepared, rng):
             return prepared[0].generate(prepared[1], rng)
@@ -512,10 +512,10 @@ def test_plugin_composite_uses_public_preparation_context() -> None:
 
         def prepare(self, spec, context=None):
             assert context is not None
-            return context.prepare_child("wrapper", "'child'", spec["child"])
+            return context.prepare_child("wrapper", ("child",), spec["child"])
 
         def nested_specs(self, spec):
-            return (("child", spec["child"]),)
+            return ((("child",), spec["child"]),)
 
         def generate(self, prepared, rng):
             generator, child = prepared

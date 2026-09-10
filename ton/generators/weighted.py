@@ -36,6 +36,7 @@ from .._distribution import (
     prepare_distribution,
 )
 from .._proof import ProofResult
+from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
 from .base import Generator, PreparationContext
@@ -53,14 +54,16 @@ class WeightedGenerator(Generator):
 
     type_name = "weighted"
 
-    def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    def nested_specs(
+        self, spec: Mapping[str, Any]
+    ) -> tuple[tuple[SpecPath, Mapping[str, Any]], ...]:
         choices = spec.get("choices")
         if not isinstance(choices, list):
             return ()
-        nested: list[tuple[str, Mapping[str, Any]]] = []
+        nested: list[tuple[SpecPath, Mapping[str, Any]]] = []
         for index, choice in enumerate(choices):
             if isinstance(choice, Mapping) and isinstance(choice.get("spec"), Mapping):
-                nested.append((f"choices[{index}].spec", choice["spec"]))
+                nested.append((("choices", index, "spec"), choice["spec"]))
         return tuple(nested)
 
     def prepare(

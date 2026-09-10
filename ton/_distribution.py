@@ -107,7 +107,7 @@ def _prepare_choice(
     owner = f"types.{context.path}" if context.path else label
     require_known_keys(f"{owner}.choices[{index}]", choice, _CHOICE_KEYS)
     weight = _coerce_weight(index, choice, label)
-    child = context.prepare_child(label, f"'choices[{index}].spec'", choice.get("spec"))
+    child = context.prepare_child(label, ("choices", index, "spec"), choice.get("spec"))
     return weight, child
 
 

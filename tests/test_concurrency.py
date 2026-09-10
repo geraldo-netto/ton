@@ -479,11 +479,11 @@ def test_worker_offsets_only_declared_plugin_children(replacing, aliased) -> Non
         type_name = "metadata"
 
         def nested_specs(self, spec):
-            return (("child", spec["child"]),) if "child" in spec else ()
+            return ((("child",), spec["child"]),) if "child" in spec else ()
 
         def prepare(self, spec, context=None):
             child = (
-                context.prepare_child(self.type_name, "child", spec["child"])
+                context.prepare_child(self.type_name, ("child",), spec["child"])
                 if "child" in spec
                 else None
             )
@@ -629,3 +629,35 @@ def test_workers_ignore_unused_malformed_fields(unused_kind):
     ]:
         with pytest.raises(ValueError):
             build()
+
+
+@pytest.mark.parametrize("key", ["dotted.key", "child[0]", "'quoted'", ""])
+def test_worker_plugin_child_keys_are_literal(key):
+    """CONC-023: punctuation in a mapping key is never a traversal instruction."""
+    from ton._registry import make_registry
+    from ton.generators import Generator
+
+    class LiteralChild(Generator):
+        type_name = "literal_child"
+
+        def nested_specs(self, spec):
+            return (((key,), spec[key]),)
+
+        def prepare(self, spec, context=None):
+            return context.prepare_child(self.type_name, (key,), spec[key])
+
+        def generate(self, prepared, rng):
+            generator, child = prepared
+            return generator.generate(child, rng)
+
+    registry = make_registry()
+    registry["literal_child"] = LiteralChild()
+    config = {
+        "rows": 4,
+        "format": "$x$",
+        "types": {"x": {"type": "literal_child", key: {"type": "sequence"}}},
+    }
+    assert list(Engine.from_config(config, registry=registry)) == ["0", "1", "2", "3"]
+    worker = fork_engine(config, registry=registry, parent_seed=1, worker_id=1, workers=2, rows=2)
+    assert list(worker) == ["2", "3"]
+    assert config["types"]["x"][key] == {"type": "sequence"}

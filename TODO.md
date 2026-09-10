@@ -40,12 +40,6 @@
 |---|---|---|---|---|
 | OBS-032 | open | medium | medium | Observability: retain the originating nested proof hook's stage/reference across `ChildPipelineGenerator._prove_steps`, composite proof traversal and `ProofChecker`. A transform proof raising `RuntimeError` is reported as `Transform proof / proof_crash` at the root, `Source proof / oneOf` inside oneOf, and `Transform proof / distribution` inside a distribution candidate. Add permanent root/nested hook-failure regressions for exception and structured-log attribution before fixing. |
 
-### Concurrency
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| CONC-023 | open | medium | medium | Concurrency: stop interpreting every plugin child-location string as a dotted/indexed traversal path in `ton/concurrency.py::_replace_owned_child`. A declared child stored under the literal key `dotted.key` generates `0, 1` through the ordinary engine but `fork_engine` raises `KeyError('dotted')`. Use an unambiguous ownership/location representation shared with compilation; add permanent direct/worker parity regressions for literal dots and brackets while preserving metadata isolation. |
-
 ## Blocked / Deferred
 
 | id | status | severity | effort | description |

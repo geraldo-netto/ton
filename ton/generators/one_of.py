@@ -27,6 +27,7 @@ from random import Random
 from typing import Any, cast
 
 from .._proof import ProofResult
+from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
 from .base import Generator, PreparationContext, drawn, prove_draws, proven_draws
@@ -42,12 +43,14 @@ class OneOfGenerator(Generator):
 
     type_name = "oneOf"
 
-    def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    def nested_specs(
+        self, spec: Mapping[str, Any]
+    ) -> tuple[tuple[SpecPath, Mapping[str, Any]], ...]:
         choices = spec.get("choices")
         if not isinstance(choices, list):
             return ()
         return tuple(
-            (f"choices[{index}]", choice)
+            (("choices", index), choice)
             for index, choice in enumerate(choices)
             if isinstance(choice, Mapping)
         )
@@ -63,7 +66,7 @@ class OneOfGenerator(Generator):
         if not isinstance(raw, list) or not raw:
             raise ValueError("oneOf 'choices' must be a non-empty list")
         children = tuple(
-            context.prepare_child("oneOf", f"'choices[{i}]'", entry) for i, entry in enumerate(raw)
+            context.prepare_child("oneOf", ("choices", i), entry) for i, entry in enumerate(raw)
         )
         return OneOfSpec(children=children)
 

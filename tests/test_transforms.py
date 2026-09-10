@@ -95,7 +95,7 @@ def test_distribution_transform_declares_nested_specs() -> None:
 
     assert transform.nested_specs(
         {"choices": [{"spec": first}, {"weight": 2, "spec": second}]}
-    ) == (("choices[0].spec", first), ("choices[1].spec", second))
+    ) == ((("choices", 0, "spec"), first), (("choices", 1, "spec"), second))
     assert transform.nested_specs({"choices": "invalid"}) == ()
 
 

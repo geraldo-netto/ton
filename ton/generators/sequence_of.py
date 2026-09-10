@@ -26,6 +26,7 @@ from random import Random
 from typing import Any, cast
 
 from .._proof import ProofResult, _trace_enabled
+from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
 from .base import (
@@ -51,9 +52,11 @@ class SequenceOfGenerator(Generator):
 
     type_name = "sequence_of"
 
-    def nested_specs(self, spec: Mapping[str, Any]) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    def nested_specs(
+        self, spec: Mapping[str, Any]
+    ) -> tuple[tuple[SpecPath, Mapping[str, Any]], ...]:
         child = spec.get("spec")
-        return (("spec", child),) if isinstance(child, Mapping) else ()
+        return ((("spec",), child),) if isinstance(child, Mapping) else ()
 
     def prepare(
         self,
@@ -68,7 +71,7 @@ class SequenceOfGenerator(Generator):
         separator = spec.get("separator", "")
         if not isinstance(separator, str):
             raise ValueError("sequence_of 'separator' must be a string")
-        child = context.prepare_child("sequence_of", "'spec'", spec.get("spec"))
+        child = context.prepare_child("sequence_of", ("spec",), spec.get("spec"))
         return SequenceOfSpec(count=count, separator=separator, child=child)
 
     @cooperative

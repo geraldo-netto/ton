@@ -310,9 +310,10 @@ Custom plugins register via three entry-point groups in any installed package: `
 Generator extensions implement `prepare(spec, context)` and `generate(prepared, rng)`.
 Preparation runs once per engine. Composite generators resolve children with
 `context.prepare_child(parent_type, location, child_spec)` and declare their owned
-child locations with `nested_specs(spec)`. Discovery reads these declarations;
-ordinary plugin metadata remains opaque. Locations use config paths such as
-`spec` or `choices[0].spec`.
+child locations with `nested_specs(spec)`. Discovery reads only these declarations;
+ordinary plugin metadata remains opaque. Each location is a tuple of literal mapping keys
+and list indices, for example
+`("choices", 0, "spec")` or `("dotted.key",)`. Pass the same tuple to `prepare_child`.
 
 A composite generator using the public API:
 
@@ -324,10 +325,10 @@ class BracketGenerator(api.Generator):
     config_keys = frozenset({"spec"})
 
     def nested_specs(self, spec):
-        return (("spec", spec["spec"]),)
+        return ((("spec",), spec["spec"]),)
 
     def prepare(self, spec, context=None):
-        return context.prepare_child(self.type_name, "spec", spec["spec"])
+        return context.prepare_child(self.type_name, ("spec",), spec["spec"])
 
     def generate(self, prepared, rng):
         child, child_spec = prepared

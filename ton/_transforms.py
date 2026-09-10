@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
+from ._specpath import SpecPath
+
 
 @dataclass(frozen=True)
 class TransformCapabilities:
@@ -73,7 +75,7 @@ class Transform(Protocol):
     def nested_specs(
         self,
         spec: Mapping[str, Any],
-    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    ) -> tuple[tuple[SpecPath, Mapping[str, Any]], ...]:
         """Declare generator-bearing config locations for lazy discovery."""
         raise NotImplementedError  # pragma: no cover
 
@@ -116,7 +118,7 @@ class BaseTransform:
     def nested_specs(
         self,
         spec: Mapping[str, Any],
-    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    ) -> tuple[tuple[SpecPath, Mapping[str, Any]], ...]:
         """Declare generator-bearing config locations for lazy discovery."""
         del spec
         return ()

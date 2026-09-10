@@ -7,6 +7,7 @@ from random import Random
 from typing import Any, ClassVar, cast
 
 from .._distribution import WeightedChoiceSet, prepare_distribution
+from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import BaseTransform, TransformCapabilities, TransformProof, TransformResult
 from ..generators.base import PreparationContext
@@ -23,12 +24,12 @@ class DistributionTransform(BaseTransform):
     def nested_specs(
         self,
         spec: Mapping[str, Any],
-    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    ) -> tuple[tuple[SpecPath, Mapping[str, Any]], ...]:
         choices = spec.get("choices")
         if not isinstance(choices, list):
             return ()
         return tuple(
-            (f"choices[{index}].spec", choice["spec"])
+            (("choices", index, "spec"), choice["spec"])
             for index, choice in enumerate(choices)
             if isinstance(choice, Mapping) and isinstance(choice.get("spec"), Mapping)
         )

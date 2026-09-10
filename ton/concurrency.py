@@ -40,7 +40,6 @@ the partitioned row order.
 from __future__ import annotations
 
 import hashlib
-import re
 import struct
 from collections.abc import Mapping
 from random import Random
@@ -53,6 +52,7 @@ from ._logging import logger as _logger
 from ._output import open_output_path
 from ._proofcheck import ProofFailureSink
 from ._registry import default_transforms, make_registry, resolve_reference
+from ._specpath import SpecPath, format_spec_path
 from ._specsnapshot import snapshot_spec
 from ._template import parse
 from ._transforms import Transform
@@ -274,26 +274,24 @@ def _offset_sequence_spec(
         for location, child, amount in children:
             child_copy = dict(child)
             _replace_owned_child(spec, location, child_copy)
-            pending.append((child, child_copy, amount, f"{child_path}.{location}", False))
+            pending.append(
+                (child, child_copy, amount, f"{child_path}.{format_spec_path(location)}", False)
+            )
     return root
 
 
-def _replace_owned_child(spec: dict[str, Any], location: str, child: dict[str, Any]) -> None:
+def _replace_owned_child(spec: dict[str, Any], location: SpecPath, child: dict[str, Any]) -> None:
     """Copy only containers on a declared child path, retaining opaque metadata aliases."""
-    keys = [
-        int(index) if index else name
-        for name, index in re.findall(r"([^.[\]]+)|\[(\d+)\]", location)
-    ]
     target: Any = spec
-    for key in keys[:-1]:
+    for key in location[:-1]:
         target[key] = target[key].copy()
         target = target[key]
-    target[keys[-1]] = child
+    target[location[-1]] = child
 
 
 def _offset_source_spec(
     value: Any, offset: int, generator: Generator
-) -> list[tuple[str, Any, int]]:
+) -> list[tuple[SpecPath, Any, int]]:
     """Apply built-in sequence semantics to the effective generator implementation."""
     if isinstance(generator, SequenceGenerator):
         start = coerce_int(value, "start", type_name="sequence", default=0)
@@ -306,9 +304,9 @@ def _offset_source_spec(
 
 def _transform_sequence_children(
     value: Mapping[str, Any], offset: int, registry: Mapping[str, Transform]
-) -> tuple[bool, list[tuple[str, Any, int]]]:
+) -> tuple[bool, list[tuple[SpecPath, Any, int]]]:
     uses_source = True
-    children: list[tuple[str, Any, int]] = []
+    children: list[tuple[SpecPath, Any, int]] = []
     specs = value.get("transforms", [])
     if not isinstance(specs, list):
         return uses_source, children
@@ -320,7 +318,7 @@ def _transform_sequence_children(
             if index == 0:
                 uses_source = transform.requires_source
             children.extend(
-                (f"transforms[{index}].{location}", child, offset)
+                (("transforms", index, *location), child, offset)
                 for location, child in transform.nested_specs(spec)
             )
     return uses_source, children

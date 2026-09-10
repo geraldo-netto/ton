@@ -10,19 +10,17 @@ validation surfaces cannot drift (REL-011).
 from __future__ import annotations
 
 import codecs
-import json
 from collections.abc import Mapping
-from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
 
 from ._compiler import TemplateError, compile_plan
+from ._json import parse_json
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._registry import ExtensionCatalog
 from ._speckeys import unknown_key_message
 from ._template import UndeclaredVariableError, validate_against
-from .generators.base import str_to_int
 
 
 class ConfigError(ValueError):
@@ -54,12 +52,9 @@ def load(path: str | Path) -> dict[str, Any]:
 
     try:
         with config_path.open(encoding="utf-8") as fh:
-            # ``str_to_int`` keeps arbitrarily large JSON integers loadable:
-            # the stdlib parser inherits CPython's 4,300-digit conversion
-            # ceiling and would fail before structural validation (CFG-006).
-            # ``Decimal`` keeps written decimal bounds exact: binary floats
-            # silently moved them off the requested interval (CFG-007).
-            data = json.load(fh, parse_int=str_to_int, parse_float=Decimal)
+            # Container traversal uses heap frames; scalar decoding retains
+            # arbitrary-size integers and exact Decimal bounds (SCALE-017).
+            data = parse_json(fh.read())
     except UnicodeDecodeError as exc:
         raise ConfigError(f"Config file must be valid UTF-8: {exc}") from exc
 

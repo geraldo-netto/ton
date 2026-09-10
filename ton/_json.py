@@ -1,14 +1,91 @@
-"""Exact, stack-safe JSON encoding for audit payloads and fingerprints."""
+"""Exact, stack-safe JSON decoding and encoding."""
 
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
 from ._specsnapshot import FrozenSequence
-from .generators.base import int_to_str
+from .generators.base import int_to_str, str_to_int
+
+_SCALAR_DECODER = json.JSONDecoder(parse_int=str_to_int, parse_float=Decimal)
+_SPACE = re.compile(r"[ \t\n\r]*")
+
+
+@dataclass
+class _JsonFrame:
+    container: Any
+    first: bool = True
+
+
+def parse_json(text: str) -> Any:
+    """Decode containers iteratively, using the public JSON decoder for scalar syntax."""
+    reader = _JsonReader(text)
+    result = reader.value()
+    while reader.frames:
+        reader.fill(reader.frames[-1])
+    reader.whitespace()
+    if reader.position != len(text):
+        raise json.JSONDecodeError("Extra data", text, reader.position)
+    return result
+
+
+class _JsonReader:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.position = 0
+        self.frames: list[_JsonFrame] = []
+
+    def whitespace(self) -> None:
+        match = _SPACE.match(self.text, self.position)
+        assert match is not None
+        self.position = match.end()
+
+    def take(self, token: str) -> bool:
+        self.whitespace()
+        if not self.text.startswith(token, self.position):
+            return False
+        self.position += len(token)
+        return True
+
+    def require(self, token: str) -> None:
+        if not self.take(token):
+            raise json.JSONDecodeError(f"Expecting '{token}' delimiter", self.text, self.position)
+
+    def value(self) -> Any:
+        self.whitespace()
+        char = self.text[self.position : self.position + 1]
+        if char in ("{", "["):
+            self.position += 1
+            container: Any = {} if char == "{" else []
+            self.frames.append(_JsonFrame(container))
+            return container
+        value, self.position = _SCALAR_DECODER.raw_decode(self.text, self.position)
+        return value
+
+    def fill(self, frame: _JsonFrame) -> None:
+        is_object = isinstance(frame.container, dict)
+        if self.take("}" if is_object else "]"):
+            self.frames.pop()
+            return
+        if not frame.first:
+            self.require(",")
+        frame.first = False
+        if is_object:
+            self.whitespace()
+            if not self.text.startswith('"', self.position):
+                raise json.JSONDecodeError(
+                    "Expecting property name enclosed in double quotes", self.text, self.position
+                )
+            key = self.value()
+            self.require(":")
+            frame.container[key] = self.value()
+        else:
+            frame.container.append(self.value())
 
 
 def iter_json(value: Any, *, sort_keys: bool = False) -> Iterator[str]:

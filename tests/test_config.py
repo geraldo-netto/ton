@@ -906,3 +906,35 @@ def test_validator_aliases_preserve_validation(reference, key, nested):
     field["values"] = [""]
     with pytest.raises(api.ValidationError, match="non_empty"):
         list(api.generate(config, validators=validators))
+
+
+def test_load_deep_json_in_a_fresh_process(tmp_path):
+    """SCALE-017: JSON container nesting has no process-stack ceiling."""
+    import subprocess
+    import sys
+
+    depth = 5000
+    field = (
+        '{"type":"oneOf","choices":[' * depth + '{"type":"string","values":["x"]}' + "]}" * depth
+    )
+    path = tmp_path / "deep.json"
+    path.write_text('{"rows":0,"format":"$x$","types":{"x":' + field + "}}", encoding="utf-8")
+    program = """
+import sys
+from ton import api
+before = sys.getrecursionlimit(), sys.get_int_max_str_digits()
+config = api.load_config(sys.argv[1])
+field = config['types']['x']
+for _ in range(5000):
+    assert field['type'] == 'oneOf'
+    field = field['choices'][0]
+assert field == {'type': 'string', 'values': ['x']}
+assert config['rows'] == 0
+assert before == (sys.getrecursionlimit(), sys.get_int_max_str_digits())
+print('ok')
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", program, str(path)], capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"

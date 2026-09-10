@@ -9,12 +9,6 @@
 | REL-055 | open | medium | medium | Reliability/correctness: preserve nested generator exception attribution through composite execution. A generator raising `RuntimeError` reports `GeneratorExecutionError` with its own class at the root, but reports `OneOfGenerator` inside oneOf and becomes `TransformExecutionError(reference='distribution')` inside a distribution candidate. Preserve the failing generator's public error type/reference and original cause; add permanent root/nested API and row-context regressions before fixing. |
 | REL-056 | open | medium | medium | Reliability/correctness: preserve nested transform exception attribution in `ChildPipelineGenerator._generate_steps` and engine error translation. A transform raising `RuntimeError` produces `TransformExecutionError(reference='crash')` at the root, but becomes `GeneratorExecutionError(reference='OneOfGenerator')` inside oneOf or is attributed to the outer distribution transform. Add permanent root/nested regressions for public error type, transform reference, cause and row log context before fixing. |
 
-### Scalability
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| SCALE-017 | open | medium | medium | Scalability: remove the JSON decoder's nesting ceiling from `ton/_config.py::load`. A valid zero-row config containing 5,000 nested oneOf wrappers fails with `RecursionError` in `json.load`, although downstream snapshots and composite compilation use iterative traversal. Add a permanent fresh-process file-loading regression and use stack-safe parsing without changing the process recursion limit or imposing a depth cap. |
-
 ### Observability
 
 | id | status | severity | effort | description |

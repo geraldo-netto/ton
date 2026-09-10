@@ -6,6 +6,18 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from typing import Any
 
+from ._validation import ValidationError, ValidatorHookError
+
+
+class OperationError(RuntimeError):
+    """Retain the originating component until the engine supplies field/row context."""
+
+    def __init__(self, stage: str, reference: str, cause: Exception) -> None:
+        self.stage = stage
+        self.reference = reference
+        self.cause = cause
+        super().__init__(str(cause))
+
 
 @dataclass(frozen=True)
 class Call:
@@ -15,6 +27,7 @@ class Call:
 
 
 type Steps = Generator[Call, Any, Any]
+type _Frame = tuple[Call, Steps]
 
 
 def cooperative[F: Callable[..., Any]](operation: F) -> F:
@@ -26,7 +39,7 @@ def cooperative[F: Callable[..., Any]](operation: F) -> F:
 def run_steps(target: Any, operation: str, *args: Any) -> Any:
     """Drive cooperative composite operations while leaf hooks keep their normal API."""
     request: Call | None = Call(target, operation, args)
-    stack: list[Steps] = []
+    stack: list[_Frame] = []
     result: Any = None
     try:
         while request is not None:
@@ -37,28 +50,37 @@ def run_steps(target: Any, operation: str, *args: Any) -> Any:
                     result = method(*request.args)
                 else:
                     stepper = getattr(request.target, f"_{request.operation}_steps")
-                    stack.append(stepper(*request.args))
+                    stack.append((request, stepper(*request.args)))
                     result = None
             except Exception as exc:
-                error = exc
+                error = _attribute_error(request, exc)
             request, result = _resume(stack, result, error)
         return result
     finally:
-        for steps in reversed(stack):
+        for _request, steps in reversed(stack):
             steps.close()
 
 
-def _resume(stack: list[Steps], result: Any, error: Exception | None) -> tuple[Call | None, Any]:
+def _resume(stack: list[_Frame], result: Any, error: Exception | None) -> tuple[Call | None, Any]:
     while stack:
+        owner, steps = stack[-1]
         try:
-            request = stack[-1].throw(error) if error is not None else stack[-1].send(result)
+            request = steps.throw(error) if error is not None else steps.send(result)
             return request, None
         except StopIteration as completed:
             stack.pop()
             result, error = completed.value, None
         except Exception as exc:
             stack.pop()
-            error = exc
+            error = _attribute_error(owner, exc)
     if error is not None:
         raise error
     return None, result
+
+
+def _attribute_error(request: Call, error: Exception) -> Exception:
+    if isinstance(error, (OperationError, ValidationError, ValidatorHookError)):
+        return error
+    if request.operation == "generate":
+        return OperationError("Generator", type(request.target).__name__, error)
+    return error

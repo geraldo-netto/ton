@@ -26,6 +26,7 @@ from ._proof import (
     _trace_enabled,
 )
 from ._proofcheck import ProofChecker, ProofFailureSink, ProofHookError
+from ._steps import OperationError
 from ._transforms import Transform, TransformResult
 from ._validation import ValidationError, Validator, ValidatorHookError, validate_with_reference
 from .generators import Generator
@@ -560,6 +561,9 @@ class Engine:
         *,
         redact: bool = False,
     ) -> NoReturn:
+        if isinstance(cause, OperationError):
+            error_type, stage = GeneratorExecutionError, cause.stage
+            reference, cause = cause.reference, cause.cause
         if isinstance(cause, ValidatorHookError):
             error_type, stage = ValidatorExecutionError, "Validator"
             reference, cause = cause.reference, cause.cause

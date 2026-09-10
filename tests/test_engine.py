@@ -1011,3 +1011,73 @@ def test_distribution_short_circuits_unrelated_source_generation() -> None:
     registry = {**make_registry(), "unused_source": UnusedSource()}
 
     assert list(Engine(config, registry=registry, rng=Random(0), proof_mode="all")) == ["yes"]
+
+
+def _nested_failure_field(child, location):
+    if location == "oneOf":
+        return {"type": "oneOf", "choices": [child]}
+    if location == "sequence_of":
+        return {"type": "sequence_of", "count": 1, "spec": child}
+    choices = [
+        {"weight": 1, "spec": child},
+        {"weight": 0, "spec": {"type": "string", "values": ["unused"]}},
+    ]
+    if location == "weighted":
+        return {"type": "weighted", "choices": choices}
+    if location == "distribution":
+        return {
+            "type": "string",
+            "values": ["unused"],
+            "transforms": [{"type": "distribution", "choices": choices}],
+        }
+    return child
+
+
+def _assert_originating_failure(error, cause, caplog, stage, reference):
+    assert error.stage == stage
+    assert error.reference == reference
+    assert error.type_key == "x"
+    assert error.cause is cause
+    assert error.__cause__ is cause
+    failures = [
+        record for record in caplog.records if getattr(record, "event", "") == "generate_failed"
+    ]
+    assert len(failures) == 1
+    assert (
+        failures[0].stage,
+        failures[0].reference,
+        failures[0].type_key,
+        failures[0].row,
+        failures[0].error_type,
+    ) == (stage, reference, "x", 2, "RuntimeError")
+
+
+@pytest.mark.parametrize("location", ["root", "oneOf", "sequence_of", "weighted", "distribution"])
+@pytest.mark.parametrize("proof_mode", ["off", "all"])
+def test_nested_generator_crash_preserves_origin(location, proof_mode, caplog):
+    """REL-055: nested draws preserve the actual generator, cause and failing row."""
+    from ton import api
+
+    cause = RuntimeError("generator boom")
+
+    class CrashGenerator(Generator):
+        type_name = "crash"
+
+        def __init__(self):
+            self.calls = 0
+
+        def generate(self, prepared, rng):
+            self.calls += 1
+            if self.calls == 2:
+                raise cause
+            return "x"
+
+    registry = make_registry()
+    registry["crash"] = CrashGenerator()
+    field = _nested_failure_field({"type": "crash"}, location)
+    config = {"rows": 3, "format": "$x$", "types": {"x": field}}
+    rows = api.generate(config, registry=registry, proof_mode=proof_mode)
+    assert next(rows) == "x"
+    with caplog.at_level("ERROR", logger="ton"), pytest.raises(GeneratorExecutionError) as error:
+        next(rows)
+    _assert_originating_failure(error.value, cause, caplog, "Generator", "CrashGenerator")

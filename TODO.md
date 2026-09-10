@@ -55,7 +55,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| PLAT-016 | open | medium | small | Platform: add permanent automated coverage for `_recursion._stack_bytes` when `resource` is unavailable. Simulate the missing module on any host and verify the documented fallback stack size and usable depth without importing POSIX-only modules. This coverage can proceed independently of the Windows CI verification in PLAT-015. |
 
 ### Documentation
 

@@ -341,3 +341,10 @@ def test_unlimited_stack_falls_back_to_an_assumed_size(monkeypatch) -> None:
 
     assert _recursion._stack_bytes() == _recursion.DEFAULT_STACK_BYTES
     assert _recursion.max_supported_depth() > 0
+
+
+def test_missing_resource_module_has_a_usable_stack_fallback(monkeypatch) -> None:
+    """PLAT-016: exercise the non-POSIX branch without importing POSIX modules."""
+    monkeypatch.setitem(sys.modules, "resource", None)
+    assert _recursion._stack_bytes() == _recursion.DEFAULT_STACK_BYTES
+    assert _recursion.max_supported_depth() > 0

@@ -45,7 +45,7 @@ class NestingTooDeepError(ValueError):
 def _stack_bytes() -> int:
     try:
         import resource
-    except ImportError:  # pragma: no cover - non-POSIX platforms
+    except ImportError:
         return DEFAULT_STACK_BYTES
     soft, _hard = resource.getrlimit(resource.RLIMIT_STACK)
     if soft in (resource.RLIM_INFINITY, 0) or soft < 0:

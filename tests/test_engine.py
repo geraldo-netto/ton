@@ -127,6 +127,78 @@ def test_paired_fields_and_generator_errors_bypass_direct_path() -> None:
         list(broken_pair)
 
 
+@pytest.mark.parametrize("location", ["root", "oneOf", "distribution"])
+@pytest.mark.parametrize("crash", [False, True])
+def test_nested_validator_attribution_matches_root(
+    location, crash, caplog, capsys, tmp_path, monkeypatch
+):
+    """REL-047: nested validator failures retain their component, row and CLI category."""
+    import json
+
+    from ton import api
+    from ton.cli import main
+
+    class Explode:
+        type_name = "explode"
+
+        def __init__(self):
+            self.calls = 0
+
+        def validate(self, value):
+            self.calls += 1
+            if self.calls == 1:
+                return True
+            if crash:
+                raise RuntimeError("validator boom")
+            return False
+
+    child = {"type": "string", "values": ["x"], "validators": ["acme.explode"]}
+    spec = child
+    if location == "oneOf":
+        spec = {"type": "oneOf", "choices": [child]}
+    if location == "distribution":
+        spec = {
+            "type": "string",
+            "values": ["unused"],
+            "transforms": [
+                {
+                    "type": "distribution",
+                    "choices": [
+                        {"weight": 1, "spec": child},
+                        {"weight": 0, "spec": {"type": "string", "values": ["unused"]}},
+                    ],
+                },
+            ],
+        }
+    config = {"rows": 3, "format": "$x$", "types": {"x": spec}}
+    engine = Engine.from_config(config, validators={"acme.explode": Explode()})
+    error_type = ValidatorExecutionError if crash else api.ValidationError
+    with caplog.at_level("ERROR", logger="ton"), pytest.raises(error_type) as raised:
+        list(engine)
+    if crash:
+        assert raised.value.reference == "explode"
+        assert raised.value.type_key == "x"
+        assert isinstance(raised.value.cause, RuntimeError)
+        failures = [r for r in caplog.records if getattr(r, "event", "") == "generate_failed"]
+        assert len(failures) == 1
+        assert (failures[0].stage, failures[0].reference, failures[0].row) == (
+            "Validator",
+            "explode",
+            2,
+        )
+    caplog.clear()
+    catalog = api.build_extension_catalog()
+    catalog.register_validator("acme", "explode", Explode())
+    monkeypatch.setattr(api, "build_extension_catalog", lambda **kwargs: catalog)
+    path = tmp_path / "validator.json"
+    path.write_text(json.dumps(config))
+    assert main([str(path), "--entry-points"]) == (3 if crash else 2)
+    assert "explode" in capsys.readouterr().err
+    terminal = next(r for r in caplog.records if getattr(r, "event", "") == "cli_failed")
+    assert terminal.error_category == ("pipeline" if crash else "validation")
+    assert terminal.rows_written == 1
+
+
 def test_pipeline_failures_identify_transform_validator_and_proof_stages() -> None:
     class BrokenTransform(BaseTransform):
         type_name = "broken_transform"

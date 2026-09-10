@@ -27,7 +27,7 @@ from ._proof import (
 )
 from ._proofcheck import ProofChecker, ProofFailureSink, ProofHookError
 from ._transforms import Transform, TransformResult
-from ._validation import ValidationError, Validator
+from ._validation import ValidationError, Validator, ValidatorHookError, validate_with_reference
 from .generators import Generator
 
 TemplateError = _TemplateError
@@ -476,7 +476,7 @@ class Engine:
     def _run_validators(self, type_key: str, field: PreparedField, value: str) -> None:
         for validator in field.validators:
             try:
-                valid = validator.validate(value)
+                valid = validate_with_reference(validator, value)
             except Exception as exc:
                 self._raise_pipeline_error(
                     ValidatorExecutionError,
@@ -560,6 +560,9 @@ class Engine:
         *,
         redact: bool = False,
     ) -> NoReturn:
+        if isinstance(cause, ValidatorHookError):
+            error_type, stage = ValidatorExecutionError, "Validator"
+            reference, cause = cause.reference, cause.cause
         _logger.error(
             "pipeline_stage_failed stage=%s reference=%s type_key=%s row=%d error_type=%s",
             stage,

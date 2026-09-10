@@ -39,7 +39,7 @@ from typing import Any, ClassVar, cast
 from .._proof import PreparedTransform, ProofResult, TransformStep, _trace_enabled
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
-from .._validation import ValidationError
+from .._validation import ValidationError, validate_with_reference
 
 ChildPreparer = Callable[
     ["PreparationContext", str, str, Any],
@@ -260,7 +260,7 @@ class ChildPipelineGenerator(Generator):
             if steps is not None:
                 steps.append(TransformStep(transform, before, result))
         for validator in prepared.validators:
-            if not validator.validate(result.value):
+            if not validate_with_reference(validator, result.value):
                 raise ValidationError(f"Nested value failed validator {validator.type_name!r}")
         if steps is None:
             return result.value

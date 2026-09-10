@@ -19,6 +19,15 @@ class ValidationError(ValueError):
     """Raised when a generated value fails a configured validator."""
 
 
+class ValidatorHookError(RuntimeError):
+    """Carry validator attribution through nested generator/transform calls."""
+
+    def __init__(self, reference: str, cause: Exception) -> None:
+        self.reference = reference
+        self.cause = cause
+        super().__init__(str(cause))
+
+
 class NonEmptyValidator:
     """Reference validator accepting values containing at least one character."""
 
@@ -40,3 +49,11 @@ class Validator(Protocol):
     type_name: str
 
     def validate(self, value: str) -> bool: ...
+
+
+def validate_with_reference(validator: Validator, value: str) -> bool:
+    """Preserve unexpected validator failures until the engine adds row context."""
+    try:
+        return validator.validate(value)
+    except Exception as exc:
+        raise ValidatorHookError(validator.type_name, exc) from exc

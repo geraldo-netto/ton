@@ -17,6 +17,7 @@ from ._registry import (
     make_registry,
     normalize_reference,
     plugin_provenance,
+    resolve_reference,
     runtime_type_name,
 )
 from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
@@ -195,7 +196,7 @@ class EngineCompiler:
             except RegistryError as exc:
                 raise TemplateError(str(exc)) from exc
             type_name = runtime_type_name(self.types[type_key]["type"])
-            if type_name not in self.registry:
+            if resolve_reference(self.registry, type_name) is None:
                 raise TemplateError(
                     f"Unknown type {type_name!r} for variable {type_key!r}. "
                     f"Available types: {self._available_type_names()}."
@@ -210,7 +211,8 @@ class EngineCompiler:
         for type_key in self.field_keys:
             self._child_prepared.clear()
             spec = self.types[type_key]
-            generator = self.registry[runtime_type_name(spec["type"])]
+            generator = resolve_reference(self.registry, spec["type"])
+            assert generator is not None
             try:
                 prepared[type_key] = self._prepare_tree(type_key, spec, generator)
             except Exception as exc:  # noqa: BLE001
@@ -331,7 +333,7 @@ class EngineCompiler:
             reference = nested_spec.get("type")
             if not isinstance(reference, str):
                 continue
-            child = self.registry.get(runtime_type_name(reference))
+            child = resolve_reference(self.registry, reference)
             if child is not None:
                 yield f"{path}.{location}", nested_spec, child
 

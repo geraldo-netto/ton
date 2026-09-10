@@ -816,3 +816,28 @@ def test_preparation_cache_cannot_alias_a_different_field_path() -> None:
     }
     with pytest.raises(TemplateError, match="must be an object with a 'type' field"):
         list(api.generate(config))
+
+
+@pytest.mark.parametrize("reference", ["string", "core.string"])
+def test_qualified_only_registry_can_use_its_advertised_type(reference) -> None:
+    """CFG-026: canonical lookup must honor qualified-only supplied registrations."""
+    from ton.generators.string import StringGenerator
+
+    config = {"rows": 2, "format": "$x$", "types": {"x": {"type": reference, "values": ["x"]}}}
+    registry = {"core.string": StringGenerator()}
+    assert list(api.generate(config, registry=registry, proof_mode="all")) == ["x", "x"]
+
+
+def test_qualified_only_registry_prepares_deep_owned_children_iteratively() -> None:
+    """CFG-026: resolving owned children must use the same catalog rules as roots."""
+    import sys
+
+    catalog = api.build_extension_catalog().generators()
+    registry = {key: value for key, value in catalog.items() if key.startswith("core.")}
+    spec = {"type": "core.string", "values": ["x"]}
+    for _ in range(1200):
+        spec = {"type": "core.oneOf", "choices": [spec]}
+    config = {"rows": 1, "format": "$x$", "types": {"x": spec}}
+    before = sys.getrecursionlimit()
+    assert list(api.generate(config, registry=registry, proof_mode="all")) == ["x"]
+    assert sys.getrecursionlimit() == before

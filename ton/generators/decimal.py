@@ -100,7 +100,8 @@ class DecimalGenerator(Generator):
         return proof_result(
             value.is_finite()
             and prepared.min_value <= value <= prepared.max_value
-            and (prepared.decimals == 0 or len(expected_fraction) == prepared.decimals)
+            and len(expected_fraction) == prepared.decimals
+            and (prepared.decimals != 0 or value == value.to_integral_value())
             and width_ok,
             "decimal value is outside its bounds, scale, or padding contract",
         )

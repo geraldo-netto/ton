@@ -76,6 +76,21 @@ def test_core_proof_accepts_generated_value_and_rejects_mutation(generator, spec
     assert not generator.prove(prepared, mutated).ok
 
 
+@pytest.mark.parametrize("padding", [False, True])
+@pytest.mark.parametrize("value", ["1.5", "-1.5", "0.1", "1e-1", "1.0"])
+def test_decimal_zero_scale_rejects_fractional_renderings(padding, value) -> None:
+    """REL-042: zero-scale proof enforces the integral generation contract."""
+    generator = DecimalGenerator()
+    prepared = generator.prepare(
+        {"minValue": -100, "maxValue": 100, "decimals": 0, "padWithZero": padding}
+    )
+    assert not generator.prove(prepared, TransformResult(value)).ok
+    for seed in range(20):
+        generated = generator.generate(prepared, Random(seed))
+        assert "." not in generated
+        assert generator.prove(prepared, TransformResult(generated)).ok
+
+
 def test_hash_proof_computes_uncached_digest_and_rejects_missing_plaintext() -> None:
     generator = HashGenerator()
     spec = {"algorithm": "sha256", "values": ["secret"]}

@@ -63,7 +63,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| DOC-043 | open | low | small | Documentation/distribution: README says an entry with omitted `weight` samples uniformly at 1/N, but `_distribution._coerce_weight` assigns weight 1.0 and sampling remains proportional to all effective weights. With two choices weighted 9 and omitted, the omitted choice has probability 1/10, not 1/2. Document the default weight and say uniform sampling applies when all effective weights are equal; cover a mixed explicit/default example. |
 
 ## Blocked / Deferred
 

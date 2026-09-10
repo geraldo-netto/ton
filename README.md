@@ -557,13 +557,25 @@ AMD
 
 #### `weighted`
 
-Pick one alternative with probability proportional to its weight. `weight` is **optional** — omit it and that entry samples uniformly (1/N per entry).
+Pick one alternative with probability proportional to its effective weight.
+Omitted `weight` defaults to `1.0`. Sampling is uniform (1/N per entry) when
+all effective weights are equal.
+
+For example, the omitted weight below is 1, so `rare` has probability 1/10
+and `common` has probability 9/10:
+
+```json
+{"type": "weighted", "choices": [
+  {"weight": 9, "spec": {"type": "string", "values": ["common"]}},
+  {"spec": {"type": "string", "values": ["rare"]}}
+]}
+```
 
 Any registered generator can be weighted, not just literal strings:
 
 | field     | type     | description                                                       |
 |-----------|----------|-------------------------------------------------------------------|
-| `choices` | object[] | each entry is `{"weight": number?, "spec": <type spec>}` — `weight` defaults to `1.0` (uniform) when omitted |
+| `choices` | object[] | each entry is `{"weight": number?, "spec": <type spec>}` — `weight` defaults to `1.0` when omitted |
 
 ```json
 {"type": "weighted",

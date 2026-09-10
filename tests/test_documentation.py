@@ -94,7 +94,7 @@ def test_closed_review_ids_are_not_left_as_todo_annotations() -> None:
     assert stale == []
 
 
-_TYPE_EXAMPLE = re.compile(r"```json\n(\{.*?\})\n```\n\n```\n(.*?)```", re.S)
+_TYPE_EXAMPLE = re.compile(r"```json\n(\{(?:(?!```).)*?\})\n```\n\n```\n(.*?)```", re.S)
 
 
 def _documented_type_examples() -> list[tuple[str, dict, str]]:
@@ -115,7 +115,7 @@ def test_readme_documents_type_examples() -> None:
     examples = _documented_type_examples()
 
     assert len(examples) >= 20
-    assert {"decimal", "char", "phone"} <= {name for name, _spec, _expected in examples}
+    assert {"decimal", "char", "phone", "weighted"} <= {name for name, _spec, _expected in examples}
 
 
 @pytest.mark.parametrize(
@@ -201,3 +201,24 @@ def test_documented_transform_extension_contract() -> None:
     namespace = {}
     exec(snippet, namespace)
     assert namespace["rows"] == ["x!", "x!"]
+
+
+def test_documented_mixed_default_weights() -> None:
+    """DOC-043: omitted weight contributes one, not an independent 1/N probability."""
+    from random import Random
+
+    class Quantile(Random):
+        def __init__(self, quantile):
+            super().__init__(0)
+            self.quantile = quantile
+
+        def random(self):
+            return self.quantile
+
+    example = README.split("For example, the omitted weight below is 1", 1)[1]
+    field = json.loads(example.split("```json\n", 1)[1].split("```", 1)[0])
+    config = {"rows": 1, "format": "$x$", "types": {"x": field}}
+    results = [
+        next(iter(api.Engine(config, rng=Quantile((index + 0.5) / 100)))) for index in range(100)
+    ]
+    assert results == ["common"] * 90 + ["rare"] * 10

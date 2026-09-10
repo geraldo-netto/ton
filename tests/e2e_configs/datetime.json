@@ -1,0 +1,4 @@
+{"rows": 100, "format": "$v$",
+ "types": {"v": {"type": "date",
+                  "minValue": "2024-01-01T12:30:00", "maxValue": "2024-12-31",
+                  "format": "%Y-%m-%d %H:%M:%S"}}}

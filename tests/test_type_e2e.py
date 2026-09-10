@@ -163,11 +163,31 @@ def _check_sequence_of(rows: list[str], config: dict[str, Any]) -> None:
 def _check_date(rows: list[str], config: dict[str, Any]) -> None:
     spec = config["types"]["v"]
     fmt = spec["format"]
-    lo = datetime.strptime(spec["minValue"], "%Y-%m-%d")
-    hi = datetime.strptime(spec["maxValue"], "%Y-%m-%d")
+    # Compare the components represented by these date/datetime fixture formats.
+    lo = datetime.strptime(datetime.fromisoformat(spec["minValue"]).strftime(fmt), fmt)
+    hi = datetime.strptime(datetime.fromisoformat(spec["maxValue"]).strftime(fmt), fmt)
     for r in rows:
         parsed = datetime.strptime(r, fmt)
-        assert lo <= parsed <= hi.replace(hour=23, minute=59, second=59)
+        assert lo <= parsed <= hi
+
+
+@pytest.mark.parametrize(
+    "value", ["2023-12-31 23:59:59", "2024-12-31 00:00:01", "2024-12-31 12:00:00"]
+)
+def test_date_oracle_rejects_values_outside_exact_bounds(value) -> None:
+    """REL-045: datetime output cannot extend a midnight upper bound."""
+    config = json.loads((E2E_DIR / "date.json").read_text())
+    config["types"]["v"]["format"] = "%Y-%m-%d %H:%M:%S"
+    _check_date(["2024-01-01 00:00:00", "2024-12-31 00:00:00"], config)
+    with pytest.raises(AssertionError):
+        _check_date([value], config)
+
+
+def test_date_oracle_accepts_date_projection_of_datetime_bounds() -> None:
+    """REL-045: omitted time components represent the date containing the bound."""
+    config = json.loads((E2E_DIR / "date.json").read_text())
+    config["types"]["v"].update(minValue="2024-01-01T12:00:00", maxValue="2024-01-02T12:00:00")
+    _check_date(["2024-01-01", "2024-01-02"], config)
 
 
 def _check_timestamp_unix(rows: list[str], config: dict[str, Any]) -> None:
@@ -321,6 +341,7 @@ _CHECKERS: dict[str, Callable[[list[str], dict[str, Any]], None]] = {
     "oneOf.json": _check_oneOf,
     "sequence_of.json": _check_sequence_of,
     "date.json": _check_date,
+    "datetime.json": _check_date,
     "timestamp_unix.json": _check_timestamp_unix,
     "uuid.json": _check_uuid,
     "sequence.json": _check_sequence,

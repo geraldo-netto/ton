@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pickle
+from copy import deepcopy
 from random import Random
 from typing import Any
 
@@ -72,6 +74,49 @@ def _registry() -> dict[str, Generator]:
     reg["reject"] = _RejectGenerator()
     reg["permissive"] = _PermissiveGenerator()
     return reg
+
+
+@pytest.mark.parametrize("serialization", ["pickle", "deepcopy"])
+@pytest.mark.parametrize("transformed", [False, True])
+def test_traced_draw_and_audit_roundtrips_preserve_proof_ownership(serialization, transformed):
+    """CONC-020: reconstructible strings must preserve the selected rejecting branch."""
+
+    def roundtrip(value):
+        return pickle.loads(pickle.dumps(value)) if serialization == "pickle" else deepcopy(value)
+
+    child = {"type": "reject"}
+    reason = "always rejects"
+    if transformed:
+        child = {"type": "string", "values": ["x"], "transforms": [{"type": "reject_transform"}]}
+        reason = "nested transform rejects"
+    field_spec = {
+        "type": "weighted",
+        "choices": [
+            {"spec": child, "weight": 1},
+            {"spec": {"type": "permissive"}, "weight": 0},
+        ],
+    }
+    engine = Engine(
+        {"rows": 1, "format": "$x$", "types": {"x": field_spec}},
+        registry=_registry(),
+        transforms={"reject_transform": _RejectTransform()},
+        proof_mode="audit",
+    )
+    field = engine._plan.prepared["x"]
+    value = field.generator.generate(field.source_prepared, Random(0))
+    copied_field, copied_value = roundtrip((field, value))
+    assert copied_value == value == "x"
+    assert copied_value.owner is copied_field.source_prepared.distribution
+    proof = copied_field.generator.prove(
+        copied_field.source_prepared, TransformResult(copied_value)
+    )
+    assert not proof.ok and reason in proof.reason
+    assert list(engine) == ["x"]
+    failure = roundtrip(engine.proof_failures[0])
+    assert failure.row == 1 and failure.type_key == "x" and reason in failure.reason
+    assert failure.spec == engine.proof_failures[0].spec
+    proof = failure.value.owner.prove(TransformResult(failure.value))
+    assert not proof.ok and reason in proof.reason
 
 
 @pytest.mark.parametrize("mode", ["all", "audit"])

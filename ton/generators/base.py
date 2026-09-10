@@ -167,6 +167,9 @@ class DrawnValue(str):
         instance.owner = owner
         return instance
 
+    def __getnewargs_ex__(self) -> tuple[tuple[Any, ...], dict[str, Any]]:
+        return (str(self), self.draws, self.owner), {}
+
 
 def drawn(generator: Generator, prepared: Any, value: str, owner: object) -> str:
     """Tag ``value`` with the single child draw that produced it."""
@@ -218,6 +221,9 @@ class _GeneratedChildValue(str):
         instance.source = source
         instance.steps = steps
         return instance
+
+    def __getnewargs_ex__(self) -> tuple[tuple[Any, ...], dict[str, Any]]:
+        return (str(self), self.pipeline, self.source, self.steps), {}
 
 
 @dataclass(frozen=True)

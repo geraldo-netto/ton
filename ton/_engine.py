@@ -16,6 +16,7 @@ from typing import Any, NoReturn, cast
 from . import _config
 from ._compiler import ResolvedToken, compile_plan
 from ._compiler import TemplateError as _TemplateError
+from ._contracts import Generator
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import (
@@ -29,7 +30,6 @@ from ._proofcheck import ProofChecker, ProofFailureSink, ProofHookError
 from ._steps import OperationError
 from ._transforms import Transform, TransformResult
 from ._validation import ValidationError, Validator, ValidatorHookError, validate_with_reference
-from .generators import Generator
 
 TemplateError = _TemplateError
 

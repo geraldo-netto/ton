@@ -9,7 +9,7 @@ Each module here implements one generator class that:
   to emit both a primary value and a secondary (``[id]``) value within
   the same row.
 
-The :mod:`ton.registry` module collects these classes into a name -> instance
+The :mod:`ton._registry` module collects these classes into a name -> instance
 mapping that the engine uses to dispatch. To add a new built-in type:
 
 1. Create ``<type>.py`` with a ``<Type>Generator(Generator)`` subclass
@@ -21,7 +21,7 @@ Third-party generators do not need to live here -- they can be registered
 via the ``ton.generators`` entry-point group.
 """
 
-from .base import Generator, PairedGenerator
+from .._contracts import Generator, PairedGenerator
 from .boolean import BooleanGenerator
 from .bytes import BytesGenerator
 from .char import CharGenerator

@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .._proof import ProofResult
+from .._contracts import Generator
+from .._proof import ProofResult, proof_result
 from .._scalars import require_string_tuple
 from .._transforms import TransformResult
-from .base import Generator, proof_result
 
 
 @dataclass(frozen=True)

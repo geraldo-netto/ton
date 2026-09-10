@@ -49,6 +49,7 @@ from typing import Any
 from . import _config
 from ._config import ConfigError
 from ._config import output_encoding as _output_encoding
+from ._contracts import Generator, PairedGenerator, PreparationContext
 from ._engine import (
     Engine,
     EngineOptions,
@@ -72,13 +73,8 @@ from ._output import (
 )
 from ._proof import ProofFailure, ProofResult, ProvenanceRecord
 from ._proofcheck import ProofFailureSink
-from ._registry import (
-    EntryPointSelector,
-    ExtensionCatalog,
-    RegistryError,
-    catalog_with_entry_points,
-    normalize_reference,
-)
+from ._references import RegistryError, normalize_reference
+from ._registry import EntryPointSelector, ExtensionCatalog, catalog_with_entry_points
 from ._registry import (
     build_extension_catalog as _build_extension_catalog,
 )
@@ -91,8 +87,6 @@ from ._transforms import (
 )
 from ._validation import ValidationError, Validator
 from .concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write_shard
-from .generators import Generator, PairedGenerator
-from .generators.base import PreparationContext
 
 __all__ = [
     "ConfigError",

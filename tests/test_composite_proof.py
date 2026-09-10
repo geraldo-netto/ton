@@ -9,17 +9,12 @@ from typing import Any
 
 import pytest
 
+from ton._contracts import Generator, PreparationContext
 from ton._engine import Engine, ProofError
+from ton._pipeline import ChildPipelineGenerator, ChildPipelineSpec, DrawnValue
 from ton._proof import ProofResult
 from ton._transforms import BaseTransform, TransformProof, TransformResult
 from ton._validation import ValidationError
-from ton.generators import Generator
-from ton.generators.base import (
-    ChildPipelineGenerator,
-    ChildPipelineSpec,
-    DrawnValue,
-    PreparationContext,
-)
 from ton.generators.one_of import OneOfGenerator
 from ton.generators.sequence_of import SequenceOfGenerator
 from ton.generators.weighted import WeightedGenerator
@@ -443,7 +438,7 @@ def test_one_of_ignores_draw_tags_from_another_composite() -> None:
 @pytest.mark.parametrize("kind", ["oneOf", "weighted"])
 def test_composite_proof_work_depends_only_on_selected_draws(monkeypatch, size, kind) -> None:
     """PERF-040: proving a selected child must not revisit its whole candidate pool."""
-    from ton.generators import base
+    from ton import _pipeline
 
     child = {"type": "string", "values": ["x"]}
     choices = [child if kind == "oneOf" else {"spec": child} for _ in range(size)]
@@ -458,7 +453,7 @@ def test_composite_proof_work_depends_only_on_selected_draws(monkeypatch, size, 
         calls.append(obj)
         return id(obj)
 
-    monkeypatch.setattr(base, "id", counted_id, raising=False)
+    monkeypatch.setattr(_pipeline, "id", counted_id, raising=False)
     assert field.generator.prove(field.source_prepared, TransformResult(value)).ok
     assert len(calls) <= 2
 

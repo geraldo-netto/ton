@@ -17,11 +17,11 @@ from dataclasses import dataclass, field
 from random import Random
 from typing import Any
 
-from .._proof import ProofResult
+from .._contracts import PairedGenerator
+from .._proof import ProofResult, proof_result
 from .._scalars import coerce_bool, coerce_int, require_string_tuple
 from .._transforms import TransformResult
 from ._md4 import md4 as _pure_md4
-from .base import PairedGenerator, proof_result
 
 
 def _select_md4_backend() -> Callable[[bytes], bytes]:

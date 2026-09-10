@@ -20,6 +20,7 @@ from unittest import mock
 import pytest
 
 from ton import api
+from ton._contracts import Generator
 from ton._engine import Engine, PipelineStageError, TemplateError
 from ton._registry import (
     _ensure_default_classes,
@@ -29,7 +30,6 @@ from ton._registry import (
 from ton._scalars import coerce_int
 from ton._template import Token, split_segments
 from ton.cli import main as cli_main
-from ton.generators import Generator
 
 # ---------------------------------------------------------------------------
 # _template.split_segments: ``$$`` literal continue branch
@@ -350,7 +350,7 @@ def test_coerce_int_rejects_non_integer_value() -> None:
 
 def test_generator_prepare_ignores_context_when_not_composite() -> None:
     """A non-composite generator prepares identically with or without a context."""
-    from ton.generators.base import PreparationContext
+    from ton._contracts import PreparationContext
     from ton.generators.integer import IntegerGenerator
 
     gen = IntegerGenerator()
@@ -436,9 +436,9 @@ def test_entry_point_load_logs_sanitized_name(
 ) -> None:
     import logging as logging_mod
 
+    from ton._contracts import Generator as _Gen
     from ton._logging import LogEvent as _LE
     from ton._registry import catalog_with_entry_points
-    from ton.generators import Generator as _Gen
 
     class _Fake(_Gen):
         type_name = "fake_sanitized"

@@ -18,6 +18,7 @@ from unittest import mock
 import pytest
 
 from ton import api
+from ton._contracts import Generator, PairedGenerator
 from ton._engine import Engine
 from ton._output import OutputPublishedError, PartialOutputCommitError, atomic_output
 from ton._proof import REDACTED, ProofResult
@@ -26,7 +27,6 @@ from ton._proofcheck import MAX_AUDIT_SAMPLE
 from ton._transforms import TransformResult
 from ton.api import ProofError, ValidationError
 from ton.cli import main
-from ton.generators import Generator, PairedGenerator
 
 
 class _FailingGenerator(Generator):

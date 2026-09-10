@@ -8,8 +8,8 @@ from random import Random
 
 import pytest
 
+from ton._contracts import PreparationContext
 from ton._registry import make_registry
-from ton.generators.base import PreparationContext
 from ton.generators.weighted import WeightedGenerator
 
 

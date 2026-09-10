@@ -14,12 +14,12 @@ import pytest
 
 from ton import _proofaudit as proofaudit
 from ton import _proofcheck as proofcheck
+from ton._contracts import Generator
 from ton._engine import Engine, ProofError
 from ton._proof import REDACTED, PreparedField, ProofFailure, ProofResult
 from ton._proofaudit import PROOF_AUDIT_SCHEMA, ProofAuditWriteError, ProofAuditWriter
 from ton._proofcheck import ProofChecker, ProofFailureSinkError
 from ton._transforms import TransformResult
-from ton.generators import Generator
 
 
 class _EchoingReasonGenerator(Generator):

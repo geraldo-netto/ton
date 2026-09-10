@@ -108,3 +108,8 @@ class ProvenanceRecord:
     proof_failures: int = 0
     plugin_package: str | None = None
     plugin_version: str | None = None
+
+
+def proof_result(ok: bool, reason: str) -> ProofResult:
+    """Build a compact proof result with a reason only on failure."""
+    return ProofResult(ok=ok, reason="" if ok else reason)

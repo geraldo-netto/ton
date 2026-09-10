@@ -25,10 +25,10 @@ from datetime import datetime, timedelta
 from random import Random
 from typing import Any
 
-from .._proof import ProofResult
+from .._contracts import Generator
+from .._proof import ProofResult, proof_result
 from .._transforms import TransformResult
 from ._datetime import duration_seconds, parse_iso_bounds, uniform_offset_seconds
-from .base import Generator, proof_result
 
 _DEFAULT_FORMAT = "%Y-%m-%d %H:%M:%S"
 

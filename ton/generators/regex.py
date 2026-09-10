@@ -32,11 +32,11 @@ from functools import lru_cache
 from random import Random
 from typing import Any, cast
 
-from .._proof import ProofResult
+from .._contracts import Generator
+from .._proof import ProofResult, proof_result
 from .._transforms import TransformResult
 from . import _regex_parse as rx
 from ._regex_parse import RegexParseError
-from .base import Generator, proof_result
 
 _PRINTABLE_ASCII = tuple(chr(c) for c in range(0x20, 0x7F))
 _DIGITS = tuple(string.digits)

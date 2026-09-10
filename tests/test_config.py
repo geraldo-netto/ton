@@ -13,9 +13,9 @@ import pytest
 
 from ton import api
 from ton._config import ConfigError, load
+from ton._contracts import Generator
 from ton._engine import Engine, TemplateError
 from ton._transforms import BaseTransform, TransformCapabilities, TransformProof
-from ton.generators import Generator
 
 
 def _write(tmp_path: Path, payload: dict) -> Path:
@@ -520,7 +520,7 @@ def test_nested_choice_typo_reports_complete_owning_path(transform) -> None:
 
 def test_plugin_generator_may_own_custom_keys() -> None:
 
-    from ton.generators import Generator
+    from ton._contracts import Generator
 
     class PluginGenerator(Generator):
         type_name = "plugin"
@@ -537,7 +537,7 @@ def test_plugin_generator_may_own_custom_keys() -> None:
 
 def test_plugin_metadata_type_key_is_not_a_nested_generator() -> None:
 
-    from ton.generators import Generator
+    from ton._contracts import Generator
 
     class PluginGenerator(Generator):
         type_name = "metadata"

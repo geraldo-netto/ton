@@ -6,6 +6,7 @@ from math import isfinite
 from random import Random
 from typing import Any
 
+from ton._contracts import PreparationContext
 from ton._registry import make_registry
 from ton._transforms import (
     BaseTransform,
@@ -14,7 +15,6 @@ from ton._transforms import (
     TransformResult,
     fold_paired_capabilities,
 )
-from ton.generators.base import PreparationContext
 from ton.transforms import DistributionTransform
 
 

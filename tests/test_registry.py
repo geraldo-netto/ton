@@ -17,22 +17,20 @@ import pytest
 
 import ton._registry as _registry_module
 from ton import api
+from ton._contracts import Generator
+from ton._references import RegistryError, normalize_reference, resolve_reference, runtime_type_name
 from ton._registry import (
     EntryPointSelector,
     ExtensionCatalog,
-    RegistryError,
     build_extension_catalog,
     catalog_with_entry_points,
     clear_default_registry_cache,
     make_registry,
-    normalize_reference,
     plugin_provenance,
-    resolve_reference,
-    runtime_type_name,
 )
 from ton._transforms import BaseTransform
 from ton._validation import NonEmptyValidator
-from ton.generators import BUILTIN_GENERATOR_CLASSES, Generator, StringGenerator
+from ton.generators import BUILTIN_GENERATOR_CLASSES, StringGenerator
 
 
 @pytest.mark.parametrize(

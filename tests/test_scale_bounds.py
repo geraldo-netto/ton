@@ -13,10 +13,10 @@ from random import Random
 import pytest
 
 from ton import api
+from ton._contracts import Generator
 from ton._engine import Engine, TemplateError
 from ton._scalars import int_to_str, str_to_int
 from ton._specsnapshot import snapshot_spec
-from ton.generators import Generator
 from ton.generators.bytes import BytesGenerator
 from ton.generators.char import CharGenerator
 from ton.generators.regex import RegexGenerator

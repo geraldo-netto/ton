@@ -10,22 +10,20 @@ from fractions import Fraction
 from itertools import accumulate
 from math import gcd, lcm
 from random import Random
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
+from ._contracts import PreparationContext
+from ._pipeline import drawn, proven_draws
 from ._proof import ProofResult
 from ._speckeys import require_known_keys
 from ._specpath import format_spec_path
 from ._steps import Call, Steps, cooperative, run_steps
+from ._transforms import TransformResult
 
 _CHOICE_KEYS = frozenset(("weight", "spec"))
 
-if TYPE_CHECKING:
-    from .generators.base import PreparationContext
-
 
 def _as_result(value: str) -> Any:
-    from ._transforms import TransformResult
-
     return TransformResult(value)
 
 
@@ -42,8 +40,6 @@ class WeightedChoiceSet:
         return cast(str, run_steps(self, "choose", rng))
 
     def _choose_steps(self, rng: Random) -> Steps:
-        from .generators.base import drawn
-
         index = weighted_index(self.cum_weights, rng)
         generator, prepared = self.children[index]
         value = yield Call(generator, "generate", (prepared, rng))
@@ -55,8 +51,6 @@ class WeightedChoiceSet:
 
     def _prove_steps(self, result: Any) -> Steps:
         """Evaluate each selected child once and carry its original rejection (REL-038)."""
-        from .generators.base import proven_draws
-
         draws = proven_draws(result, self)
         if draws is not None:
             for draw in draws:
@@ -84,8 +78,6 @@ def prepare_distribution(
     min_choices: int,
     context: PreparationContext | None = None,
 ) -> WeightedChoiceSet:
-    from .generators.base import PreparationContext
-
     raw_choices = spec.get("choices")
     if not isinstance(raw_choices, list) or len(raw_choices) < min_choices:
         raise ValueError(_choices_error(label, min_choices))

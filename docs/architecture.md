@@ -9,6 +9,12 @@ and proof checking so each extension point has a narrow contract.
 `ton._engine`, `ton._registry`, and `ton._config` can change between releases.
 Applications should build registries and catalogs through `ton.api`.
 
+Generator and preparation contracts live below the catalog and runtime layers
+in `ton._contracts`; namespace resolution lives in `ton._references`. Neither
+imports concrete generators or the compiler. `ton._pipeline` owns child execution
+and draw traces. Shared scalar parsing and formatting live in `ton._scalars`, so
+JSON decoding and CLI integer handling do not depend on generator implementations.
+
 ## Namespaced Registrations
 
 Built-in data types and transforms live in the `core` namespace. Legacy config

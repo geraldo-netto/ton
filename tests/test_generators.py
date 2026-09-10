@@ -623,7 +623,7 @@ def test_paired_generator_default_returns_primary() -> None:
 
 def test_paired_generator_knob_flips_to_id() -> None:
     """generate_returns_id=True flips the shortcut to the id half (ARCH-005)."""
-    from ton.generators.base import PairedGenerator
+    from ton._contracts import PairedGenerator
 
     class FlippedHash(PairedGenerator):
         type_name = ""  # not registered
@@ -675,7 +675,7 @@ def test_partial_time_formats_pass_their_own_strict_proof(fmt: str) -> None:
 
 def test_partial_time_format_still_rejects_an_out_of_range_date() -> None:
     """Widening for omitted components must not make the interval check vacuous."""
-    from ton.generators.base import PreparationContext
+    from ton._contracts import PreparationContext
     from ton.generators.date import DateGenerator
 
     generator = DateGenerator()

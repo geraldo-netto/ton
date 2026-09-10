@@ -34,11 +34,11 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .._proof import ProofResult
+from .._contracts import Generator
+from .._proof import ProofResult, proof_result
 from .._scalars import require_string_tuple
 from .._transforms import TransformResult
 from ._identity_data import EMAIL_DOMAINS, FAMILY_NAMES, GIVEN_NAMES
-from .base import Generator, proof_result
 
 _LOWER_GIVEN_NAMES = frozenset(name.lower() for name in GIVEN_NAMES)
 _LOWER_FAMILY_NAMES = frozenset(name.lower() for name in FAMILY_NAMES)

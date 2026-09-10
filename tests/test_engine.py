@@ -11,6 +11,7 @@ import pytest
 
 from ton._compiler import CompiledPlan, EngineCompiler
 from ton._config import ConfigError
+from ton._contracts import Generator, PairedGenerator
 from ton._engine import (
     Engine,
     GeneratorExecutionError,
@@ -29,7 +30,6 @@ from ton._transforms import (
     TransformProof,
     TransformResult,
 )
-from ton.generators import Generator, PairedGenerator
 
 
 def test_engine_yields_requested_row_count(basic_config: dict) -> None:
@@ -319,7 +319,7 @@ def test_engine_rejects_unknown_type(basic_config: dict) -> None:
 def test_engine_wraps_unexpected_prepare_error_as_template_error() -> None:
     """A buggy third-party generator that raises a non-ValueError must still
     surface as TemplateError so the CLI maps to exit 2 (REL-012)."""
-    from ton.generators import Generator
+    from ton._contracts import Generator
 
     class BrokenGenerator(Generator):
         type_name = "broken"

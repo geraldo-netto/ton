@@ -33,10 +33,10 @@ from itertools import count
 from random import Random
 from typing import Any
 
-from .._proof import ProofResult
+from .._contracts import Generator
+from .._proof import ProofResult, proof_result
 from .._scalars import coerce_int, int_to_str, pad_with_zero, str_to_int
 from .._transforms import TransformResult
-from .base import Generator, proof_result
 
 
 @dataclass(frozen=True)

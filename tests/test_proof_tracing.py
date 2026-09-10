@@ -10,9 +10,9 @@ from unittest import mock
 import pytest
 
 from ton import api
+from ton._pipeline import ChildPipelineGenerator, _GeneratedChildValue
 from ton._proof import TransformStep, _trace_enabled
 from ton._transforms import BaseTransform, TransformProof, TransformResult
-from ton.generators.base import ChildPipelineGenerator, _GeneratedChildValue
 
 
 class RecordingTransform(BaseTransform):
@@ -76,7 +76,7 @@ def test_traces_follow_sampling_without_changing_draws_or_validators(
     transform, validator = RecordingTransform(), RecordingValidator()
     with (
         mock.patch("ton._engine.TransformStep", wraps=TransformStep) as root_trace,
-        mock.patch("ton.generators.base.TransformStep", wraps=TransformStep) as child_trace,
+        mock.patch("ton._pipeline.TransformStep", wraps=TransformStep) as child_trace,
         mock.patch.object(
             _GeneratedChildValue, "__new__", wraps=_GeneratedChildValue.__new__
         ) as child_value,
@@ -178,7 +178,7 @@ def test_nested_engine_restores_the_parent_proof_decision() -> None:
 @pytest.mark.parametrize("mode, checked", [("off", 0), ("sample", 1), ("all", 3)])
 def test_plain_composites_allocate_traces_only_on_checked_rows(kind, mode, checked) -> None:
     """PERF-039: plain composite children follow the row's sampling decision too."""
-    from ton.generators.base import ChildDraw, DrawnValue
+    from ton._pipeline import ChildDraw, DrawnValue
 
     child = {"type": "integer", "minValue": 0, "maxValue": 100}
     choices = [{"spec": child}, {"spec": child}]
@@ -191,7 +191,7 @@ def test_plain_composites_allocate_traces_only_on_checked_rows(kind, mode, check
     config = {"rows": 3, "format": "$x$", "types": {"x": fields[kind]}}
     expected = list(api.generate(config, seed=12, proof_mode="all"))
     with (
-        mock.patch("ton.generators.base.ChildDraw", wraps=ChildDraw) as draws,
+        mock.patch("ton._pipeline.ChildDraw", wraps=ChildDraw) as draws,
         mock.patch("ton.generators.sequence_of.ChildDraw", wraps=ChildDraw) as sequence_draws,
         mock.patch.object(DrawnValue, "__new__", wraps=DrawnValue.__new__) as values,
     ):

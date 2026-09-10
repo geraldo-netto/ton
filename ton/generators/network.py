@@ -32,10 +32,10 @@ from fractions import Fraction
 from random import Random
 from typing import Any
 
-from .._proof import ProofResult
+from .._contracts import Generator
+from .._proof import ProofResult, proof_result
 from .._scalars import coerce_bool
 from .._transforms import TransformResult
-from .base import Generator, proof_result
 
 # ---------------------------------------------------------------------------
 # IPv4 / IPv6

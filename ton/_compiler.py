@@ -6,19 +6,18 @@ from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 
+from ._contracts import Generator, PreparationContext, resolve_child_spec
 from ._logging import LogEvent
 from ._logging import logger as _logger
+from ._pipeline import ChildPipelineGenerator, ChildPipelineSpec
 from ._proof import PreparedField, PreparedTransform
+from ._references import RegistryError, normalize_reference, resolve_reference, runtime_type_name
 from ._registry import (
     RegisteredExtensions,
-    RegistryError,
     default_transforms,
     default_validators,
     make_registry,
-    normalize_reference,
     plugin_provenance,
-    resolve_reference,
-    runtime_type_name,
 )
 from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
 from ._specpath import SpecPath, format_spec_path
@@ -26,13 +25,7 @@ from ._specsnapshot import snapshot_spec
 from ._template import Token, parse, split_segments
 from ._transforms import Transform, fold_paired_capabilities
 from ._validation import Validator
-from .generators import BUILTIN_GENERATOR_CLASSES, Generator
-from .generators.base import (
-    ChildPipelineGenerator,
-    ChildPipelineSpec,
-    PreparationContext,
-    resolve_child_spec,
-)
+from .generators import BUILTIN_GENERATOR_CLASSES
 
 
 @dataclass(frozen=True)

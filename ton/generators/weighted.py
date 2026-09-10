@@ -31,6 +31,7 @@ from fractions import Fraction
 from random import Random
 from typing import Any, cast
 
+from .._contracts import Generator, PreparationContext
 from .._distribution import (
     WeightedChoiceSet,
     prepare_distribution,
@@ -39,7 +40,6 @@ from .._proof import ProofResult
 from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
-from .base import Generator, PreparationContext
 
 
 @dataclass(frozen=True)

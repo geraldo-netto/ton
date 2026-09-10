@@ -11,13 +11,13 @@ from unittest import mock
 import pytest
 
 from ton import api
+from ton._contracts import Generator
 from ton._engine import Engine
 from ton._logging import LOGGER_NAME, LogEvent, configure_stderr, logger, terminal_failure_fields
 from ton._proof import ProofResult
 from ton._registry import clear_default_registry_cache, make_registry
 from ton._transforms import TransformResult
 from ton.cli import main
-from ton.generators import Generator
 
 
 def test_terminal_failure_schema_is_safe_and_complete() -> None:

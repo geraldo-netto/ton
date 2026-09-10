@@ -6,11 +6,11 @@ from collections.abc import Mapping
 from random import Random
 from typing import Any, ClassVar, cast
 
+from .._contracts import PreparationContext
 from .._distribution import WeightedChoiceSet, prepare_distribution
 from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import BaseTransform, TransformCapabilities, TransformProof, TransformResult
-from ..generators.base import PreparationContext
 
 
 class DistributionTransform(BaseTransform):

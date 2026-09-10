@@ -25,12 +25,13 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, cast
 
+from .._contracts import Generator, PreparationContext
+from .._pipeline import ChildDraw, DrawnValue, prove_draws, proven_draws
 from .._proof import ProofResult, _trace_enabled
 from .._scalars import coerce_int
 from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
-from .base import ChildDraw, DrawnValue, Generator, PreparationContext, prove_draws, proven_draws
 
 
 @dataclass(frozen=True)

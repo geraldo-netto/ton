@@ -21,11 +21,20 @@ from dataclasses import dataclass
 from importlib.metadata import entry_points
 from typing import Any
 
+from ._contracts import Generator
 from ._logging import LogEvent
 from ._logging import logger as _logger
+from ._references import (
+    CORE_NAMESPACE,
+    RegistryError,
+    _validate_identifier,
+    _validate_reference,
+    normalize_reference,
+    resolve_reference,
+)
 from ._transforms import IdentityTransform, Transform
 from ._validation import NonEmptyValidator, Validator
-from .generators import BUILTIN_GENERATOR_CLASSES, Generator
+from .generators import BUILTIN_GENERATOR_CLASSES
 from .transforms import DistributionTransform
 
 #: Entry-point group third-party packages publish to expose a Generator
@@ -35,14 +44,8 @@ from .transforms import DistributionTransform
 ENTRY_POINT_GROUP = "ton.generators"
 TRANSFORM_ENTRY_POINT_GROUP = "ton.transforms"
 VALIDATOR_ENTRY_POINT_GROUP = "ton.validators"
-CORE_NAMESPACE = "core"
 
-_ASCII_IDENTIFIER = re.compile(r"[A-Za-z0-9_]+\Z")
 _ASCII_DISTRIBUTION = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*\Z")
-
-
-class RegistryError(ValueError):
-    """Raised when plugin registration would make lookup ambiguous."""
 
 
 @dataclass(frozen=True, order=True)
@@ -246,31 +249,6 @@ class ExtensionCatalog:
         # Registration mutated a store; drop cached flattened views so
         # the next read reflects the new plugin (PERF-003).
         self._flat_cache.clear()
-
-
-def normalize_reference(reference: str) -> str:
-    """Return a qualified registry reference."""
-    _validate_reference(reference)
-    if "." in reference:
-        return reference
-    return f"{CORE_NAMESPACE}.{reference}"
-
-
-def resolve_reference[T](registry: Mapping[str, T], reference: str) -> T | None:
-    """Resolve qualified or bare references using registry namespace rules."""
-    normalized = normalize_reference(reference)
-    for key in (normalized, reference, normalized.removeprefix(f"{CORE_NAMESPACE}.")):
-        value = registry.get(key)
-        if value is not None:
-            return value
-    return None
-
-
-def runtime_type_name(reference: object) -> str:
-    """Return the bare runtime key for a built-in qualified reference."""
-    if isinstance(reference, str):
-        return normalize_reference(reference).removeprefix(f"{CORE_NAMESPACE}.")
-    return str(reference)
 
 
 def default_transforms() -> dict[str, Transform]:
@@ -502,23 +480,6 @@ def _entry_point_namespace_name(
         _validate_identifier("name", type_name)
         return "plugin", type_name
     return "plugin", entry_point_name
-
-
-def _validate_reference(reference: str) -> None:
-    parts = reference.split(".")
-    if len(parts) == 1:
-        _validate_identifier("name", parts[0])
-        return
-    if len(parts) == 2:
-        _validate_identifier("namespace", parts[0])
-        _validate_identifier("name", parts[1])
-        return
-    raise RegistryError(f"invalid registry reference {reference!r}")
-
-
-def _validate_identifier(label: str, value: str) -> None:
-    if _ASCII_IDENTIFIER.fullmatch(value) is None:
-        raise RegistryError(f"{label} must contain only ASCII letters, numbers, or '_'")
 
 
 #: Process-wide cache of the canonical built-in generator classes, indexed by

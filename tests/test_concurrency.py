@@ -634,8 +634,8 @@ def test_workers_ignore_unused_malformed_fields(unused_kind):
 @pytest.mark.parametrize("key", ["dotted.key", "child[0]", "'quoted'", ""])
 def test_worker_plugin_child_keys_are_literal(key):
     """CONC-023: punctuation in a mapping key is never a traversal instruction."""
+    from ton._contracts import Generator
     from ton._registry import make_registry
-    from ton.generators import Generator
 
     class LiteralChild(Generator):
         type_name = "literal_child"

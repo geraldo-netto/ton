@@ -17,9 +17,9 @@ from unittest import mock
 import pytest
 
 from ton import api
+from ton._contracts import Generator
 from ton._proof import ProofResult
 from ton._transforms import TransformResult
-from ton.generators import Generator
 
 EXPECTED_PUBLIC_API = {
     "ConfigError",

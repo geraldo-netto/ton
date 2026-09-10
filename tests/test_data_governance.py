@@ -12,12 +12,12 @@ from typing import Any, ClassVar
 import pytest
 
 from ton import api
+from ton._contracts import Generator
 from ton._engine import Engine
 from ton._proof import REDACTED, ProofFailure
 from ton._proofcheck import ProofChecker
 from ton._scalars import coerce_int
 from ton._transforms import BaseTransform, TransformResult
-from ton.generators import Generator
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _SENSITIVE_ASSIGNMENTS = (

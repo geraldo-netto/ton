@@ -22,10 +22,10 @@ from datetime import UTC, datetime
 from random import Random
 from typing import Any
 
-from .._proof import ProofResult
+from .._contracts import Generator
+from .._proof import ProofResult, proof_result
 from .._transforms import TransformResult
 from ._datetime import parse_iso_bounds
-from .base import Generator, proof_result
 
 _UNIT_MULTIPLIERS = {"seconds": 1, "millis": 1000}
 

@@ -1,6 +1,6 @@
 """Tests for the composite generators added in PAT-011 (oneOf, sequence_of).
 
-Also covers the shared :func:`ton.generators.base.prepare_child_spec`
+Also covers the shared :func:`ton._contracts.prepare_child_spec`
 helper, REL-019's paired-nested guard, and the LogEvent enum surface.
 """
 
@@ -13,10 +13,10 @@ from typing import Any
 import pytest
 
 from ton import api
+from ton._contracts import Generator, PreparationContext, prepare_child_spec
 from ton._engine import Engine, TemplateError
 from ton._logging import LogEvent
 from ton._validation import ValidationError
-from ton.generators.base import Generator, PreparationContext, prepare_child_spec
 from ton.generators.one_of import OneOfGenerator
 from ton.generators.sequence_of import SequenceOfGenerator
 

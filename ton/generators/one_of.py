@@ -26,11 +26,12 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any, cast
 
+from .._contracts import Generator, PreparationContext
+from .._pipeline import drawn, prove_draws, proven_draws
 from .._proof import ProofResult
 from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
-from .base import Generator, PreparationContext, drawn, prove_draws, proven_draws
 
 
 @dataclass(frozen=True)

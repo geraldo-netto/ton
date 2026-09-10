@@ -28,6 +28,7 @@ register a custom generator via the ``ton.generators`` entry point.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
@@ -100,7 +101,10 @@ class EmailGenerator(Generator):
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> EmailSpec:
         if "domains" not in spec:
             return EmailSpec(domains=tuple(EMAIL_DOMAINS))
-        return EmailSpec(domains=require_string_tuple(spec, key="domains"))
+        domains = require_string_tuple(spec, key="domains")
+        for domain in domains:
+            _validate_email_domain(domain)
+        return EmailSpec(domains=domains)
 
     def generate(self, prepared: EmailSpec, rng: Random) -> str:
         local = f"{rng.choice(GIVEN_NAMES).lower()}.{rng.choice(FAMILY_NAMES).lower()}"
@@ -122,6 +126,17 @@ class EmailGenerator(Generator):
 # ---------------------------------------------------------------------------
 # phone
 # ---------------------------------------------------------------------------
+
+
+def _validate_email_domain(domain: str) -> None:
+    """Validate DNS label syntax while preserving the configured spelling."""
+    try:
+        ascii_domain = domain.encode("idna").decode("ascii")
+    except UnicodeError as exc:
+        raise ValueError(f"email domain {domain!r} is not a valid domain") from exc
+    label = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
+    if re.fullmatch(rf"{label}(?:\.{label})*", ascii_domain) is None:
+        raise ValueError(f"email domain {domain!r} is not a valid domain")
 
 
 @dataclass(frozen=True)

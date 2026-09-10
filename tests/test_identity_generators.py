@@ -7,6 +7,7 @@ from random import Random
 
 import pytest
 
+from ton import api
 from ton._transforms import TransformResult
 from ton.generators.identity import EmailGenerator, NameGenerator, PhoneGenerator
 
@@ -45,6 +46,40 @@ def test_email_rejects_empty_domains() -> None:
     generator = EmailGenerator()
     with pytest.raises(ValueError):
         generator.prepare({"domains": []})
+
+
+@pytest.mark.parametrize(
+    "domain",
+    [
+        "bad@x",
+        "a b.com",
+        "a\nb.com",
+        ".com",
+        "a..com",
+        "-bad.com",
+        "bad-.com",
+        "bad/com",
+        "bad_com",
+    ],
+)
+def test_email_rejects_malformed_domain_overrides(domain) -> None:
+    """REL-041: reject domains that cannot form the configured email contract."""
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "email", "domains": [domain]}}}
+    with pytest.raises(api.ConfigError, match="domain"):
+        api.validate_config(config)
+    for mode in ("off", "all"):
+        with pytest.raises(api.TemplateError, match="domain"):
+            list(api.generate(config, proof_mode=mode))
+
+
+@pytest.mark.parametrize("domain", ["EXAMPLE.COM", "sub.example.com", "localhost", "münchen.de"])
+def test_email_custom_domains_generate_provable_values(domain) -> None:
+    """REL-041: accepted overrides work identically with and without strict proof."""
+    config = {"rows": 20, "format": "$x$", "types": {"x": {"type": "email", "domains": [domain]}}}
+    api.validate_config(config)
+    rows = list(api.generate(config, seed=7))
+    assert rows == list(api.generate(config, seed=7, proof_mode="all"))
+    assert all(row.endswith("@" + domain) and row.count("@") == 1 for row in rows)
 
 
 def test_email_proof_reuses_precomputed_name_sets(monkeypatch) -> None:

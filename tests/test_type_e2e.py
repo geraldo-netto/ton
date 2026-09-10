@@ -17,10 +17,11 @@ import ipaddress
 import json
 import re
 import string
+import time
 import uuid as uuid_mod
 from collections import Counter
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -192,16 +193,55 @@ def test_date_oracle_accepts_date_projection_of_datetime_bounds() -> None:
 
 def _check_timestamp_unix(rows: list[str], config: dict[str, Any]) -> None:
     spec = config["types"]["v"]
-    lo_dt = datetime.fromisoformat(spec["minValue"])
-    hi_dt = datetime.fromisoformat(spec["maxValue"]).replace(hour=23, minute=59, second=59)
-    lo = int(lo_dt.timestamp())
-    hi = int(hi_dt.timestamp())
-    multiplier = 1 if spec.get("unit", "seconds") == "seconds" else 1000
+    lo = datetime.fromisoformat(spec["minValue"])
+    hi = datetime.fromisoformat(spec["maxValue"])
+    lo = lo.replace(tzinfo=UTC) if lo.tzinfo is None else lo
+    hi = hi.replace(tzinfo=UTC) if hi.tzinfo is None else hi
+    microseconds_per_unit = 1_000_000 if spec.get("unit", "seconds") == "seconds" else 1000
     for r in rows:
-        v = int(r) // multiplier
-        # Date-only bounds are interpreted as UTC midnight; allow a one-day
-        # window of slack on each side for local-timezone interpretation.
-        assert lo - 86400 <= v <= hi + 86400, r
+        instant = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(
+            microseconds=int(r) * microseconds_per_unit
+        )
+        assert lo <= instant <= hi, r
+
+
+@pytest.mark.parametrize("timezone", ["UTC0", "EST5", "JST-9"])
+@pytest.mark.parametrize("unit,multiplier", [("seconds", 1), ("millis", 1000)])
+@pytest.mark.parametrize("bound", ["1970-01-01", "1970-01-01T00:00:00+00:00"])
+def test_timestamp_oracle_enforces_exact_utc_endpoints(
+    timezone, unit, multiplier, bound, monkeypatch
+):
+    """REL-046: every out-of-range unit is rejected regardless of local timezone."""
+    config = {"types": {"v": {"minValue": bound, "maxValue": bound, "unit": unit}}}
+    try:
+        with monkeypatch.context() as environment:
+            environment.setenv("TZ", timezone)
+            if hasattr(time, "tzset"):
+                time.tzset()
+            _check_timestamp_unix(["0"], config)
+            for outside in [-1, 1, 12 * 3600 * multiplier]:
+                with pytest.raises(AssertionError):
+                    _check_timestamp_unix([str(outside)], config)
+    finally:
+        if hasattr(time, "tzset"):
+            time.tzset()
+
+
+def test_timestamp_oracle_preserves_fractional_millisecond_bounds():
+    """REL-046: milliseconds must not disappear through integer-second truncation."""
+    config = {
+        "types": {
+            "v": {
+                "minValue": "1970-01-01T00:00:00.001001",
+                "maxValue": "1970-01-01T00:00:00.002999",
+                "unit": "millis",
+            }
+        }
+    }
+    _check_timestamp_unix(["2"], config)
+    for outside in ["1", "3"]:
+        with pytest.raises(AssertionError):
+            _check_timestamp_unix([outside], config)
 
 
 def _check_uuid(rows: list[str], config: dict[str, Any]) -> None:

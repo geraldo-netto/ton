@@ -444,6 +444,25 @@ def test_builtin_generator_rejects_unknown_owned_key() -> None:
         api.validate_config(payload)
 
 
+@pytest.mark.parametrize(
+    "obsolete", [{"values": ["ignored"]}, {"weights": [0]}, {"values": ["ignored"], "weights": [0]}]
+)
+def test_weighted_rejects_removed_keys_in_mixed_forms(obsolete) -> None:
+    """ARCH-007: only choices belongs to the weighted schema."""
+    from ton import api
+
+    field = {
+        "type": "weighted",
+        "choices": [{"spec": {"type": "string", "values": ["x"]}}],
+        **obsolete,
+    }
+    config = {"rows": 1, "format": "$x$", "types": {"x": field}}
+    with pytest.raises(api.ConfigError, match="Unknown key"):
+        api.validate_config(config)
+    with pytest.raises(api.TemplateError, match="Unknown key"):
+        list(api.generate(config))
+
+
 def test_validate_config_rejects_weighted_choice_wrapper_typo() -> None:
     payload = {
         "rows": 1,

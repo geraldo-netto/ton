@@ -32,7 +32,6 @@
 | id | status | severity | effort | description |
 |---|---|---|---|---|
 | ARCH-006 | open | high | medium | Architecture/data governance: `_proofcheck._audit_spec` creates a separate but mutable dict shared by retained failures and the sink. A sink changing `failure.spec['values'][0]` changes earlier and later retained records; `_proofaudit` still reuses the fingerprint of the pre-mutation serialization. Audit content must remain immutable. Resolve by preventing sink/consumer mutation from altering retained audit content or its fingerprint; test record contents and serialized references, not only generated rows. |
-| ARCH-007 | open | medium | small | Architecture/schema: weighted preparation now implements only `choices`, but `generators.__init__.BUILTIN_GENERATOR_CONFIG_KEYS['weighted']` still admits removed `values` and `weights` options. A valid `choices` spec mixed with `values: ['ignored']` and `weights: [0]` validates and silently ignores those fields, contrary to the approved single-form schema and unknown-key checks. Remove obsolete accepted keys and test rejection of mixed forms; do not restore legacy behavior. |
 
 ### Plugin extensibility
 

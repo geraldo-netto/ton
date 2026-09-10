@@ -93,7 +93,7 @@ BUILTIN_GENERATOR_CONFIG_KEYS: dict[str, frozenset[str]] = {
     "text": frozenset(("unit", "count")),
     "timestamp_unix": frozenset(("minValue", "maxValue", "unit")),
     "uuid": frozenset(("version", "uppercase")),
-    "weighted": frozenset(("values", "weights", "choices")),
+    "weighted": frozenset(("choices",)),
 }
 for _generator_class in BUILTIN_GENERATOR_CLASSES:
     _generator_class.config_keys = BUILTIN_GENERATOR_CONFIG_KEYS[_generator_class.type_name]

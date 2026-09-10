@@ -407,6 +407,67 @@ def test_catalog_entry_points_load_separate_plugin_kinds() -> None:
     assert "acme.custom" in catalog.list_validators()
 
 
+@pytest.mark.parametrize(
+    "group,factory",
+    [
+        ("ton.generators", StringGenerator),
+        ("ton.transforms", BaseTransform),
+        ("ton.validators", NonEmptyValidator),
+    ],
+)
+def test_entry_points_isolate_uncloneable_prototypes(group, factory, monkeypatch, caplog):
+    """PLUG-021: unusable prototypes fail inside the individual provider boundary."""
+
+    def broken_factory():
+        plugin = factory()
+        plugin.lock = threading.Lock()
+        return plugin
+
+    def entry(name, build):
+        return SimpleNamespace(
+            name=name,
+            value="pkg:Plugin",
+            load=lambda: build,
+            dist=SimpleNamespace(name="acme", version="1"),
+        )
+
+    candidates = [entry("acme.broken", broken_factory), entry("acme.valid", factory)]
+    monkeypatch.setattr(
+        _registry_module,
+        "entry_points",
+        lambda group: candidates if group == selected_group else [],
+    )
+    selected_group = group
+    with caplog.at_level("INFO", logger="ton"):
+        catalog = catalog_with_entry_points()
+    available = getattr(catalog, group.split(".")[1])()
+    assert "acme.broken" not in available
+    assert "acme.valid" in available
+    assert any(getattr(record, "event", "") == "entry_point_failed" for record in caplog.records)
+    assert not any(
+        getattr(record, "event", "") == "entry_point_loaded" and record.ep_name == "acme.broken"
+        for record in caplog.records
+    )
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {
+            "x": {"type": "string", "values": ["x"]},
+        },
+    }
+    assert list(
+        api.generate(
+            config,
+            registry=catalog.generators(),
+            transforms=catalog.transforms(),
+            validators=catalog.validators(),
+        )
+    ) == ["x"]
+    selector = EntryPointSelector(group, "acme", "acme.broken")
+    with pytest.raises(RegistryError, match=r"failed to load \(TypeError\)"):
+        catalog_with_entry_points(allowed_selectors={selector})
+
+
 def test_entry_point_logs_and_provenance_sanitize_distribution_metadata(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

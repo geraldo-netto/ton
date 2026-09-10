@@ -394,6 +394,8 @@ def _load_catalog_candidate(
         plugin = ep.load()()
         namespace, name = _entry_point_namespace_name(ep.name, kind, plugin)
         _validate_entry_point_plugin(kind, plugin)
+        # Catalog views clone prototypes for each engine; isolate failures here too.
+        deepcopy(plugin)
         _register_entry_point_plugin(catalog, kind, namespace, name, plugin)
         catalog._providers[kind, f"{namespace}.{name}"] = _safe_entry_point_dist(ep)
     except Exception as exc:  # noqa: BLE001 - per-entry failure isolation

@@ -16,12 +16,6 @@
 | CONC-020 | open | medium | small | Concurrency: make proof-traced string values reconstructible in `ton/generators/base.py::DrawnValue` and `_GeneratedChildValue`. `deepcopy` and pickle round-trips call their multi-argument `__new__` with only the string, raising `TypeError`; `proven_draws` explicitly promises preserved ownership. Add permanent round-trip tests for plain and transformed composite draws and retained audit failures, verifying proof ownership and rejection survive serialization. |
 | CONC-021 | open | high | small | Concurrency: detect active-path cycles while traversing declared children in `ton/concurrency.py::_offset_sequence_spec`. A `oneOf` whose sole choice is itself raises a contextual `TemplateError` through `Engine.from_config`, but `fork_engine` loops indefinitely before compilation (reproduced with a two-second subprocess timeout). Add a permanent subprocess regression for generator and transform cycles, retaining support for acyclic shared specs. |
 
-### Plugin extensibility
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| PLUG-021 | open | high | medium | Plugin extensibility: validate prototype cloneability inside the isolated entry-point loading boundary in `ton/_registry.py::_load_catalog_candidate`. A generator containing a `threading.Lock` is logged as successfully loaded, but the subsequent `catalog.generators()` raises `TypeError`, aborting broad discovery despite its documented broken-plugin isolation. Add permanent generator/transform/validator regressions: broad loading skips and logs the uncloneable provider, exact selectors raise `RegistryError`, and valid providers remain usable. |
-
 ### Architecture / modularity / SOLID
 
 | id | status | severity | effort | description |

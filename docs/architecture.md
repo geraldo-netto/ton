@@ -27,7 +27,7 @@ catalog.register_transform("acme", "mask", MaskTransform())
 
 Plugin registrations are resolved by qualified name, such as
 `acme.customer_id`. Built-ins cannot be removed or replaced through
-`ExtensionCatalog`; if a plugin registers `plugin.string`, the legacy
+`ExtensionCatalog`; if a plugin registers `plugin.string`, the bare
 `string` alias still resolves to `core.string`.
 
 Entry-point loading is opt-in. When enabled, TON loads:
@@ -103,9 +103,10 @@ assert rows == ["x!", "x!"]
 ```
 
 The built-in `distribution` transform chooses among two or more prepared
-candidate data-type specs. The legacy `weighted` generator delegates its
-composite choice behavior to the same distribution implementation while
-preserving existing `weighted` config shapes.
+candidate data-type specs. The `weighted` generator uses the same distribution
+implementation. Both accept a `choices` list of objects containing a generator
+`spec` and an optional `weight` (default `1.0`). Use string-generator children
+for literal choices; `values` and `weights` are not weighted-generator options.
 
 The built-in `identity` transform returns values unchanged and preserves
 paired values. It provides an explicit no-op transform for configs and tests
@@ -132,8 +133,8 @@ Structured proof-check logs include identifiers such as row, field, stage, and
 reference. They do not include raw generated values. Proof reports include
 values, paired ids, and field specs unless `--redact-proof-failures` is set.
 
-## Compatibility
+## Configuration references
 
-Existing configs using unqualified built-in type names remain supported.
-Existing `weighted` legacy and composite forms remain supported. Plugin loading
-remains opt-in for both CLI and library callers.
+Built-in types can be named with either their bare name or `core.name`.
+Plugin types use qualified names. Entry-point loading is opt-in for both CLI
+and library callers. Weighted generation has one schema: `choices`.

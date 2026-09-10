@@ -114,7 +114,8 @@ def atomic_output(
     no_clobber: bool = False,
 ) -> Iterator[TextIO]:
     """Yield a temporary stream and atomically replace ``path`` on success."""
-    directory = os.path.dirname(os.path.abspath(path)) or "."
+    path = os.path.abspath(path)
+    directory = os.path.dirname(path)
     basename = os.path.basename(path)
     tmp_name = ""
     published = False
@@ -366,6 +367,7 @@ def open_output_path(
     encoding: str = "utf-8",
 ) -> Iterator[TextIO]:
     """Open a validated path with FIFO or atomic regular-file semantics."""
+    path = os.path.abspath(path)
     if validate_output_target(path, no_clobber=no_clobber):
         with _open_fifo(path, encoding=encoding) as stream:
             yield cast(TextIO, EncodingNormalizingStream(stream))

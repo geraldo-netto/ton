@@ -10,12 +10,6 @@
 | REL-055 | open | medium | medium | Reliability/correctness: preserve nested generator exception attribution through composite execution. A generator raising `RuntimeError` reports `GeneratorExecutionError` with its own class at the root, but reports `OneOfGenerator` inside oneOf and becomes `TransformExecutionError(reference='distribution')` inside a distribution candidate. Preserve the failing generator's public error type/reference and original cause; add permanent root/nested API and row-context regressions before fixing. |
 | REL-056 | open | medium | medium | Reliability/correctness: preserve nested transform exception attribution in `ChildPipelineGenerator._generate_steps` and engine error translation. A transform raising `RuntimeError` produces `TransformExecutionError(reference='crash')` at the root, but becomes `GeneratorExecutionError(reference='OneOfGenerator')` inside oneOf or is attributed to the outer distribution transform. Add permanent root/nested regressions for public error type, transform reference, cause and row log context before fixing. |
 
-### Robustness / recovery
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| ROB-014 | open | high | small | Robustness/recovery: bind relative output paths to the directory resolved when opening the output in `ton/_output.py::atomic_output` / `open_output_path`. Opening `result.txt` in directory A, changing cwd to B inside the context, then closing publishes B/result.txt while the stage and directory fsync belong to A. This can overwrite an unintended destination. Add a permanent temporary-directory regression for publication, no-clobber and cleanup before fixing. |
-
 ### Performance
 
 | id | status | severity | effort | description |

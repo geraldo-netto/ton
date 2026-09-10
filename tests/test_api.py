@@ -734,3 +734,58 @@ def test_public_facade_exports_the_plugin_contract_types() -> None:
     ):
         assert name in api.__all__
         assert hasattr(api, name)
+
+
+@pytest.mark.parametrize("no_clobber", [False, True])
+@pytest.mark.parametrize("direct", [False, True])
+def test_output_publication_retains_opening_directory(tmp_path, monkeypatch, no_clobber, direct):
+    """ROB-014: publication keeps the path resolved when the context was entered."""
+    from ton._output import atomic_output
+
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    other = second / "result.txt"
+    other.write_text("unrelated")
+    monkeypatch.chdir(first)
+    opener = atomic_output if direct else api.open_output_path
+    with opener("result.txt", no_clobber=no_clobber) as stream:
+        stream.write("generated")
+        monkeypatch.chdir(second)
+    assert (first / "result.txt").read_text() == "generated"
+    assert other.read_text() == "unrelated"
+    assert sorted(path.name for path in first.iterdir()) == ["result.txt"]
+
+
+def test_output_no_clobber_race_checks_original_directory(tmp_path, monkeypatch):
+    """ROB-014: a competing original target survives a cwd change and rollback."""
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    monkeypatch.chdir(first)
+    with (
+        pytest.raises(FileExistsError),
+        api.open_output_path("result.txt", no_clobber=True) as stream,
+    ):
+        stream.write("generated")
+        (first / "result.txt").write_text("competitor")
+        monkeypatch.chdir(second)
+    assert (first / "result.txt").read_text() == "competitor"
+    assert list(second.iterdir()) == []
+    assert sorted(path.name for path in first.iterdir()) == ["result.txt"]
+
+
+def test_output_body_failure_cleans_original_directory(tmp_path, monkeypatch):
+    """ROB-014: failed generation removes the stage even after cwd changes."""
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    monkeypatch.chdir(first)
+    with (
+        pytest.raises(RuntimeError, match="interrupted"),
+        api.open_output_path("result.txt") as stream,
+    ):
+        stream.write("partial")
+        monkeypatch.chdir(second)
+        raise RuntimeError("interrupted")
+    assert list(first.iterdir()) == list(second.iterdir()) == []

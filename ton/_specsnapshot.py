@@ -66,7 +66,8 @@ def snapshot_spec(value: Any, *, immutable: bool = False) -> Any:
         if id(item) in memo:
             target[key] = memo[id(item)]
         elif isinstance(item, Mapping):
-            copied: Any = {}
+            # Reserve keys before the LIFO work stack fills their values (ARCH-022).
+            copied: Any = dict.fromkeys(item)
             view = FrozenMapping(copied) if immutable else copied
             memo[id(item)] = view
             target[key] = view

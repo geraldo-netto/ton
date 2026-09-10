@@ -329,6 +329,34 @@ def test_snapshot_preserves_cyclic_metadata_without_recursion() -> None:
     assert clone["children"][0] is clone
 
 
+@pytest.mark.parametrize("immutable", [False, True])
+def test_snapshot_preserves_mapping_order_and_aliases(immutable) -> None:
+    """ARCH-022: a snapshot preserves ordered plugin metadata and graph identity."""
+    shared = {"first": 1, "second": 2}
+    original = {"left": shared, "right": shared}
+    copied = snapshot_spec(original, immutable=immutable)
+    assert list(copied) == ["left", "right"]
+    assert list(copied["left"]) == ["first", "second"]
+    assert copied["left"] is copied["right"]
+    shared["third"] = 3
+    assert list(copied["left"]) == ["first", "second"]
+
+
+def test_engine_preserves_order_sensitive_plugin_metadata() -> None:
+    """ARCH-022: snapshot normalization cannot reverse a plugin's output."""
+
+    class Ordered(Generator):
+        def generate(self, prepared, rng):
+            return ":".join(prepared["metadata"])
+
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {"x": {"type": "ordered", "metadata": {"first": 1, "second": 2}}},
+    }
+    assert list(api.generate(config, registry={"ordered": Ordered()})) == ["first:second"]
+
+
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX resource module (PLAT-015)")
 def test_nested_generation_needs_no_finite_stack_report(monkeypatch) -> None:
     """SCALE-007: an unlimited POSIX stack needs no estimate to generate nested values."""

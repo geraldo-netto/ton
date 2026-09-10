@@ -271,20 +271,26 @@ def _offset_sequence_spec(
         generator = resolve_reference(registry, reference) if isinstance(reference, str) else None
         if generator is not None and uses_source:
             children.extend(_offset_source_spec(spec, child_offset, generator))
+        owned: set[SpecPath] = set()
         for location, child, amount in children:
             child_copy = dict(child)
-            _replace_owned_child(spec, location, child_copy)
+            _replace_owned_child(spec, location, child_copy, owned)
             pending.append(
                 (child, child_copy, amount, f"{child_path}.{format_spec_path(location)}", False)
             )
     return root
 
 
-def _replace_owned_child(spec: dict[str, Any], location: SpecPath, child: dict[str, Any]) -> None:
-    """Copy only containers on a declared child path, retaining opaque metadata aliases."""
+def _replace_owned_child(
+    spec: dict[str, Any], location: SpecPath, child: dict[str, Any], owned: set[SpecPath]
+) -> None:
+    """Copy each owned container occurrence once, retaining opaque metadata aliases."""
     target: Any = spec
-    for key in location[:-1]:
-        target[key] = target[key].copy()
+    for index, key in enumerate(location[:-1]):
+        prefix = location[: index + 1]
+        if prefix not in owned:
+            target[key] = target[key].copy()
+            owned.add(prefix)
         target = target[key]
     target[location[-1]] = child
 

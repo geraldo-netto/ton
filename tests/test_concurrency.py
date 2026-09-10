@@ -661,3 +661,39 @@ def test_worker_plugin_child_keys_are_literal(key):
     worker = fork_engine(config, registry=registry, parent_seed=1, worker_id=1, workers=2, rows=2)
     assert list(worker) == ["2", "3"]
     assert config["types"]["x"][key] == {"type": "sequence"}
+
+
+@pytest.mark.parametrize("kind", ["oneOf", "distribution"])
+@pytest.mark.parametrize("width", [20, 200])
+def test_worker_choice_containers_are_copied_once(kind, width):
+    """PERF-041: count copied slots, independently of machine speed."""
+    from ton._registry import default_transforms, make_registry
+    from ton.concurrency import _offset_sequence_spec
+
+    copied_slots = []
+
+    class Choices(list):
+        def copy(self):
+            copied_slots.append(len(self))
+            return Choices(self)
+
+    child = {"type": "sequence", "start": 0}
+    choices = Choices([child] * width)
+    spec = {"type": "oneOf", "choices": choices}
+    if kind == "distribution":
+        choices = Choices([{"spec": child}] * width)
+        spec = {
+            "type": "string",
+            "values": ["unused"],
+            "transforms": [{"type": "distribution", "choices": choices}],
+        }
+    result = _offset_sequence_spec(spec, 5, make_registry(), default_transforms(), path="types.x")
+    assert copied_slots == [width]
+    shifted = (
+        result["choices"]
+        if kind == "oneOf"
+        else [entry["spec"] for entry in result["transforms"][0]["choices"]]
+    )
+    assert all(entry["start"] == 5 for entry in shifted)
+    assert len({id(entry) for entry in shifted}) == width
+    assert child == {"type": "sequence", "start": 0}

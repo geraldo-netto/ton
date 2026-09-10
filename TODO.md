@@ -10,12 +10,6 @@
 | REL-055 | open | medium | medium | Reliability/correctness: preserve nested generator exception attribution through composite execution. A generator raising `RuntimeError` reports `GeneratorExecutionError` with its own class at the root, but reports `OneOfGenerator` inside oneOf and becomes `TransformExecutionError(reference='distribution')` inside a distribution candidate. Preserve the failing generator's public error type/reference and original cause; add permanent root/nested API and row-context regressions before fixing. |
 | REL-056 | open | medium | medium | Reliability/correctness: preserve nested transform exception attribution in `ChildPipelineGenerator._generate_steps` and engine error translation. A transform raising `RuntimeError` produces `TransformExecutionError(reference='crash')` at the root, but becomes `GeneratorExecutionError(reference='OneOfGenerator')` inside oneOf or is attributed to the outer distribution transform. Add permanent root/nested regressions for public error type, transform reference, cause and row log context before fixing. |
 
-### Performance
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| PERF-041 | open | medium | medium | Performance: avoid copying the same owned choices list once per child in `ton/concurrency.py::_replace_owned_child`. A zero-row worker with 200 oneOf choices copies 40,000 list slots; an N-choice field incurs quadratic copying before compilation. Copy each occurrence's intermediate containers once, preserving alias/metadata isolation. Add a permanent structural work-count regression for wide oneOf and distribution fields, without timing thresholds or workload caps. |
-
 ### Scalability
 
 | id | status | severity | effort | description |

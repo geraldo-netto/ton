@@ -56,8 +56,8 @@ class IntegerGenerator(Generator):
             value = str_to_int(result.value)
         except ValueError:
             return proof_result(False, "value is not an integer")
-        width_ok = not prepared.pad_width or len(result.value) == prepared.pad_width
+        expected = pad_with_zero(int_to_str(value), prepared.pad_width)
         return proof_result(
-            prepared.min_value <= value <= prepared.max_value and width_ok,
+            prepared.min_value <= value <= prepared.max_value and result.value == expected,
             "integer value is outside its bounds or padding contract",
         )

@@ -129,3 +129,29 @@ def test_decimal_rejects_non_finite_or_boolean_bound(value: object) -> None:
     generator = DecimalGenerator()
     with pytest.raises(ValueError, match="must be a .*number"):
         generator.prepare({"minValue": value, "maxValue": 1, "decimals": 2})
+
+
+@pytest.mark.parametrize(
+    ("lower", "upper", "valid", "invalid"),
+    [
+        (1, 99, "01", [" 1", "+1", "1 ", "1", "001"]),
+        (-99, -1, "-01", [" -1", "-1 ", "-1", "-001"]),
+        (-99, 99, "001", [" +1", "+01", " 01", "01"]),
+    ],
+)
+def test_integer_proof_requires_exact_zero_padding(lower, upper, valid, invalid) -> None:
+    """REL-051: equal width alone does not establish the padding contract."""
+    generator = IntegerGenerator()
+    prepared = generator.prepare({"minValue": lower, "maxValue": upper, "padWithZero": True})
+    assert generator.prove(prepared, TransformResult(valid)).ok
+    for value in invalid:
+        assert not generator.prove(prepared, TransformResult(value)).ok, repr(value)
+
+
+@pytest.mark.parametrize("value", ["+1", " 1", "1 ", "01", "-0", "١"])
+def test_integer_proof_requires_canonical_unpadded_digits(value) -> None:
+    """REL-051: integer parsing must not admit spellings generation cannot emit."""
+    generator = IntegerGenerator()
+    prepared = generator.prepare({"minValue": -9, "maxValue": 9})
+    assert generator.prove(prepared, TransformResult("1")).ok
+    assert not generator.prove(prepared, TransformResult(value)).ok

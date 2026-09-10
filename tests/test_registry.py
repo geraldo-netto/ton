@@ -24,7 +24,6 @@ from ton._registry import (
     build_extension_catalog,
     catalog_with_entry_points,
     clear_default_registry_cache,
-    discover_generator_classes,
     make_registry,
     normalize_reference,
     plugin_provenance,
@@ -33,7 +32,7 @@ from ton._registry import (
 )
 from ton._transforms import BaseTransform
 from ton._validation import NonEmptyValidator
-from ton.generators import Generator, StringGenerator
+from ton.generators import BUILTIN_GENERATOR_CLASSES, Generator, StringGenerator
 
 
 @pytest.mark.parametrize(
@@ -118,8 +117,8 @@ def test_false_registration_keeps_canonical_precedence() -> None:
     assert resolve_reference({"core.value": False, "value": True}, "value") is False
 
 
-def test_discover_returns_only_concrete_named_subclasses() -> None:
-    for cls in discover_generator_classes():
+def test_builtin_catalog_contains_only_concrete_named_generators() -> None:
+    for cls in BUILTIN_GENERATOR_CLASSES:
         assert issubclass(cls, Generator)
         assert cls.type_name
         assert not inspect.isabstract(cls)
@@ -143,7 +142,7 @@ def test_make_registry_ignores_colliding_subclass() -> None:
     class CollidingString(StringGenerator):
         type_name = "string"
 
-    assert CollidingString not in discover_generator_classes()
+    assert CollidingString not in BUILTIN_GENERATOR_CLASSES
     clear_default_registry_cache()
     assert type(make_registry()["string"]) is StringGenerator
 

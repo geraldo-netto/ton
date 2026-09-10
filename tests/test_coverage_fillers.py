@@ -82,17 +82,14 @@ def test_require_non_empty_values_rejects_bad_input(spec: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_walk_subclasses_dedups_diamond_inheritance() -> None:
-    """`_walk_subclasses` must skip classes it has already yielded."""
-    from ton._registry import _walk_subclasses
-    from ton.generators import Generator
+def test_builtin_catalog_has_unique_classes_and_names() -> None:
+    """ARCH-024: canonical registration cannot silently collapse duplicates."""
+    from ton.generators import BUILTIN_GENERATOR_CLASSES
 
-    # The Generator subclass tree already contains diamond-ish edges
-    # because PairedGenerator subclasses can be reached through multiple
-    # inheritance paths. The walker should yield each
-    # class exactly once regardless of how many paths reach it.
-    seen = list(_walk_subclasses(Generator))
-    assert len(seen) == len(set(seen))
+    assert len(BUILTIN_GENERATOR_CLASSES) == len(set(BUILTIN_GENERATOR_CLASSES))
+    assert len(BUILTIN_GENERATOR_CLASSES) == len(
+        {cls.type_name for cls in BUILTIN_GENERATOR_CLASSES}
+    )
 
 
 def test_cli_report_handles_zero_elapsed(capsys: pytest.CaptureFixture[str]) -> None:

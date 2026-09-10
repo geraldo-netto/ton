@@ -2,9 +2,8 @@
 
 The default registry is sourced from the explicit allowlist
 ``ton.generators.BUILTIN_GENERATOR_CLASSES`` (ARCH-005).
-:func:`discover_generator_classes` walks ``Generator.__subclasses__()``
-but returns only classes on that allowlist, so neither it nor the registry
-picks up in-process test fixtures or unrelated third-party subclasses.
+In-process test fixtures and unrelated third-party subclasses cannot
+become built-ins through inheritance.
 
 Construction goes through :func:`make_registry` so callers can request
 only the type names they need (PERF-012); calling it without arguments
@@ -13,11 +12,10 @@ builds the full dictionary.
 
 from __future__ import annotations
 
-import inspect
 import re
 import threading
 from collections import Counter
-from collections.abc import Collection, Iterable, Iterator, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from importlib.metadata import entry_points
@@ -27,9 +25,6 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._transforms import IdentityTransform, Transform
 from ._validation import NonEmptyValidator, Validator
-
-# Importing ``ton.generators`` imports every concrete-generator submodule,
-# which is what populates Generator.__subclasses__() below.
 from .generators import BUILTIN_GENERATOR_CLASSES, Generator
 from .transforms import DistributionTransform
 
@@ -42,9 +37,6 @@ TRANSFORM_ENTRY_POINT_GROUP = "ton.transforms"
 VALIDATOR_ENTRY_POINT_GROUP = "ton.validators"
 CORE_NAMESPACE = "core"
 
-#: Identity-based allowlist of built-in classes. A third-party subclass may
-#: reuse a core ``type_name`` but can never become a default implementation.
-_BUILTIN_GENERATOR_CLASSES: frozenset[type[Generator]] = frozenset(BUILTIN_GENERATOR_CLASSES)
 _ASCII_IDENTIFIER = re.compile(r"[A-Za-z0-9_]+\Z")
 _ASCII_DISTRIBUTION = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*\Z")
 
@@ -529,33 +521,7 @@ def _validate_identifier(label: str, value: str) -> None:
         raise RegistryError(f"{label} must contain only ASCII letters, numbers, or '_'")
 
 
-def discover_generator_classes() -> list[type[Generator]]:
-    """Return every concrete :class:`Generator` subclass with a ``type_name``
-    that is explicitly registered as a built-in.
-
-    Walks the full subclass tree but filters by the built-in allowlist so
-    test fixtures and third-party plugins do not leak in (ARCH-005).
-    """
-    return [
-        cls
-        for cls in _walk_subclasses(Generator)  # type: ignore[type-abstract]
-        if not inspect.isabstract(cls) and cls in _BUILTIN_GENERATOR_CLASSES
-    ]
-
-
-def _walk_subclasses(root: type[Generator]) -> Iterator[type[Generator]]:
-    seen: set[type[Generator]] = set()
-    stack: list[type[Generator]] = list(root.__subclasses__())
-    while stack:
-        cls = stack.pop()
-        if cls in seen:
-            continue
-        seen.add(cls)
-        yield cls
-        stack.extend(cls.__subclasses__())
-
-
-#: Process-wide cache of the discovered generator classes, indexed by
+#: Process-wide cache of the canonical built-in generator classes, indexed by
 #: ``type_name`` so per-name lookups stay O(1) (PERF-012).
 _DEFAULT_CLASSES: dict[str, type[Generator]] = {}
 _DEFAULT_CLASSES_LOCK = threading.Lock()

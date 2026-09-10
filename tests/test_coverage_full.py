@@ -24,7 +24,6 @@ from ton._engine import Engine, PipelineStageError, TemplateError
 from ton._registry import (
     _ensure_default_classes,
     _entry_point_dist,
-    _walk_subclasses,
     clear_default_registry_cache,
 )
 from ton._template import Token, split_segments
@@ -46,34 +45,30 @@ def test_split_segments_skips_literal_dollar_escapes() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _registry._walk_subclasses: seen-skip via diamond inheritance
+# Default catalog isolation from diamond inheritance
 # ---------------------------------------------------------------------------
 
 
-def test_walk_subclasses_skips_already_yielded_diamond() -> None:
-    """Diamond hierarchy makes the same subclass appear twice on the stack."""
+def test_builtin_catalog_ignores_diamond_subclasses() -> None:
+    """ARCH-024: inheritance never expands the explicit built-in catalog."""
+    from ton._registry import make_registry
+    from ton.generators import StringGenerator
 
-    class Root:
+    before = {name: type(generator) for name, generator in make_registry().items()}
+
+    class Left(StringGenerator):
         pass
 
-    class Middle(Root):
+    class Right(StringGenerator):
         pass
 
-    class Leaf(Middle):  # Leaf is reachable via Root -> Middle -> Leaf
-        pass
+    class Diamond(Left, Right):
+        type_name = "diamond_fixture"
 
-    # ``Root.__subclasses__()`` returns [Middle, Leaf?]; actually Leaf is
-    # only a direct subclass of Middle. To force duplicate stacking we
-    # patch ``__subclasses__`` so Leaf is yielded from both Root and
-    # Middle, hitting the seen-skip branch.
-    real_root_subs = Root.__subclasses__
-    real_middle_subs = Middle.__subclasses__
-
-    with mock.patch.object(Root, "__subclasses__", staticmethod(lambda: real_root_subs() + [Leaf])):
-        seen = list(_walk_subclasses(Root))  # type: ignore[arg-type]
-    assert seen.count(Leaf) == 1  # type: ignore[comparison-overlap]
-    # Silence unused-warning lint on the unused helper.
-    assert real_middle_subs() == [Leaf]
+    clear_default_registry_cache()
+    after = {name: type(generator) for name, generator in make_registry().items()}
+    assert after == before
+    assert Diamond not in after.values()
 
 
 # ---------------------------------------------------------------------------
@@ -116,7 +111,7 @@ def test_ensure_default_classes_second_check_inside_lock(monkeypatch) -> None:
         def __enter__(self) -> None:
             # Populate the cache between the outer ``if`` and the inner
             # ``if`` so the second check returns the populated dict.
-            for cls in registry_mod.discover_generator_classes():
+            for cls in registry_mod.BUILTIN_GENERATOR_CLASSES:
                 registry_mod._DEFAULT_CLASSES[cls.type_name] = cls
             original_lock.acquire()
 

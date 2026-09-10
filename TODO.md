@@ -16,12 +16,6 @@
 |---|---|---|---|---|
 | SCALE-017 | open | medium | medium | Scalability: remove the JSON decoder's nesting ceiling from `ton/_config.py::load`. A valid zero-row config containing 5,000 nested oneOf wrappers fails with `RecursionError` in `json.load`, although downstream snapshots and composite compilation use iterative traversal. Add a permanent fresh-process file-loading regression and use stack-safe parsing without changing the process recursion limit or imposing a depth cap. |
 
-### Architecture / modularity / SOLID
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| ARCH-024 | open | low | small | Architecture/modularity/SOLID: remove the unused alternate built-in discovery path `discover_generator_classes` / `_walk_subclasses` in `ton/_registry.py`. Production `make_registry` uses `BUILTIN_GENERATOR_CLASSES` directly; the subclass walker is called only by tests and its own helper. Retarget relevant built-in isolation/registration tests to the canonical catalog and remove the duplicate discovery implementation and stale explanatory comments. |
-
 ### Observability
 
 | id | status | severity | effort | description |

@@ -24,28 +24,32 @@ def _choices(*weights: object) -> dict[str, object]:
     }
 
 
-def test_weighted_rejects_empty_values() -> None:
+def test_weighted_rejects_empty_choices() -> None:
+    """REL-048: validate current choices with a real composite context."""
     generator = WeightedGenerator()
-    with pytest.raises(ValueError):
-        generator.prepare({"values": [], "weights": []})
+    with pytest.raises(ValueError, match="non-empty list"):
+        generator.prepare(_choices(), PreparationContext(make_registry()))
 
 
-def test_weighted_rejects_mismatched_weights() -> None:
+def test_weighted_rejects_malformed_choice() -> None:
+    """REL-048: reject the malformed wrapper, not a missing context."""
     generator = WeightedGenerator()
-    with pytest.raises(ValueError):
-        generator.prepare({"values": ["A", "B"], "weights": [1]})
+    with pytest.raises(ValueError, match="must be an object"):
+        generator.prepare({"choices": [1]}, PreparationContext(make_registry()))
 
 
 def test_weighted_rejects_negative_weight() -> None:
+    """REL-048: exercise weight validation rather than the context guard."""
     generator = WeightedGenerator()
-    with pytest.raises(ValueError):
-        generator.prepare({"values": ["A"], "weights": [-1]})
+    with pytest.raises(ValueError, match="non-negative"):
+        generator.prepare(_choices(-1), PreparationContext(make_registry()))
 
 
 def test_weighted_rejects_zero_total() -> None:
+    """REL-048: reach zero-total validation through the supported schema."""
     generator = WeightedGenerator()
-    with pytest.raises(ValueError):
-        generator.prepare({"values": ["A", "B"], "weights": [0, 0]})
+    with pytest.raises(ValueError, match="sum to a positive number"):
+        generator.prepare(_choices(0, 0), PreparationContext(make_registry()))
 
 
 @pytest.mark.parametrize("weight", [float("nan"), float("inf"), float("-inf")])

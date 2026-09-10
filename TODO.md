@@ -7,7 +7,6 @@
 | id | status | severity | effort | description |
 |---|---|---|---|---|
 | REL-047 | open | medium | medium | Reliability/correctness: preserve nested validator exception attribution across `ton/generators/base.py::ChildPipelineGenerator._generate_steps` and `ton/_engine.py::_generate_source`. A validator raising `RuntimeError` yields `ValidatorExecutionError` at the root but `GeneratorExecutionError` naming `OneOfGenerator` when the same field is nested. Add permanent root/nested regressions asserting the validator error type, reference, row log context, and CLI exit 3; preserve ordinary validator rejection as `ValidationError`. |
-| REL-048 | open | medium | small | Reliability/correctness: repair the first four validation tests in `tests/test_weighted_generator.py`. The empty/mismatched/negative/zero-weight cases use removed `values`/`weights` options and omit `PreparationContext`, so all pass solely on the composite-context guard without reaching the validation named by each test. Use current choices specs and a real context, assert the intended diagnostics, and retain obsolete-key rejection separately through the normal compiler path. |
 
 ### Configuration discoverability
 

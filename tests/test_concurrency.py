@@ -136,6 +136,31 @@ def test_fork_engine_offsets_sequence_ranges_without_mutating_config() -> None:
     assert config["types"]["id"]["start"] == 10
 
 
+@pytest.mark.parametrize("nested", [False, True])
+@pytest.mark.parametrize("repeated", [False, True])
+def test_worker_offsets_shared_specs_per_occurrence(nested, repeated) -> None:
+    """CONC-019: aliases must not accumulate offsets across fields or child owners."""
+    shared = {"type": "sequence", "start": 0}
+    fields = {"a": shared, "b": shared}
+    expected = ["2/2", "3/3"]
+    if repeated:
+        expected = ["4:5/2", "6:7/3"]
+    if nested:
+        fields = {
+            "a": {"type": "sequence_of", "spec": shared, "count": 2, "separator": ","},
+            "b": {"type": "sequence_of", "spec": shared, "count": 3, "separator": ","},
+        }
+        expected = (
+            ["8,9:10,11/6,7,8", "12,13:14,15/9,10,11"] if repeated else ["4,5/6,7,8", "6,7/9,10,11"]
+        )
+    config = {"rows": 4, "format": "$a$:$a$/$b$" if repeated else "$a$/$b$", "types": fields}
+    original = pickle.loads(pickle.dumps(config))
+    engine = fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=2, proof_mode="all")
+    assert list(engine) == expected
+    assert config == original
+    assert shared == {"type": "sequence", "start": 0}
+
+
 def test_fork_engine_offsets_uneven_sequence_shards() -> None:
     config = {
         "rows": 10,
@@ -445,7 +470,8 @@ def test_partitioned_workers_emit_disjoint_sequences(label: str, field: dict) ->
 
 
 @pytest.mark.parametrize("replacing", [False, True])
-def test_worker_offsets_only_declared_plugin_children(replacing) -> None:
+@pytest.mark.parametrize("aliased", [False, True])
+def test_worker_offsets_only_declared_plugin_children(replacing, aliased) -> None:
     """CONC-018: metadata resembling sequence specs stays opaque to worker offsets."""
     from ton import api
 
@@ -473,6 +499,10 @@ def test_worker_offsets_only_declared_plugin_children(replacing) -> None:
         "child": {"type": "sequence", "start": 0},
     }
     expected = ["100:2", "100:3"]
+    if aliased:
+        # CONC-019: even metadata aliasing an owned child must retain its original value.
+        field["metadata"] = field["child"]
+        expected = ["0:2", "0:3"]
     if replacing:
         field = {
             "type": "sequence",

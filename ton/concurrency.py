@@ -40,6 +40,7 @@ the partitioned row order.
 from __future__ import annotations
 
 import hashlib
+import re
 import struct
 from collections.abc import Mapping
 from random import Random
@@ -234,7 +235,7 @@ def _offset_sequences(
     for token in parse(str(copied.get("format", ""))):
         occurrences[token.type_key] = occurrences.get(token.type_key, 0) + 1
     for type_key, spec in copied.get("types", {}).items():
-        _offset_sequence_spec(
+        copied["types"][type_key] = _offset_sequence_spec(
             spec,
             offset * occurrences.get(type_key, 0),
             generators,
@@ -251,28 +252,43 @@ def _offset_sequence_spec(
     transforms: Mapping[str, Transform],
     *,
     path: str,
-) -> None:
+) -> dict[str, Any]:
     """Visit only declared generator children, preserving opaque plugin metadata (CONC-018)."""
-    pending = [(value, offset, path, False)]
+    root = dict(value)
+    pending = [(value, root, offset, path, False)]
     active: set[int] = set()
     while pending:
-        spec, child_offset, child_path, ready = pending.pop()
+        original, spec, child_offset, child_path, ready = pending.pop()
         if ready:
-            active.remove(id(spec))
+            active.remove(id(original))
             continue
-        if id(spec) in active:
+        if id(original) in active:
             raise TemplateError(f"Cyclic generator specification at {child_path}")
-        active.add(id(spec))
-        pending.append((spec, child_offset, child_path, True))
+        active.add(id(original))
+        pending.append((original, spec, child_offset, child_path, True))
         uses_source, children = _transform_sequence_children(spec, child_offset, transforms)
         reference = spec.get("type")
         generator = resolve_reference(registry, reference) if isinstance(reference, str) else None
         if generator is not None and uses_source:
             children.extend(_offset_source_spec(spec, child_offset, generator))
-        pending.extend(
-            (child, amount, f"{child_path}.{location}", False)
-            for location, child, amount in children
-        )
+        for location, child, amount in children:
+            child_copy = dict(child)
+            _replace_owned_child(spec, location, child_copy)
+            pending.append((child, child_copy, amount, f"{child_path}.{location}", False))
+    return root
+
+
+def _replace_owned_child(spec: dict[str, Any], location: str, child: dict[str, Any]) -> None:
+    """Copy only containers on a declared child path, retaining opaque metadata aliases."""
+    keys = [
+        int(index) if index else name
+        for name, index in re.findall(r"([^.[\]]+)|\[(\d+)\]", location)
+    ]
+    target: Any = spec
+    for key in keys[:-1]:
+        target[key] = target[key].copy()
+        target = target[key]
+    target[keys[-1]] = child
 
 
 def _offset_source_spec(

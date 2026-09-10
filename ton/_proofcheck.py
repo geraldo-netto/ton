@@ -23,6 +23,7 @@ from ._logging import logger as _logger
 from ._proof import PreparedField, ProofFailure, TransformStep
 from ._specsnapshot import snapshot_spec
 from ._transforms import TransformResult
+from .generators.base import coerce_int
 
 #: Upper bound on the number of detailed audit failures retained in
 #: memory. Beyond this the total count and per-type tallies keep
@@ -298,7 +299,9 @@ def validate_proof_mode(proof_mode: str) -> str:
 
 
 def validate_proof_sample_rate(proof_sample_rate: int) -> int:
-    parsed = int(proof_sample_rate)
+    parsed = coerce_int(
+        {"proof_sample_rate": proof_sample_rate}, "proof_sample_rate", type_name="proof"
+    )
     if parsed < 1:
         raise ValueError("proof_sample_rate must be >= 1")
     return parsed

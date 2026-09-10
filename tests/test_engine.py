@@ -877,9 +877,11 @@ def test_engine_sample_proof_mode_checks_sampled_rows() -> None:
         list(engine)
 
 
-def test_engine_rejects_bad_proof_sample_rate(basic_config: dict) -> None:
+@pytest.mark.parametrize("rate", [0, -1, True, False, 2.9, float("nan"), float("inf")])
+def test_engine_rejects_bad_proof_sample_rate(basic_config: dict, rate) -> None:
+    """CLI-022: API sampling must reject non-positive or non-integral rates."""
     with pytest.raises(ValueError, match="proof_sample_rate"):
-        Engine(basic_config, proof_mode="sample", proof_sample_rate=0)
+        Engine.from_config(basic_config, proof_mode="sample", proof_sample_rate=rate)
 
 
 def test_engine_applies_distribution_transform() -> None:

@@ -19,12 +19,6 @@
 | CFG-029 | open | medium | small | Configuration discoverability: reject the bcrypt-only `rounds` option for other algorithms in `ton/generators/hash.py::HashGenerator.prepare`, as already done for `cache`. `algorithm="sha256", rounds="invalid"` currently validates and silently ignores the option. Add direct, catalog-validation, and CLI regressions for irrelevant rounds before fixing. |
 | CFG-030 | open | medium | small | Configuration discoverability: preserve the owning field path for choice-wrapper errors in `ton/_distribution.py::_prepare_choice`. A misspelled weight inside `types.outer.choices[0].choices[0]` reports only `weighted.choices[0].weigth`, losing the parent path promised by README diagnostics. Build the location from `PreparationContext.path`; add permanent nested weighted and distribution-transform regressions asserting the complete path and suggestion. |
 
-### CLI / option integrity
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| CLI-022 | open | medium | small | CLI / option integrity: validate `proof_sample_rate` exactly in `ton/_proofcheck.py::validate_proof_sample_rate`. Library construction accepts `True` as 1 and truncates 2.9 to 2, while the CLI requires a positive integer, silently changing which rows receive strict checks. Add permanent public-API regressions rejecting boolean, fractional, and non-finite rates while preserving valid integer sampling. |
-
 ### Scalability
 
 | id | status | severity | effort | description |

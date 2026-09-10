@@ -671,6 +671,45 @@ def test_unknown_type_diagnostic_names_real_alternatives() -> None:
         assert expected in message
 
 
+@pytest.mark.parametrize("restricted", [None, {}, {"only": Generator}])
+def test_unknown_type_lists_exact_effective_registry(restricted) -> None:
+    """CFG-008: explicit empty/restricted catalogs must not advertise built-ins."""
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "nosuch"}}}
+    with pytest.raises(TemplateError) as error:
+        list(api.generate(config, registry=restricted))
+    names = str(error.value).split("Available types: ")[1].removesuffix(".")
+    actual = set() if names == "(none)" else set(names.split(", "))
+    expected = (
+        set(api.build_extension_catalog().generators()) if restricted is None else set(restricted)
+    )
+    assert actual == expected
+
+
+def test_unknown_type_diagnostic_does_not_construct_unused_generators(monkeypatch) -> None:
+    """CFG-008: available-name metadata does not require generator construction."""
+    from ton.generators.string import StringGenerator
+
+    def unexpected_init(self):
+        raise AssertionError("unused string generator constructed")
+
+    monkeypatch.setattr(StringGenerator, "__init__", unexpected_init)
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "nosuch"}}}
+    with pytest.raises(TemplateError, match="Available types"):
+        list(api.generate(config))
+
+
+@pytest.mark.parametrize("validate", [False, True])
+def test_cli_available_types_match_the_effective_catalog(tmp_path, capsys, validate) -> None:
+    """CFG-008: CLI generation and validation name the same actual references."""
+    from ton.cli import main
+
+    path = tmp_path / "unknown.json"
+    path.write_text('{"rows": 1, "format": "$x$", "types": {"x": {"type": "nosuch"}}}')
+    assert main([str(path), *(["--validate"] if validate else [])]) == 2
+    diagnostic = capsys.readouterr().err.split("Available types: ")[1].split(".\n")[0]
+    assert set(diagnostic.split(", ")) == set(api.build_extension_catalog().generators())
+
+
 def test_generate_and_validate_config_agree_on_available_types() -> None:
     """Both entry points describe the same catalog for the same config (CFG-008)."""
     config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "nosuch"}}}
@@ -682,7 +721,7 @@ def test_generate_and_validate_config_agree_on_available_types() -> None:
 
     def _named(message: str) -> set[str]:
         listed = message.rsplit("Available types: ", 1)[1].rstrip(".")
-        return {name.strip() for name in listed.split(",") if "." not in name}
+        return {name.strip() for name in listed.split(",")}
 
     assert _named(str(from_generate.value)) == _named(str(from_validate.value))
 

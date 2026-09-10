@@ -23,7 +23,7 @@ from ._specsnapshot import snapshot_spec
 from ._template import Token, parse, split_segments
 from ._transforms import Transform, fold_paired_capabilities
 from ._validation import Validator
-from .generators import Generator
+from .generators import BUILTIN_GENERATOR_CLASSES, Generator
 from .generators.base import (
     ChildPipelineGenerator,
     ChildPipelineSpec,
@@ -100,6 +100,15 @@ class EngineCompiler:
             else {
                 **built_in_validators,
                 **{f"core.{name}": value for name, value in built_in_validators.items()},
+            }
+        )
+        self.available_types = (
+            set(registry)
+            if registry is not None
+            else {
+                reference
+                for cls in BUILTIN_GENERATOR_CLASSES
+                for reference in (cls.type_name, f"core.{cls.type_name}")
             }
         )
         self.registry = self._resolve_registry(registry)
@@ -204,15 +213,8 @@ class EngineCompiler:
                 )
 
     def _available_type_names(self) -> str:
-        """List every type a config could name, for an unknown-type diagnostic.
-
-        ``self.registry`` is narrowed to the names this config asked for, so
-        an unknown name leaves it empty and reporting from it said
-        "(none)" -- while ``validate_config`` listed every built-in for the
-        same config (CFG-008).
-        """
-        available = set(self.registry) | set(make_registry())
-        return ", ".join(sorted(available)) or "(none)"
+        """List references from the effective catalog without constructing unused types."""
+        return ", ".join(sorted(self.available_types)) or "(none)"
 
     def _build_prepared(self) -> dict[str, PreparedField]:
         prepared: dict[str, PreparedField] = {}

@@ -49,7 +49,6 @@
 | id | status | severity | effort | description |
 |---|---|---|---|---|
 | PLUG-021 | open | high | medium | Plugin extensibility: validate prototype cloneability inside the isolated entry-point loading boundary in `ton/_registry.py::_load_catalog_candidate`. A generator containing a `threading.Lock` is logged as successfully loaded, but the subsequent `catalog.generators()` raises `TypeError`, aborting broad discovery despite its documented broken-plugin isolation. Add permanent generator/transform/validator regressions: broad loading skips and logs the uncloneable provider, exact selectors raise `RegistryError`, and valid providers remain usable. |
-| PLUG-022 | open | medium | small | Plugin extensibility: resolve registrations by presence rather than truthiness in `ton/_registry.py::resolve_reference`. A valid `StringGenerator` subclass whose `__bool__` returns false is reported as unknown when supplied as `{"core.string": instance}`; a bare registry works. Add permanent root/child lookup regressions covering false-valued extensions and both reference spellings, then remove boolean fallback semantics from canonical lookup. |
 
 ### Architecture / modularity / SOLID
 

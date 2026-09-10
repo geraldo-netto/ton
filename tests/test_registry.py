@@ -93,6 +93,31 @@ def test_resolve_reference_handles_bare_and_core_qualified_catalogs() -> None:
     assert runtime_type_name(42) == "42"
 
 
+@pytest.mark.parametrize("reference", ["string", "core.string"])
+@pytest.mark.parametrize("key", ["string", "core.string"])
+@pytest.mark.parametrize("nested", [False, True])
+def test_false_valued_generator_registration_remains_resolvable(reference, key, nested) -> None:
+    """PLUG-022: registered extensions are present even when their value is false."""
+
+    class EmptyGenerator(StringGenerator):
+        def __bool__(self):
+            return False
+
+    generator = EmptyGenerator()
+    registry = {key: generator, "oneOf": api.build_extension_catalog().get_data_type("oneOf")}
+    spec = {"type": reference, "values": ["x"]}
+    if nested:
+        spec = {"type": "oneOf", "choices": [spec]}
+    config = {"rows": 1, "format": "$x$", "types": {"x": spec}}
+    assert resolve_reference(registry, reference) is generator
+    assert list(api.generate(config, registry=registry, proof_mode="all")) == ["x"]
+
+
+def test_false_registration_keeps_canonical_precedence() -> None:
+    """PLUG-022: a false canonical entry must not select a different alias."""
+    assert resolve_reference({"core.value": False, "value": True}, "value") is False
+
+
 def test_discover_returns_only_concrete_named_subclasses() -> None:
     for cls in discover_generator_classes():
         assert issubclass(cls, Generator)

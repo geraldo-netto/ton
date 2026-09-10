@@ -767,3 +767,33 @@ def test_a_real_typo_on_a_builtin_is_still_reported_with_a_suggestion() -> None:
 
     with pytest.raises(ConfigError, match="Did you mean 'transforms'"):
         api.validate_config(config)
+
+
+@pytest.mark.parametrize("entry", ["generation", "validation"])
+@pytest.mark.parametrize("key", ["x", "customer"])
+def test_mixed_nested_transform_errors_preserve_field_path(entry, key) -> None:
+    """CFG-004: child preparation carries the actual owning path through every layer."""
+    child = {
+        "type": "string",
+        "values": ["x"],
+        "transforms": [
+            {
+                "type": "distribution",
+                "choices": [
+                    {"spec": {"type": "integer", "minvalue": 1, "maxValue": 2}},
+                    {"spec": {"type": "string", "values": ["y"]}},
+                ],
+            }
+        ],
+    }
+    config = {
+        "rows": 1,
+        "format": f"${key}$",
+        "types": {key: {"type": "oneOf", "choices": [child]}},
+    }
+    with pytest.raises((ConfigError, TemplateError)) as error:
+        if entry == "generation":
+            list(api.generate(config))
+        else:
+            api.validate_config(config)
+    assert f"types.{key}.choices[0].transforms[0].choices[0].spec.minvalue" in str(error.value)

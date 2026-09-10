@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from ._logging import LogEvent
@@ -218,8 +218,8 @@ class EngineCompiler:
 
     def _build_prepared(self) -> dict[str, PreparedField]:
         prepared: dict[str, PreparedField] = {}
-        context = PreparationContext(self.registry, self._prepare_child)
         for type_key in self.field_keys:
+            context = PreparationContext(self.registry, self._prepare_child, path=type_key)
             spec = self.types[type_key]
             generator = self.registry[runtime_type_name(spec["type"])]
             try:
@@ -261,6 +261,8 @@ class EngineCompiler:
         location: str,
         nested_spec: Any,
     ) -> tuple[Generator, Any]:
+        child_path = f"{context.path}.{location.strip(chr(39))}"
+        context = replace(context, path=child_path)
         child, source_prepared = prepare_child_spec(
             parent_type,
             location,
@@ -269,9 +271,9 @@ class EngineCompiler:
             context,
         )
         transforms, _is_paired, uses_source = self._prepare_transforms(
-            f"{parent_type}.{location}", nested_spec, child, context
+            child_path, nested_spec, child, context
         )
-        validators = self._resolve_validators(f"{parent_type}.{location}", nested_spec)
+        validators = self._resolve_validators(child_path, nested_spec)
         if not transforms and not validators:
             return child, source_prepared
         self.has_child_pipelines = True
@@ -387,7 +389,9 @@ class EngineCompiler:
             prepared.append(
                 PreparedTransform(
                     transform,
-                    transform.prepare(transform_spec, context),
+                    transform.prepare(
+                        transform_spec, replace(context, path=f"{type_key}.transforms[{index}]")
+                    ),
                 )
             )
             _logger.info(

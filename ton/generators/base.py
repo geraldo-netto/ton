@@ -51,6 +51,7 @@ class PreparationContext:
 
     registry: Mapping[str, Generator]
     child_preparer: ChildPreparer | None = None
+    path: str = ""
 
     def prepare_child(
         self,

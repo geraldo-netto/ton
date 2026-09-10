@@ -44,7 +44,6 @@
 | id | status | severity | effort | description |
 |---|---|---|---|---|
 | CFG-007 | open | medium | medium | Configuration precision/audit-format: the approved contract preserves numeric JSON syntax through audit serialization, but `_proofaudit._json_default` returns `str(Decimal(...))`; a numeric bound `0.10000000000000001` becomes a quoted string in the report. Its docstring incorrectly treats JSON numbers as inherently binary floats. Resolve with exact numeric JSON serialization for both payloads and fingerprint input, without float conversion or a replacement precision cap. Test decoded types and exact values, not just matching text. |
-| CFG-004 | open | medium | small | Configuration discoverability: nested transform-child key errors still lose the owning field path in `_compiler`. A typo inside `types.x.choices[0].transforms[0].choices[0].spec` is reported as `types.oneOf.'choices[0]'.transforms[0].choices[0].spec.minvalue` in both generation and validation. README and the approved finding require the full actual config path. Carry the field/index path through recursive preparation rather than reconstructing it from the parent generator type; assert the complete path for mixed generator/transform nesting. |
 
 ### Observability
 

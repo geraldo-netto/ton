@@ -48,7 +48,7 @@ within that snapshot while isolating mutable extension state between Engines.
 For each template field, `Engine` prepares an explicit pipeline:
 
 1. Source data type: `Generator.prepare(spec, preparation_context)`.
-2. Ordered transform chain: `Transform.prepare_composite()`.
+2. Ordered transform chain: `Transform.prepare(spec, preparation_context)`.
 3. Per-row source generation, unless the first transform explicitly declares
    that it replaces the source.
 4. Per-row transform application.
@@ -65,6 +65,42 @@ Transforms declare whether they accept paired inputs and whether they preserve
 pairing. This lets TON reject incompatible chains at preparation time. For
 example, a transform that does not preserve pairing cannot safely support both
 `$name$` and `$name[id]$` for the same field.
+
+Transforms implement `prepare(spec, context)`, `apply(prepared, value, rng)`,
+and `prove(prepared, before, after)`. Their `nested_specs(spec)` declaration
+identifies any owned generator children, resolved with `context.prepare_child`.
+
+A transform using the public API:
+
+```python
+from ton import api
+
+class SuffixTransform:
+    type_name = "suffix"
+    config_keys = frozenset({"suffix"})
+    capabilities = api.TransformCapabilities()
+    requires_source = True
+
+    def nested_specs(self, spec):
+        return ()
+
+    def prepare(self, spec, context):
+        return spec["suffix"]
+
+    def apply(self, prepared, value, rng):
+        return api.TransformResult(value.value + prepared)
+
+    def prove(self, prepared, before, after):
+        return api.TransformProof(ok=after.value == before.value + prepared)
+
+config = {"rows": 2, "format": "$x$", "types": {
+    "x": {"type": "string", "values": ["x"],
+          "transforms": [{"type": "example.suffix", "suffix": "!"}]}
+}}
+rows = list(api.generate(config, transforms={"example.suffix": SuffixTransform()},
+                         proof_mode="all"))
+assert rows == ["x!", "x!"]
+```
 
 The built-in `distribution` transform chooses among two or more prepared
 candidate data-type specs. The legacy `weighted` generator delegates its

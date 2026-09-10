@@ -191,3 +191,13 @@ def test_documented_generator_extension_contract() -> None:
     namespace = {}
     exec(snippet, namespace)
     assert namespace["rows"] == ["[x]", "[x]"]
+
+
+def test_documented_transform_extension_contract() -> None:
+    """DOC-037: execute the documented preparation, application and proof hooks."""
+    guide = (ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
+    snippet = guide.split("A transform using the public API:", 1)[1]
+    snippet = snippet.split("```python\n", 1)[1].split("```", 1)[0]
+    namespace = {}
+    exec(snippet, namespace)
+    assert namespace["rows"] == ["x!", "x!"]

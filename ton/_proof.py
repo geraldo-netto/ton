@@ -13,7 +13,7 @@ from ._transforms import TransformResult
 #: Placeholder substituted for sensitive proof-failure fields (DG-002).
 REDACTED = "<redacted>"
 
-# Scoped to one Engine row, including calls through legacy generator signatures.
+# Scoped to one Engine row, including nested generator calls.
 # Standalone child draws retain traces so callers can prove them afterward.
 _trace_enabled: ContextVar[bool] = ContextVar("ton_proof_trace_enabled", default=True)
 

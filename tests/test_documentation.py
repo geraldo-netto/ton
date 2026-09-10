@@ -182,3 +182,12 @@ def test_documented_char_semantics_are_draw_count_not_length() -> None:
     }
 
     assert list(api.generate(config, seed=1, proof_mode="all")) == ["abab", "abab"]
+
+
+def test_documented_generator_extension_contract() -> None:
+    """DOC-036: execute the published composite against the public compiler API."""
+    snippet = README.split("A composite generator using the public API:", 1)[1]
+    snippet = snippet.split("```python\n", 1)[1].split("```", 1)[0]
+    namespace = {}
+    exec(snippet, namespace)
+    assert namespace["rows"] == ["[x]", "[x]"]

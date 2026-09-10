@@ -15,11 +15,11 @@ Two-phase contract
 Generators have an *optional* preparation step that runs once when the
 engine is constructed, plus the per-row ``generate`` call:
 
-* ``prepare(spec_dict)`` -- validate the raw JSON dict and return a
+* ``prepare(spec_dict, context)`` -- validate the raw JSON dict and return a
   typed "prepared spec" (typically a dataclass). The engine caches the
   result and never re-parses the dict. Default implementation passes
-  the dict through, so third-party generators that have not migrated
-  to typed specs still work.
+  the dict through. Composite preparation resolves declared children
+  through the supplied context.
 * ``generate(prepared, rng)`` -- the hot path. Receives whatever
   ``prepare`` returned. Built-in generators receive a typed dataclass
   so their runtime code is pure draw + format.

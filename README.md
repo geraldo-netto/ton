@@ -307,11 +307,40 @@ alter generated rows.
 
 Custom plugins register via three entry-point groups in any installed package: `ton.generators` (data types), `ton.transforms`, and `ton.validators`:
 
-Generator extensions implement `prepare(spec, context=None)`. Composite generators
-resolve children with `context.prepare_child(parent_type, location, child_spec)` and
-declare generator-bearing config locations with `nested_specs(spec)`; the default
-`nested_types(spec)` discovery derives references from those locations. The legacy
-one-argument `prepare(spec)` contract remains supported for existing plugins.
+Generator extensions implement `prepare(spec, context)` and `generate(prepared, rng)`.
+Preparation runs once per engine. Composite generators resolve children with
+`context.prepare_child(parent_type, location, child_spec)` and declare their owned
+child locations with `nested_specs(spec)`. Discovery reads these declarations;
+ordinary plugin metadata remains opaque. Locations use config paths such as
+`spec` or `choices[0].spec`.
+
+A composite generator using the public API:
+
+```python
+from ton import api
+
+class BracketGenerator(api.Generator):
+    type_name = "bracket"
+    config_keys = frozenset({"spec"})
+
+    def nested_specs(self, spec):
+        return (("spec", spec["spec"]),)
+
+    def prepare(self, spec, context=None):
+        return context.prepare_child(self.type_name, "spec", spec["spec"])
+
+    def generate(self, prepared, rng):
+        child, child_spec = prepared
+        return f"[{child.generate(child_spec, rng)}]"
+
+registry = api.build_extension_catalog().generators()
+registry["example.bracket"] = BracketGenerator()
+config = {"rows": 2, "format": "$x$", "types": {
+    "x": {"type": "example.bracket", "spec": {"type": "string", "values": ["x"]}}
+}}
+rows = list(api.generate(config, registry=registry, seed=1))
+assert rows == ["[x]", "[x]"]
+```
 
 ```toml
 [project.entry-points."ton.generators"]

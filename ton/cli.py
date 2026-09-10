@@ -36,6 +36,7 @@ from .api import (
     configure_stderr,
 )
 from .api import logger as _logger
+from .generators.base import str_to_int
 
 _progress_logger = logging.getLogger("ton.progress")
 
@@ -70,7 +71,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--seed",
-        type=int,
+        type=str_to_int,
         default=None,
         help="Seed the RNG for reproducible output.",
     )
@@ -181,14 +182,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _non_negative_int(value: str) -> int:
     """argparse helper rejecting negative integers (REL-017)."""
-    parsed = int(value)
+    parsed = str_to_int(value)
     if parsed < 0:
         raise argparse.ArgumentTypeError(f"must be >= 0 (got {value})")
     return parsed
 
 
 def _positive_int(value: str) -> int:
-    parsed = int(value)
+    parsed = str_to_int(value)
     if parsed < 1:
         raise argparse.ArgumentTypeError(f"must be >= 1 (got {value})")
     return parsed

@@ -1410,3 +1410,35 @@ def test_pipeline_stage_error_is_not_a_config_error() -> None:
 
     assert not isinstance(error, api.TemplateError)
     assert not isinstance(error, api.ConfigError)
+
+
+@pytest.mark.parametrize("option", ["--seed", "--proof-sample-rate", "--batch-rows", "--progress"])
+def test_cli_integer_options_have_no_digit_ceiling(write_config, option):
+    """SCALE-018: valid integer options retain exact values without global changes."""
+    from ton.cli import _build_parser
+
+    before = sys.get_int_max_str_digits()
+    text = "1" + "0" * 5000
+    path = str(write_config({"rows": 0}))
+    parsed = _build_parser().parse_args([path, option, text])
+    assert getattr(parsed, option[2:].replace("-", "_")) == 10**5000
+    assert main([path, option, text]) == 0
+    assert sys.get_int_max_str_digits() == before
+
+
+def test_cli_accepts_large_negative_seed(write_config):
+    """SCALE-018: seed sign is retained by the arbitrary-size parser."""
+    from ton.cli import _build_parser
+
+    path = str(write_config({"rows": 0}))
+    option = "--seed=-1" + "0" * 5000
+    assert _build_parser().parse_args([path, option]).seed == -(10**5000)
+    assert main([path, option]) == 0
+
+
+@pytest.mark.parametrize("option", ["--seed", "--proof-sample-rate", "--batch-rows"])
+def test_cli_large_malformed_integer_is_rejected(write_config, option):
+    """SCALE-018: unlimited magnitude does not permit malformed numeric syntax."""
+    with pytest.raises(SystemExit) as error:
+        main([str(write_config({"rows": 0})), option + "=" + "1" * 5000 + "x"])
+    assert error.value.code == 2

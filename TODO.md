@@ -21,7 +21,6 @@
 | id | status | severity | effort | description |
 |---|---|---|---|---|
 | SCALE-017 | open | medium | medium | Scalability: remove the JSON decoder's nesting ceiling from `ton/_config.py::load`. A valid zero-row config containing 5,000 nested oneOf wrappers fails with `RecursionError` in `json.load`, although downstream snapshots and composite compilation use iterative traversal. Add a permanent fresh-process file-loading regression and use stack-safe parsing without changing the process recursion limit or imposing a depth cap. |
-| SCALE-018 | open | medium | small | Scalability: use the arbitrary-size integer parser for CLI integer options in `ton/cli.py::_build_parser`, `_positive_int` and `_non_negative_int`. A valid zero-row job with a 5,000-digit `--seed`, `--proof-sample-rate` or `--batch-rows` exits 2 due to `int(text)`'s digit ceiling. Add permanent CLI regressions for large signed seeds and positive counts, preserving malformed/negative-value diagnostics and the process digit limit. |
 
 ### Plugin extensibility
 

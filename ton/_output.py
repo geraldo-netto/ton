@@ -167,9 +167,9 @@ def atomic_output(
 def inspect_staged_outputs(path: str) -> tuple[StagedOutput, ...]:
     """Return unpublished stages associated with output ``path``.
 
-    Managed stages carry their creating PID and timestamp in the filename.
-    Older unowned ``.<basename>.*.tmp`` files are reported but never removed
-    automatically because a live writer cannot be ruled out safely.
+    Inspection recognizes only filenames with this destination's hashed prefix.
+    Managed stages also carry their creating PID and timestamp. Matching stages
+    without valid ownership metadata are reported but never removed automatically.
     """
     return tuple(candidate.report for candidate in _staged_candidates(path))
 

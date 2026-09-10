@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from random import Random
 from typing import Any
 
@@ -70,7 +70,7 @@ class TimestampUnixGenerator(Generator):
 
 
 def _epoch_microseconds(value: datetime) -> int:
-    delta = value - datetime(1970, 1, 1, tzinfo=timezone.utc)
+    delta = value - datetime(1970, 1, 1, tzinfo=UTC)
     return ((delta.days * 86400 + delta.seconds) * 1_000_000) + delta.microseconds
 
 

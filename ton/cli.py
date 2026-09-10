@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TextIO, TypeVar, cast
+from typing import TextIO, cast
 
 from . import __version__, api
 from ._logging import terminal_failure_fields
@@ -50,7 +50,6 @@ _LOG_LEVELS = {
 #: Default rows between explicit output flushes. Overridable via
 #: ``--batch-rows``.
 _DEFAULT_BATCH_ROWS = 1024
-_T = TypeVar("_T")
 
 
 @dataclass
@@ -317,7 +316,7 @@ def _prepare_engine(args: argparse.Namespace) -> tuple[Engine, str] | int:
     return _map_config_errors(prepare)
 
 
-def _map_config_errors(operation: Callable[[], _T]) -> _T | int:
+def _map_config_errors[T](operation: Callable[[], T]) -> T | int:
     """Run a config operation and map its domain failures to CLI exit codes.
 
     Every exit here is terminal, so each one emits ``cli_failed`` -- these
@@ -600,7 +599,7 @@ def _open_proof_report(
         _translate_proof_report_io(lambda: report.__exit__(None, None, None))
 
 
-def _translate_proof_report_io(operation: Callable[[], _T]) -> _T:
+def _translate_proof_report_io[T](operation: Callable[[], T]) -> T:
     """Map only proof-report resource I/O to its CLI-specific error."""
     try:
         return operation()

@@ -448,6 +448,9 @@ def coerce_int(
         raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})")
     if isinstance(raw, int):
         return raw
+    # Check Decimal exactly before int() can truncate it (CFG-024).
+    if isinstance(raw, Decimal) and (not raw.is_finite() or raw != raw.to_integral_value()):
+        raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})")
     if isinstance(raw, float):
         if raw.is_integer():
             return int(raw)

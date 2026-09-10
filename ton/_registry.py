@@ -21,7 +21,7 @@ from collections.abc import Collection, Iterable, Iterator, Mapping, MutableMapp
 from copy import deepcopy
 from dataclasses import dataclass
 from importlib.metadata import entry_points
-from typing import Any, TypeVar
+from typing import Any
 from weakref import WeakKeyDictionary
 
 from ._logging import LogEvent
@@ -42,7 +42,6 @@ ENTRY_POINT_GROUP = "ton.generators"
 TRANSFORM_ENTRY_POINT_GROUP = "ton.transforms"
 VALIDATOR_ENTRY_POINT_GROUP = "ton.validators"
 CORE_NAMESPACE = "core"
-_T = TypeVar("_T")
 
 #: Identity-based allowlist of built-in classes. A third-party subclass may
 #: reuse a core ``type_name`` but can never become a default implementation.
@@ -180,7 +179,7 @@ class ExtensionCatalog:
             return self._clone_prototype(self._transforms, reference)
 
     @staticmethod
-    def _clone_prototype(store: Mapping[str, Mapping[str, _T]], reference: str) -> _T:
+    def _clone_prototype[T](store: Mapping[str, Mapping[str, T]], reference: str) -> T:
         normalized = normalize_reference(reference)
         namespace, name = normalized.split(".", 1)
         try:
@@ -234,7 +233,7 @@ def normalize_reference(reference: str) -> str:
     return f"{CORE_NAMESPACE}.{reference}"
 
 
-def resolve_reference(registry: Mapping[str, _T], reference: str) -> _T | None:
+def resolve_reference[T](registry: Mapping[str, T], reference: str) -> T | None:
     """Resolve qualified or bare references using registry namespace rules."""
     normalized = normalize_reference(reference)
     return (
@@ -698,9 +697,8 @@ def plugin_provenance(plugin: Any) -> tuple[str | None, str | None]:
 def _entry_point_dist(ep: object) -> tuple[str | None, str | None]:
     """Return ``(name, version)`` of the distribution that ships ``ep``.
 
-    ``EntryPoint.dist`` is only present on importlib.metadata 3.10+ and
-    can still be ``None`` for entry points discovered outside any
-    installed distribution; tolerate either case (OBS-005).
+    ``EntryPoint.dist`` can be ``None`` for entry points discovered outside
+    an installed distribution; tolerate missing metadata (OBS-005).
     """
     dist = getattr(ep, "dist", None)
     if dist is None:

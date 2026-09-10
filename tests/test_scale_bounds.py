@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import os
 import sys
 from random import Random
 
@@ -209,6 +210,7 @@ def test_spec_snapshot_is_stack_safe_independently_of_the_limit() -> None:
     assert clone is not original
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX resource module (PLAT-015)")
 def test_unlimited_stack_falls_back_to_an_assumed_size(monkeypatch) -> None:
     """An unlimited RLIMIT_STACK still yields a usable depth (SCALE-007)."""
     import resource

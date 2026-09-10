@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from random import Random
 
 import pytest
@@ -11,7 +11,7 @@ from ton.generators.timestamp_unix import TimestampUnixGenerator
 
 
 def _epoch(year: int, month: int = 1, day: int = 1) -> int:
-    return int(datetime(year, month, day, tzinfo=timezone.utc).timestamp())
+    return int(datetime(year, month, day, tzinfo=UTC).timestamp())
 
 
 def test_seconds_within_bounds() -> None:

@@ -82,7 +82,7 @@ BUILTIN_GENERATOR_CONFIG_KEYS: dict[str, frozenset[str]] = {
     "ipv4": frozenset(("cidr",)),
     "ipv6": frozenset(("cidr",)),
     "integer": frozenset(("minValue", "maxValue", "padWithZero")),
-    "mac": frozenset(("separator", "uppercase", "oui")),
+    "mac": frozenset(("separator", "uppercase", "oui", "invalidProbability")),
     "name": frozenset(("style",)),
     "oneOf": frozenset(("choices",)),
     "phone": frozenset(("format",)),

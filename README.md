@@ -10,7 +10,7 @@ TON renders rows of structured text from a small JSON description. It is useful 
 pip install -e .
 ```
 
-Python 3.10 or newer. TON has zero runtime dependencies.
+Python 3.12 or newer. TON has zero runtime dependencies.
 
 ## Run without installing
 
@@ -859,13 +859,14 @@ Random IP inside a CIDR block.
 
 #### `mac`
 
-48-bit MAC address, optionally with a fixed 24-bit OUI prefix.
+Generates syntactically valid [48-bit MAC addresses](https://www.rfc-editor.org/rfc/rfc9542.html#section-2.1): six hexadecimal octets, optionally with a fixed 24-bit prefix. Values may be unicast, multicast, or broadcast; vendor allocation and uniqueness are not verified.
 
-| field        | type   | description                                |
-|--------------|--------|--------------------------------------------|
-| `separator`  | string | single char between octets (default `:`)   |
-| `uppercase`  | bool   | upper-case the hex (default `false`)       |
-| `oui`        | string | 24-bit prefix (`00:1A:2B`, `00-1A-2B`, …)  |
+| field                | type   | description |
+|----------------------|--------|-------------|
+| `separator`          | string | `:`, `-`, or `""` for compact hex (default `:`) |
+| `uppercase`          | bool   | Uppercase the hex (default `false`) |
+| `oui`                | string | Exactly three hex octets: `001A2B`, `00:1A:2B`, or `00-1A-2B`. Whitespace, mixed separators, and misplaced separators are rejected. |
+| `invalidProbability` | number | Probability of intentionally invalid output, from `0` to `1` (default `0`). `0` produces only valid addresses; `1` produces only invalid values. |
 
 ```json
 {"type": "mac", "oui": "00:1A:2B"}
@@ -877,6 +878,23 @@ Random IP inside a CIDR block.
 00:1a:2b:6a:f1:d8
 00:1a:2b:3e:61:cd
 ```
+
+For negative testing, invalid values contain **five octets** instead of six. They retain the configured prefix, separator, and case. Each row is selected independently, so the proportion in a finite batch is approximate; the same seed reproduces the same rows. Decimal JSON probabilities are sampled exactly, including very small nonzero values.
+
+This example selects invalid output with probability 25% per row:
+
+```json
+{"type": "mac", "oui": "00:1A:2B", "invalidProbability": 0.25}
+```
+
+```
+00:1a:2b:58:b7:91
+00:1a:2b:4c:41
+00:1a:2b:d4:7e
+00:1a:2b:10:e5:78
+```
+
+Proof checking validates this configured contract: intentional five-octet values pass when `invalidProbability > 0`, and six-octet addresses pass when `invalidProbability < 1`. Wrong prefixes, case, or layouts still fail. Configuration errors are rejected at every probability.
 
 #### `name`
 

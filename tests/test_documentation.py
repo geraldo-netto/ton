@@ -5,10 +5,10 @@ from __future__ import annotations
 import io
 import json
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
-import tomllib
 
 from ton import api
 from ton._engine import TemplateError

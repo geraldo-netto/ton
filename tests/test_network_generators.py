@@ -90,9 +90,9 @@ def test_mac_rejects_multichar_separator() -> None:
 @pytest.mark.parametrize(
     "spec",
     [
-        {"separator": "a"},
+        {"separator": "-"},
         {"separator": ""},
-        {"separator": "a", "uppercase": True, "oui": "AA:BB:CC"},
+        {"separator": "-", "uppercase": True, "oui": "AA:BB:CC"},
     ],
 )
 def test_mac_proof_parses_generated_octets_structurally(spec: dict[str, object]) -> None:
@@ -109,7 +109,7 @@ def test_mac_proof_parses_generated_octets_structurally(spec: dict[str, object])
         (":", "00:11:22:33:44"),
         (":", "00:11:22:33:44:5g"),
         (":", "00-11:22:33:44:55"),
-        ("a", "00a11a22a33a44b55"),
+        ("-", "00-11-22-33-44b55"),
         ("", "00112233445566"),
     ],
 )

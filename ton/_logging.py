@@ -31,7 +31,7 @@ logger = logging.getLogger(LOGGER_NAME)
 logger.addHandler(logging.NullHandler())
 
 
-class LogEvent(str, Enum):
+class LogEvent(str, Enum):  # noqa: UP042 -- str() identifies the member; .value is the event ID.
     """Canonical ``event=...`` discriminator for the ``ton`` logger.
 
     Promotes the previously stringly-typed event values into a typed
@@ -42,8 +42,7 @@ class LogEvent(str, Enum):
 
     Callers that emit events should write ``LogEvent.<NAME>.value`` into
     the ``extra`` dict so the on-the-wire representation is the bare
-    string regardless of Python version (``str(Enum.X)`` was changed in
-    3.11).
+    event identifier rather than the qualified enum member name (DOC-041).
     """
 
     ENGINE_CONSTRUCTED = "engine_constructed"

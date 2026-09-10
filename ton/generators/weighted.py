@@ -53,6 +53,7 @@ class WeightedGenerator(Generator):
     """Pick one alternative with probability proportional to its weight."""
 
     type_name = "weighted"
+    config_keys = frozenset(("choices",))
 
     def nested_specs(
         self, spec: Mapping[str, Any]

@@ -51,6 +51,7 @@ class SequenceGenerator(Generator):
     """Emit the next integer in a per-engine counter."""
 
     type_name = "sequence"
+    config_keys = frozenset(("padWidth", "start", "step"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> SequenceSpec:
         start = coerce_int(spec, "start", type_name="sequence", default=0)

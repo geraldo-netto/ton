@@ -13,7 +13,8 @@ The :mod:`ton._registry` module collects these classes into a name -> instance
 mapping that the engine uses to dispatch. To add a new built-in type:
 
 1. Create ``<type>.py`` with a ``<Type>Generator(Generator)`` subclass
-   (or ``PairedGenerator`` if you need the paired contract).
+   (or ``PairedGenerator`` if you need the paired contract), declaring
+   its owned ``config_keys`` alongside its preparation method.
 2. Export it from this ``__init__``.
 3. Add it to ``BUILTIN_GENERATOR_CLASSES`` below.
 
@@ -71,36 +72,8 @@ BUILTIN_GENERATOR_CLASSES: tuple[type[Generator], ...] = (
     WeightedGenerator,
 )
 
-BUILTIN_GENERATOR_CONFIG_KEYS: dict[str, frozenset[str]] = {
-    "boolean": frozenset(("whenTrue", "whenFalse")),
-    "bytes": frozenset(("length", "encoding")),
-    "char": frozenset(("values", "maxChar")),
-    "date": frozenset(("minValue", "maxValue", "format")),
-    "decimal": frozenset(("minValue", "maxValue", "decimals", "padWithZero")),
-    "email": frozenset(("domains",)),
-    "hash": frozenset(("values", "algorithm", "rounds", "cache")),
-    "ipv4": frozenset(("cidr",)),
-    "ipv6": frozenset(("cidr",)),
-    "integer": frozenset(("minValue", "maxValue", "padWithZero")),
-    "mac": frozenset(("separator", "uppercase", "oui", "invalidProbability")),
-    "name": frozenset(("style",)),
-    "oneOf": frozenset(("choices",)),
-    "phone": frozenset(("format",)),
-    "regex": frozenset(("pattern",)),
-    "sequence": frozenset(("start", "step", "padWidth")),
-    "sequence_of": frozenset(("count", "separator", "spec")),
-    "string": frozenset(("values",)),
-    "text": frozenset(("unit", "count")),
-    "timestamp_unix": frozenset(("minValue", "maxValue", "unit")),
-    "uuid": frozenset(("version", "uppercase")),
-    "weighted": frozenset(("choices",)),
-}
-for _generator_class in BUILTIN_GENERATOR_CLASSES:
-    _generator_class.config_keys = BUILTIN_GENERATOR_CONFIG_KEYS[_generator_class.type_name]
-
 __all__ = [
     "BUILTIN_GENERATOR_CLASSES",
-    "BUILTIN_GENERATOR_CONFIG_KEYS",
     "BooleanGenerator",
     "BytesGenerator",
     "CharGenerator",

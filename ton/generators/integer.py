@@ -31,6 +31,7 @@ class IntegerGenerator(Generator):
     """Uniform integer in ``[minValue, maxValue]`` with optional zero padding."""
 
     type_name = "integer"
+    config_keys = frozenset(("maxValue", "minValue", "padWithZero"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> IntegerSpec:
         min_value = coerce_int(spec, "minValue", type_name="integer")

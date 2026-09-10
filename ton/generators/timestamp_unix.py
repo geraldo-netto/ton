@@ -40,6 +40,7 @@ class TimestampUnixGenerator(Generator):
     """Uniform epoch timestamp in ``[minValue, maxValue]``."""
 
     type_name = "timestamp_unix"
+    config_keys = frozenset(("maxValue", "minValue", "unit"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> TimestampUnixSpec:
         lo, hi = parse_iso_bounds("timestamp_unix", spec, as_utc=True)

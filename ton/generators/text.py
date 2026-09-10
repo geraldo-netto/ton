@@ -105,6 +105,7 @@ class TextGenerator(Generator):
     """Lorem-style text: ``count`` words / sentences / paragraphs."""
 
     type_name = "text"
+    config_keys = frozenset(("count", "unit"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> TextSpec:
         unit = str(spec.get("unit", "words"))

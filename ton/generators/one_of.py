@@ -43,6 +43,7 @@ class OneOfGenerator(Generator):
     """Pick uniformly between several nested generators."""
 
     type_name = "oneOf"
+    config_keys = frozenset(("choices",))
 
     def nested_specs(
         self, spec: Mapping[str, Any]

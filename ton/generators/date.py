@@ -109,6 +109,7 @@ class DateGenerator(Generator):
     """Uniform datetime in ``[minValue, maxValue]`` with portable formatting."""
 
     type_name = "date"
+    config_keys = frozenset(("format", "maxValue", "minValue"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> DateSpec:
         lo, hi = parse_iso_bounds("date", spec)

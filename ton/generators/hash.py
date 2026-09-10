@@ -73,6 +73,7 @@ class HashGenerator(PairedGenerator):
     """Generate ``(plaintext, digest)`` pairs from a fixed word list."""
 
     type_name = "hash"
+    config_keys = frozenset(("algorithm", "cache", "rounds", "values"))
 
     def prepare(
         self, spec: Mapping[str, Any], context: Any = None

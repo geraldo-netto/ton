@@ -75,6 +75,7 @@ class IPv4Generator(Generator):
     """Random IPv4 inside a CIDR block (default 0.0.0.0/0)."""
 
     type_name = "ipv4"
+    config_keys = frozenset(("cidr",))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> IPNetworkSpec:
         return _prepare_ip(spec, default_cidr="0.0.0.0/0", version=4)
@@ -90,6 +91,7 @@ class IPv6Generator(Generator):
     """Random IPv6 inside a CIDR block (default ::/0)."""
 
     type_name = "ipv6"
+    config_keys = frozenset(("cidr",))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> IPNetworkSpec:
         return _prepare_ip(spec, default_cidr="::/0", version=6)
@@ -131,6 +133,7 @@ class MACGenerator(Generator):
     """Random 48-bit MAC, with optional five-octet negative-test output."""
 
     type_name = "mac"
+    config_keys = frozenset(("invalidProbability", "oui", "separator", "uppercase"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> MACSpec:
         separator = spec.get("separator", ":")

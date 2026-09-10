@@ -56,6 +56,7 @@ class DecimalGenerator(Generator):
     """Uniform fixed-point value in ``[minValue, maxValue]``."""
 
     type_name = "decimal"
+    config_keys = frozenset(("decimals", "maxValue", "minValue", "padWithZero"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> DecimalSpec:
         min_value = _coerce_decimal(spec, "minValue")

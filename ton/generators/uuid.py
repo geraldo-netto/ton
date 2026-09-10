@@ -43,6 +43,7 @@ class UUIDGenerator(Generator):
     """Emit a UUID string (version 1 or 4)."""
 
     type_name = "uuid"
+    config_keys = frozenset(("uppercase", "version"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> UUIDSpec:
         version = coerce_int(spec, "version", type_name="uuid", default=4)

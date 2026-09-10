@@ -87,6 +87,7 @@ class RegexGenerator(Generator):
     """Emit strings matching the supplied regex ``pattern``."""
 
     type_name = "regex"
+    config_keys = frozenset(("pattern",))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> RegexSpec:
         pattern = spec.get("pattern")

@@ -23,6 +23,7 @@ class CharGenerator(Generator):
     """Concatenate ``maxChar`` random picks from ``values`` (with replacement)."""
 
     type_name = "char"
+    config_keys = frozenset(("maxChar", "values"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> CharSpec:
         values = require_string_tuple(spec)

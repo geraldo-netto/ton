@@ -59,6 +59,7 @@ class NameGenerator(Generator):
     """Random person name from built-in given/family pools."""
 
     type_name = "name"
+    config_keys = frozenset(("style",))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> NameSpec:
         style = str(spec.get("style", "full"))
@@ -98,6 +99,7 @@ class EmailGenerator(Generator):
     """Random ``<given>.<family>@<domain>`` style email."""
 
     type_name = "email"
+    config_keys = frozenset(("domains",))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> EmailSpec:
         if "domains" not in spec:
@@ -152,6 +154,7 @@ class PhoneGenerator(Generator):
     """Render a phone number by replacing ``#`` in ``format`` with a digit."""
 
     type_name = "phone"
+    config_keys = frozenset(("format",))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> PhoneSpec:
         pattern = str(spec.get("format", "+1 (###) ###-####"))

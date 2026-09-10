@@ -45,6 +45,7 @@ class SequenceOfGenerator(Generator):
     """Concatenate ``count`` independent draws from a single child generator."""
 
     type_name = "sequence_of"
+    config_keys = frozenset(("count", "separator", "spec"))
 
     def nested_specs(
         self, spec: Mapping[str, Any]

@@ -23,6 +23,7 @@ class BooleanGenerator(Generator):
     """Pick one of two literals with equal probability."""
 
     type_name = "boolean"
+    config_keys = frozenset(("whenFalse", "whenTrue"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> BooleanSpec:
         return BooleanSpec(

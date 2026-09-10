@@ -76,6 +76,7 @@ class BytesGenerator(Generator):
     """Emit ``length`` random bytes encoded as hex / base64 / base32."""
 
     type_name = "bytes"
+    config_keys = frozenset(("encoding", "length"))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> BytesSpec:
         length = coerce_int(spec, "length", type_name="bytes", default=16)

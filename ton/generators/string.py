@@ -22,6 +22,7 @@ class StringGenerator(Generator):
     """Pick one literal string from ``values``."""
 
     type_name = "string"
+    config_keys = frozenset(("values",))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> StringSpec:
         return StringSpec(values=require_string_tuple(spec))

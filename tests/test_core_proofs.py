@@ -185,3 +185,13 @@ def test_decimal_proof_validates_boundaries_and_padding(padding, scale) -> None:
         rendered = value + (".000" if scale else "")
         rendered = rendered.zfill(7 if scale else 3) if padding else rendered
         assert not generator.prove(prepared, TransformResult(rendered)).ok
+
+
+@pytest.mark.parametrize("digit", ["²", "١", "１", "𝟙"])
+def test_phone_proof_rejects_non_ascii_numerals(digit) -> None:
+    """REL-053: phone placeholders draw only ASCII decimal digits."""
+    generator = PhoneGenerator()
+    prepared = generator.prepare({"format": "+#-#"})
+    assert not generator.prove(prepared, TransformResult(f"+{digit}-0")).ok
+    for ascii_digit in "0123456789":
+        assert generator.prove(prepared, TransformResult(f"+{ascii_digit}-9")).ok

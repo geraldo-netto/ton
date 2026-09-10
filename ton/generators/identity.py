@@ -174,7 +174,7 @@ class PhoneGenerator(Generator):
             if not result.value.startswith(segment, position):
                 return proof_result(False, "phone literal segment does not match")
             position += len(segment)
-            if position >= len(result.value) or not result.value[position].isdigit():
+            if position >= len(result.value) or result.value[position] not in _DIGITS:
                 return proof_result(False, "phone digit does not match")
             position += 1
         valid = result.value[position:] == prepared.segments[-1]

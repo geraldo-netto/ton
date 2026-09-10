@@ -172,3 +172,33 @@ def test_nested_engine_restores_the_parent_proof_decision() -> None:
     assert len(rows) == 1
     assert len(transform.proven) == 2
     assert _trace_enabled.get() is True
+
+
+@pytest.mark.parametrize("kind", ["oneOf", "weighted", "sequence_of", "distribution"])
+@pytest.mark.parametrize("mode, checked", [("off", 0), ("sample", 1), ("all", 3)])
+def test_plain_composites_allocate_traces_only_on_checked_rows(kind, mode, checked) -> None:
+    """PERF-039: plain composite children follow the row's sampling decision too."""
+    from ton.generators.base import ChildDraw, DrawnValue
+
+    child = {"type": "integer", "minValue": 0, "maxValue": 100}
+    choices = [{"spec": child}, {"spec": child}]
+    fields = {
+        "oneOf": {"type": "oneOf", "choices": [child]},
+        "weighted": {"type": "weighted", "choices": choices},
+        "sequence_of": {"type": "sequence_of", "count": 100, "spec": child},
+        "distribution": {**child, "transforms": [{"type": "distribution", "choices": choices}]},
+    }
+    config = {"rows": 3, "format": "$x$", "types": {"x": fields[kind]}}
+    expected = list(api.generate(config, seed=12, proof_mode="all"))
+    with (
+        mock.patch("ton.generators.base.ChildDraw", wraps=ChildDraw) as draws,
+        mock.patch("ton.generators.sequence_of.ChildDraw", wraps=ChildDraw) as sequence_draws,
+        mock.patch.object(DrawnValue, "__new__", wraps=DrawnValue.__new__) as values,
+    ):
+        actual = list(api.generate(config, seed=12, proof_mode=mode, proof_sample_rate=2))
+    assert actual == expected
+    assert values.call_count == checked
+    assert draws.call_count + sequence_draws.call_count == checked * (
+        100 if kind == "sequence_of" else 1
+    )
+    assert _trace_enabled.get() is True

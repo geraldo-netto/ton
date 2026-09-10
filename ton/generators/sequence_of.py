@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from random import Random
 from typing import Any
 
-from .._proof import ProofResult
+from .._proof import ProofResult, _trace_enabled
 from .._transforms import TransformResult
 from .base import (
     ChildDraw,
@@ -73,6 +73,8 @@ class SequenceOfGenerator(Generator):
     def generate(self, prepared: SequenceOfSpec, rng: Random) -> str:
         child_gen, child_prepared = prepared.child
         parts = [child_gen.generate(child_prepared, rng) for _ in range(prepared.count)]
+        if not _trace_enabled.get():
+            return prepared.separator.join(parts)
         # Keep every element's own draw: joining into plain text dropped the
         # children's proof context, so a rejecting child passed (REL-023).
         return DrawnValue(

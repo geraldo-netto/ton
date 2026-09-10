@@ -363,11 +363,7 @@ class Engine:
             milestone = self._milestone_rows
             self._rows_emitted = 0
             self._proof.reset()
-            render = (
-                self._render_row_with_proof_context
-                if self._plan.has_child_pipelines
-                else self._render_row
-            )
+            render = self._render_row_with_proof_context
             for _ in range(self._plan.rows):
                 row = render()
                 self._rows_emitted += 1

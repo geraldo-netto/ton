@@ -20,7 +20,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| PERF-039 | open | medium | medium | Performance: the approved composite-proof cost requirement excludes trace allocation in proof-off and unsampled rows, but `drawn`, `WeightedChoiceSet.choose`, and `SequenceOfGenerator.generate` unconditionally create DrawnValue/ChildDraw records. Three rows containing 100 sequence children allocate 300 ChildDraw records in off, sample, and all modes alike. Resolve row-scoped trace collection for every composite, including those without child pipelines, and preserve validators, RNG draws, and output. Verify allocation counts on off and unsampled rows. |
 
 ### Concurrency
 

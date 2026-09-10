@@ -193,8 +193,10 @@ class DrawnValue(str):
         return instance
 
 
-def drawn(generator: Generator, prepared: Any, value: str, owner: object) -> DrawnValue:
+def drawn(generator: Generator, prepared: Any, value: str, owner: object) -> str:
     """Tag ``value`` with the single child draw that produced it."""
+    if not _trace_enabled.get():
+        return value
     return DrawnValue(value, (ChildDraw(generator, prepared, value),), owner)
 
 

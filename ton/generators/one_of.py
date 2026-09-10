@@ -93,7 +93,7 @@ class OneOfGenerator(Generator):
         # if any choice accepts it; permissive children never false-fail.
         proofs = []
         for gen, prep in prepared.children:
-            proofs.append((yield Call(gen, "prove", (prep, result))))
+            proofs.append((yield Call(gen, "prove", (prep, result), proof_stage="source")))
         if any(proof.ok for proof in proofs):
             return ProofResult(ok=True)
         detail = next((proof.reason for proof in proofs if proof.reason), "")

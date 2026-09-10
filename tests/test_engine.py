@@ -1033,12 +1033,17 @@ def _nested_failure_field(child, location):
     return child
 
 
-def _assert_originating_failure(error, cause, caplog, stage, reference):
+def _assert_originating_failure(error, cause, caplog, stage, reference, *, redact=False):
     assert error.stage == stage
     assert error.reference == reference
     assert error.type_key == "x"
-    assert error.cause is cause
-    assert error.__cause__ is cause
+    expected_cause = None if redact else cause
+    assert error.cause is expected_cause
+    assert error.__cause__ is expected_cause
+    if redact:
+        import traceback
+
+        assert str(cause) not in "".join(traceback.format_exception(error))
     failures = [
         record for record in caplog.records if getattr(record, "event", "") == "generate_failed"
     ]
@@ -1113,3 +1118,100 @@ def test_nested_transform_crash_preserves_origin(location, proof_mode, caplog):
     with caplog.at_level("ERROR", logger="ton"), pytest.raises(TransformExecutionError) as error:
         next(rows)
     _assert_originating_failure(error.value, cause, caplog, "Transform", "crash")
+
+
+@pytest.mark.parametrize("location", ["root", "oneOf", "sequence_of", "weighted", "distribution"])
+@pytest.mark.parametrize("kind", ["source", "transform"])
+@pytest.mark.parametrize("mode", ["all", "audit"])
+@pytest.mark.parametrize("redact", [False, True])
+def test_nested_proof_crash_preserves_origin(location, kind, mode, redact, caplog):
+    """OBS-032: proof hooks keep their own stage/reference through composite traces."""
+    from ton import api
+    from ton._registry import default_transforms
+
+    cause = RuntimeError("proof boom")
+    calls = 0
+
+    def check():
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise cause
+        return True
+
+    class CrashProofGenerator(Generator):
+        type_name = "proof_source"
+
+        def generate(self, prepared, rng):
+            return "x"
+
+        def prove(self, prepared, result):
+            return ProofResult(ok=check())
+
+    class CrashProofTransform(BaseTransform):
+        type_name = "proof_transform"
+
+        def prove(self, prepared, before, after):
+            return TransformProof(ok=check())
+
+    child = (
+        {"type": "proof_source"}
+        if kind == "source"
+        else {"type": "string", "values": ["x"], "transforms": [{"type": "proof_transform"}]}
+    )
+    config = {"rows": 3, "format": "$x$", "types": {"x": _nested_failure_field(child, location)}}
+    rows = api.generate(
+        config,
+        registry={**make_registry(), "proof_source": CrashProofGenerator()},
+        transforms={**default_transforms(), "proof_transform": CrashProofTransform()},
+        proof_mode=mode,
+        redact_proof_failures=redact,
+    )
+    assert next(rows) == "x"
+    with caplog.at_level("ERROR", logger="ton"), pytest.raises(ProofEvaluationError) as error:
+        next(rows)
+    _assert_originating_failure(
+        error.value, cause, caplog, kind.capitalize() + " proof", "proof_" + kind, redact=redact
+    )
+
+
+@pytest.mark.parametrize("location", ["root", "oneOf", "distribution"])
+def test_cooperative_proof_attributes_internal_helper_errors(location, caplog):
+    """OBS-032: errors within a cooperative hook belong to its owning proof frame."""
+    from ton import api
+    from ton._steps import Call, cooperative, run_steps
+
+    cause = RuntimeError("cooperative proof boom")
+
+    class CooperativeProof(Generator):
+        type_name = "cooperative_proof"
+
+        def __init__(self):
+            self.calls = 0
+
+        def generate(self, prepared, rng):
+            return "x"
+
+        @cooperative
+        def prove(self, prepared, result):
+            return run_steps(self, "prove", prepared, result)
+
+        def _prove_steps(self, prepared, result):
+            return (yield Call(self, "check", ()))
+
+        def check(self):
+            self.calls += 1
+            if self.calls == 2:
+                raise cause
+            return ProofResult(ok=True)
+
+    field = _nested_failure_field({"type": "cooperative_proof"}, location)
+    rows = api.generate(
+        {"rows": 3, "format": "$x$", "types": {"x": field}},
+        registry={**make_registry(), "cooperative_proof": CooperativeProof()},
+        proof_mode="all",
+    )
+    assert next(rows) == "x"
+    with caplog.at_level("ERROR", logger="ton"), pytest.raises(ProofEvaluationError) as error:
+        next(rows)
+    _assert_originating_failure(error.value, cause, caplog, "Source proof", "cooperative_proof")

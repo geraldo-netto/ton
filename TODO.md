@@ -2,12 +2,6 @@
 
 ## Open
 
-### Observability
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| OBS-032 | open | medium | medium | Observability: retain the originating nested proof hook's stage/reference across `ChildPipelineGenerator._prove_steps`, composite proof traversal and `ProofChecker`. A transform proof raising `RuntimeError` is reported as `Transform proof / proof_crash` at the root, `Source proof / oneOf` inside oneOf, and `Transform proof / distribution` inside a distribution candidate. Add permanent root/nested hook-failure regressions for exception and structured-log attribution before fixing. |
-
 ## Blocked / Deferred
 
 | id | status | severity | effort | description |

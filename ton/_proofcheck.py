@@ -22,6 +22,7 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import PreparedField, ProofFailure, TransformStep
 from ._specsnapshot import snapshot_spec
+from ._steps import OperationError
 from ._transforms import TransformResult
 from .generators.base import coerce_int
 
@@ -43,6 +44,9 @@ class ProofHookError(RuntimeError):
     """A generator or transform proof hook raised unexpectedly."""
 
     def __init__(self, stage: str, reference: str, cause: Exception) -> None:
+        if isinstance(cause, OperationError) and cause.stage.endswith(" proof"):
+            stage = cause.stage.removesuffix(" proof").lower()
+            reference, cause = cause.reference, cause.cause
         self.stage = stage
         self.reference = reference
         self.cause = cause

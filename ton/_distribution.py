@@ -60,12 +60,17 @@ class WeightedChoiceSet:
         draws = proven_draws(result, self)
         if draws is not None:
             for draw in draws:
-                proof = yield Call(draw.generator, "prove", (draw.prepared, _as_result(draw.value)))
+                proof = yield Call(
+                    draw.generator,
+                    "prove",
+                    (draw.prepared, _as_result(draw.value)),
+                    proof_stage="source",
+                )
                 if not proof.ok:
                     return proof
             return ProofResult(True)
         for generator, prepared in self.children:
-            proof = yield Call(generator, "prove", (prepared, result))
+            proof = yield Call(generator, "prove", (prepared, result), proof_stage="source")
             if proof.ok:
                 return ProofResult(True)
         return ProofResult(False)

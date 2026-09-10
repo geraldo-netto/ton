@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from ._validation import ValidationError, ValidatorHookError
 
@@ -24,6 +24,7 @@ class Call:
     target: Any
     operation: str
     args: tuple[Any, ...]
+    proof_stage: Literal["source", "transform"] | None = None
 
 
 type Steps = Generator[Call, Any, Any]
@@ -85,4 +86,8 @@ def _attribute_error(request: Call, error: Exception) -> Exception:
         return OperationError("Generator", type(request.target).__name__, error)
     if request.operation == "apply":
         return OperationError("Transform", request.target.type_name, error)
+    if request.operation == "prove" and request.proof_stage is not None:
+        return OperationError(
+            f"{request.proof_stage.capitalize()} proof", request.target.type_name, error
+        )
     return error

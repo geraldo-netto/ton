@@ -113,7 +113,9 @@ class SequenceOfGenerator(Generator):
         if len(parts) != prepared.count:
             return ProofResult(ok=True)
         for part in parts:
-            proof = yield Call(child_gen, "prove", (child_prepared, TransformResult(part)))
+            proof = yield Call(
+                child_gen, "prove", (child_prepared, TransformResult(part)), proof_stage="source"
+            )
             if not proof.ok:
                 return ProofResult(ok=False, reason=f"sequence_of element failed: {proof.reason}")
         return ProofResult(ok=True)

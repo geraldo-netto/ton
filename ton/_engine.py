@@ -90,6 +90,8 @@ class ValidatorExecutionError(PipelineStageError):
 _OPERATION_ERROR_TYPES = {
     "Generator": GeneratorExecutionError,
     "Transform": TransformExecutionError,
+    "Source proof": ProofEvaluationError,
+    "Transform proof": ProofEvaluationError,
 }
 
 

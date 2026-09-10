@@ -198,7 +198,12 @@ def proven_draws(result: TransformResult, owner: object) -> tuple[ChildDraw, ...
 def prove_draws(draws: tuple[ChildDraw, ...], label: str) -> Steps:
     """Prove every recorded draw against the child that produced it."""
     for draw in draws:
-        proof = yield Call(draw.generator, "prove", (draw.prepared, TransformResult(draw.value)))
+        proof = yield Call(
+            draw.generator,
+            "prove",
+            (draw.prepared, TransformResult(draw.value)),
+            proof_stage="source",
+        )
         if not proof.ok:
             reason = f"{label} failed its own proof"
             return ProofResult(
@@ -281,13 +286,19 @@ class ChildPipelineGenerator(Generator):
             return ProofResult(ok=True)
         if prepared.uses_source:
             source_proof = yield Call(
-                prepared.generator, "prove", (prepared.source_prepared, value.source)
+                prepared.generator,
+                "prove",
+                (prepared.source_prepared, value.source),
+                proof_stage="source",
             )
             if not source_proof.ok:
                 return source_proof
         for step in value.steps:
             proof = yield Call(
-                step.prepared.transform, "prove", (step.prepared.prepared, step.before, step.after)
+                step.prepared.transform,
+                "prove",
+                (step.prepared.prepared, step.before, step.after),
+                proof_stage="transform",
             )
             if not proof.ok:
                 return ProofResult(ok=False, reason=proof.reason)

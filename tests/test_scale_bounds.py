@@ -6,6 +6,7 @@ import base64
 import os
 import sys
 from decimal import Decimal, localcontext
+from fractions import Fraction
 from random import Random
 
 import pytest
@@ -116,6 +117,45 @@ def test_row_width_guards_composite_and_unknown_width_values() -> None:
 
 
 BIG = 10**4300
+
+
+@pytest.mark.parametrize("value", [Fraction(3, 2), Fraction(-3, 2)])
+@pytest.mark.parametrize("kind", ["integer", "text", "sequence"])
+def test_fractional_integer_settings_are_rejected(value, kind) -> None:
+    """REL-049: integer settings must not truncate rational inputs."""
+    from ton.concurrency import fork_engine
+
+    options = {
+        "integer": {"minValue": value, "maxValue": value},
+        "text": {"unit": "words", "count": value},
+        "sequence": {"start": value, "step": value},
+    }
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": kind, **options[kind]}}}
+    with pytest.raises(ValueError, match="must be an integer"):
+        list(api.generate(config, proof_mode="all"))
+    with pytest.raises(ValueError, match="must be an integer"):
+        fork_engine(config, parent_seed=0, worker_id=1, workers=2)
+
+
+@pytest.mark.parametrize("kind", ["integer", "text", "sequence"])
+def test_integral_rational_settings_preserve_exact_values(kind) -> None:
+    """REL-049: integral rational bounds, counts and worker starts remain valid."""
+    from ton.concurrency import fork_engine
+
+    value = Fraction(6, 2)
+    options = {
+        "integer": {"minValue": value, "maxValue": value},
+        "text": {"unit": "words", "count": value},
+        "sequence": {"start": value, "step": value},
+    }
+    config = {"rows": 2, "format": "$x$", "types": {"x": {"type": kind, **options[kind]}}}
+    rows = list(
+        fork_engine(config, parent_seed=0, worker_id=1, workers=2, rows=1, proof_mode="all")
+    )
+    if kind == "text":
+        assert len(rows[0].split()) == 3
+    else:
+        assert rows == (["6"] if kind == "sequence" else ["3"])
 
 
 def test_decimal_generation_ignores_default_exponent_ceiling() -> None:

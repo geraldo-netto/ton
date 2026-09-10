@@ -32,6 +32,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
+from numbers import Rational
 from random import Random
 from typing import Any, ClassVar, cast
 
@@ -456,6 +457,10 @@ def coerce_int(
         raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})")
     if isinstance(raw, int):
         return raw
+    if isinstance(raw, Rational):
+        if raw.denominator == 1:
+            return int(raw.numerator)
+        raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})")
     # Check Decimal exactly before int() can truncate it (CFG-024).
     if isinstance(raw, Decimal) and (not raw.is_finite() or raw != raw.to_integral_value()):
         raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})")

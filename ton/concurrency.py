@@ -45,7 +45,7 @@ from collections.abc import Mapping
 from random import Random
 from typing import Any, cast
 
-from ._config import validate_structure
+from ._config import output_encoding, validate_structure
 from ._contracts import Generator
 from ._engine import Engine, EngineOptions, TemplateError
 from ._logging import LogEvent
@@ -185,9 +185,9 @@ def write_shard(
     parent_seed: int,
     worker_id: int,
     workers: int,
-    encoding: str = "utf-8",
+    encoding: str | None = None,
 ) -> int:
-    """Stream one deterministic worker shard to ``path`` in bounded memory."""
+    """Stream one worker shard, using config encoding unless explicitly overridden."""
     rows = chunk_rows(validated_total_rows(config), workers, worker_id)
     engine = fork_engine(
         config,
@@ -197,7 +197,9 @@ def write_shard(
         rows=rows,
     )
     written = 0
-    with open_output_path(path, encoding=encoding) as stream:
+    with open_output_path(
+        path, encoding=output_encoding(config) if encoding is None else encoding
+    ) as stream:
         for row in engine:
             stream.write(f"{row}\n")
             written += 1

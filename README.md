@@ -387,7 +387,8 @@ Entry points execute installed package code while loading, so TON loads them onl
 
 Parallel runs use the public `ton.concurrency` helpers re-exported by `ton.api`.
 `write_shard` is the bounded-memory process-pool primitive used in the complete
-merge/cleanup recipe above. Callers with their own streaming sink can instead
+merge/cleanup recipe above. It honors the config's output encoding (UTF-8 when
+absent); an explicit `encoding=` overrides that setting. Callers with their own streaming sink can instead
 construct one worker engine directly:
 
 ```python

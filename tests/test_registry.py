@@ -1,4 +1,4 @@
-"""Tests for the auto-discovering registry."""
+"""Tests for the built-in registry and explicit extension discovery."""
 
 from __future__ import annotations
 
@@ -56,9 +56,7 @@ def test_public_packages_import_cleanly_in_fresh_interpreter(imports: str) -> No
     assert completed.returncode == 0, completed.stderr
 
 
-#: Every built-in type that ships with TON. If this list grows or
-#: shrinks, the registry should reflect it without anyone editing
-#: ton/registry.py (DUP-003).
+#: Exact public built-in catalog, independent of plugin classes created by tests (REL-050).
 EXPECTED_TYPES = {
     "boolean",
     "bytes",
@@ -72,9 +70,11 @@ EXPECTED_TYPES = {
     "ipv6",
     "mac",
     "name",
+    "oneOf",
     "phone",
     "regex",
     "sequence",
+    "sequence_of",
     "string",
     "text",
     "timestamp_unix",
@@ -126,14 +126,9 @@ def test_discover_returns_only_concrete_named_subclasses() -> None:
 
 
 def test_make_registry_covers_every_expected_type() -> None:
+    """REL-050: detect both missing built-ins and unintended registrations."""
     keys = set(make_registry().keys())
-    missing = EXPECTED_TYPES - keys
-    assert not missing, f"missing types in registry: {missing}"
-    # Extras may show up legitimately when other tests in the same
-    # process define their own Generator subclasses for fixtures;
-    # discover_generator_classes() walks the live subclass tree, so we
-    # only assert that the built-ins are *present*, not that nothing
-    # else is.
+    assert keys == EXPECTED_TYPES
 
 
 def test_make_registry_instances_are_independent() -> None:

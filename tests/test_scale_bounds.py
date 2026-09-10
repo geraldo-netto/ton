@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import os
 import sys
+from decimal import Decimal, localcontext
 from random import Random
 
 import pytest
@@ -115,6 +116,43 @@ def test_row_width_guards_composite_and_unknown_width_values() -> None:
 
 
 BIG = 10**4300
+
+
+def test_decimal_generation_ignores_default_exponent_ceiling() -> None:
+    """SCALE-014: a finite million-digit exponent remains generatable and provable."""
+    bound = Decimal("1e1000000")
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {"x": {"type": "decimal", "minValue": bound, "maxValue": bound, "decimals": 0}},
+    }
+    assert list(api.generate(config, proof_mode="all")) == ["1" + "0" * 1_000_000]
+
+
+@pytest.mark.parametrize(
+    "bounds, expected",
+    [
+        (("-1.29", "-1.21"), "-1.2"),
+        (("1.21", "1.29"), "1.3"),
+        (("1e-1000", "0.1"), "0.1"),
+        (("-0.1", "-1e-1000"), "-0.1"),
+    ],
+)
+def test_decimal_scaling_is_exact_under_restrictive_context(bounds, expected) -> None:
+    """SCALE-014: rounding is sign-correct and independent of caller Decimal settings."""
+    from ton.generators.decimal import DecimalGenerator
+
+    generator = DecimalGenerator()
+    # Use a nonempty rounded range with exactly one representable step.
+    lo, hi = bounds
+    if expected == "-1.2":
+        hi = "-1.2"
+    elif expected == "1.3":
+        hi = "1.3"
+    with localcontext() as context:
+        context.prec, context.Emax, context.Emin = 2, 2, -2
+        prepared = generator.prepare({"minValue": lo, "maxValue": hi, "decimals": 1})
+        assert generator.generate(prepared, Random(0)) == expected
 
 
 @pytest.mark.parametrize("suffix", ["", ",", "," + "1" + "0" * 4300])

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, InvalidOperation, localcontext
+from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal, InvalidOperation
 from functools import cached_property
 from random import Random
 from typing import Any
@@ -161,18 +161,22 @@ def _build_decimal_steps(prepared: DecimalSpec) -> DecimalSteps:
 
 def _step_bounds(min_value: Decimal, max_value: Decimal, decimals: int) -> tuple[int, int, int]:
     scale = 10**decimals
-    min_step = _scaled_integral(min_value, scale, decimals, ROUND_CEILING)
-    max_step = _scaled_integral(max_value, scale, decimals, ROUND_FLOOR)
+    min_step = _scaled_integral(min_value, decimals, ROUND_CEILING)
+    max_step = _scaled_integral(max_value, decimals, ROUND_FLOOR)
     return scale, min_step, max_step
 
 
-def _scaled_integral(value: Decimal, scale: int, decimals: int, rounding: str) -> int:
-    digits = value.as_tuple().digits
-    exponent = value.as_tuple().exponent
-    precision = len(digits) + abs(exponent if isinstance(exponent, int) else 0) + decimals + 2
-    with localcontext() as context:
-        context.prec = precision
-        return int((value * scale).to_integral_value(rounding=rounding))
+def _scaled_integral(value: Decimal, decimals: int, rounding: str) -> int:
+    """Scale finite coefficients with integer arithmetic, independent of Decimal context."""
+    sign, digits, exponent = value.as_tuple()
+    assert isinstance(exponent, int)
+    coefficient = int(Decimal((sign, digits, 0)))
+    power = exponent + decimals
+    factor: int = 10 ** abs(power)
+    if power >= 0:
+        return coefficient * factor
+    quotient, remainder = divmod(coefficient, factor)
+    return quotient + int(rounding == ROUND_CEILING and remainder != 0)
 
 
 def _format_step(step: int, scale: int, decimals: int) -> str:

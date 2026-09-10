@@ -94,8 +94,9 @@ class HashGenerator(PairedGenerator):
                 {} if coerce_bool(spec, "cache", type_name="hash", default=False) else None
             )
             return BcryptPairSpec(words=words, rounds=rounds, cache=cache)
-        if "cache" in spec:
-            raise ValueError("hash 'cache' is supported only for the bcrypt algorithm")
+        for option in ("cache", "rounds"):
+            if option in spec:
+                raise ValueError(f"hash {option!r} is supported only for the bcrypt algorithm")
         return DigestPairSpec(words=words, algorithm=algorithm)
 
     def generate_pair(

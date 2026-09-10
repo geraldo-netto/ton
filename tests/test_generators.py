@@ -359,6 +359,31 @@ def test_hash_generator_rejects_cache_for_inexpensive_digest() -> None:
         generator.prepare({"algorithm": "sha256", "values": ["secret"], "cache": True})
 
 
+@pytest.mark.parametrize("algorithm", ["md5", "sha1", "sha256", "sha512", "ntlm"])
+@pytest.mark.parametrize("rounds", [4, "invalid"])
+@pytest.mark.parametrize("entry", ["direct", "catalog", "cli"])
+def test_hash_rejects_rounds_for_non_bcrypt(algorithm, rounds, entry, tmp_path, capsys):
+    """CFG-029: bcrypt-only options must never be silently ignored."""
+    import json
+
+    from ton import api
+    from ton.cli import main
+
+    spec = {"type": "hash", "algorithm": algorithm, "rounds": rounds, "values": ["secret"]}
+    config = {"rows": 1, "format": "$x$", "types": {"x": spec}}
+    if entry == "cli":
+        path = tmp_path / "hash.json"
+        path.write_text(json.dumps(config))
+        assert main([str(path), "--validate"]) == 2
+        assert "rounds' is supported only for the bcrypt algorithm" in capsys.readouterr().err
+    else:
+        with pytest.raises(ValueError, match="rounds.*supported only for the bcrypt algorithm"):
+            if entry == "direct":
+                HashGenerator().prepare(spec)
+            else:
+                api.validate_config(config)
+
+
 def test_hash_generator_rejects_bad_bcrypt_rounds() -> None:
     generator = HashGenerator()
     with pytest.raises(ValueError, match="rounds"):

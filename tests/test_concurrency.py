@@ -7,6 +7,7 @@ import pickle
 from multiprocessing import get_context
 from pathlib import Path
 from random import Random
+from unittest import mock
 
 import pytest
 
@@ -38,6 +39,33 @@ def test_chunk_rows_distributes_remainder_without_dropping_rows() -> None:
 
     assert chunks == [3, 3, 2, 2]
     assert sum(chunks) == 10
+
+
+@pytest.mark.parametrize("value", [True, False, 2.5, 0.5, float("nan"), float("inf")])
+@pytest.mark.parametrize("coordinate", ["workers", "worker_id"])
+def test_worker_coordinates_require_integers(value, coordinate, tmp_path, monkeypatch) -> None:
+    """CONC-022: reject invalid coordinates before seeds, offsets or output."""
+    coordinates = {"workers": 2, "worker_id": 0, coordinate: value}
+    with pytest.raises(ValueError, match=coordinate):
+        chunk_rows(10, **coordinates)
+    seed = mock.Mock(side_effect=AssertionError("seed derived before validation"))
+    monkeypatch.setattr(concurrency, "derive_seed", seed)
+    config = {"rows": 10, "format": "$x$", "types": {"x": {"type": "sequence"}}}
+    with pytest.raises(ValueError, match=coordinate):
+        fork_engine(config, parent_seed=0, **coordinates)
+    path = tmp_path / "shard.txt"
+    with pytest.raises(ValueError, match=coordinate):
+        write_shard(config, str(path), parent_seed=0, **coordinates)
+    assert not path.exists()
+    seed.assert_not_called()
+
+
+@pytest.mark.parametrize("worker_id", [-1, True, 0.5, float("inf")])
+def test_unpartitioned_worker_requires_nonnegative_integer_id(worker_id) -> None:
+    """CONC-022: omitting workers does not bypass ID validation."""
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "sequence"}}}
+    with pytest.raises(ValueError, match="worker_id"):
+        fork_engine(config, parent_seed=0, worker_id=worker_id)
 
 
 @pytest.mark.parametrize("workers, worker_id", [(0, 0), (2, -1), (2, 2)])

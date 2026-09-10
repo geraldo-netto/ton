@@ -68,12 +68,20 @@ def chunk_rows(total_rows: int, workers: int, worker_id: int) -> int:
     """Return this worker's share without dropping remainder rows."""
     if not isinstance(total_rows, int) or isinstance(total_rows, bool) or total_rows < 0:
         raise ValueError("total_rows must be a non-negative integer")
-    if workers < 1:
-        raise ValueError("workers must be >= 1")
-    if not 0 <= worker_id < workers:
-        raise ValueError(f"worker_id must be in [0, {workers})")
+    _validate_worker_coordinates(workers, worker_id)
     base, remainder = divmod(total_rows, workers)
     return base + (1 if worker_id < remainder else 0)
+
+
+def _validate_worker_coordinates(workers: int | None, worker_id: int) -> None:
+    if not isinstance(worker_id, int) or isinstance(worker_id, bool) or worker_id < 0:
+        raise ValueError("worker_id must be a non-negative integer")
+    if workers is None:
+        return
+    if not isinstance(workers, int) or isinstance(workers, bool) or workers < 1:
+        raise ValueError("workers must be a positive integer")
+    if worker_id >= workers:
+        raise ValueError(f"worker_id must be in [0, {workers})")
 
 
 def derive_seed(parent_seed: int, worker_id: int) -> int:
@@ -126,6 +134,7 @@ def fork_engine(
     """
     if rows is not None and workers is None:
         raise ValueError("workers is required when rows overrides a worker shard")
+    _validate_worker_coordinates(workers, worker_id)
     seed = derive_seed(parent_seed, worker_id)
     rng = Random(seed)
     # Validate the caller's config before deriving offsets: coercing first

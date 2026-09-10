@@ -34,6 +34,7 @@ from random import Random
 from typing import Any
 
 from .._contracts import Generator
+from .._partition import PartitionSpec
 from .._proof import ProofResult, proof_result
 from .._scalars import coerce_int, int_to_str, pad_with_zero, str_to_int
 from .._transforms import TransformResult
@@ -52,6 +53,11 @@ class SequenceGenerator(Generator):
 
     type_name = "sequence"
     config_keys = frozenset(("padWidth", "start", "step"))
+
+    def partition(self, spec: Mapping[str, Any], offset: int) -> PartitionSpec:
+        start = coerce_int(spec, "start", type_name=self.type_name, default=0)
+        step = coerce_int(spec, "step", type_name=self.type_name, default=1)
+        return PartitionSpec(updates={"start": start + offset * step})
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> SequenceSpec:
         start = coerce_int(spec, "start", type_name="sequence", default=0)

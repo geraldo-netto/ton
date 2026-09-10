@@ -26,6 +26,7 @@ from random import Random
 from typing import Any, cast
 
 from .._contracts import Generator, PreparationContext
+from .._partition import PartitionSpec
 from .._pipeline import ChildDraw, DrawnValue, prove_draws, proven_draws
 from .._proof import ProofResult, _trace_enabled
 from .._scalars import coerce_int
@@ -46,6 +47,10 @@ class SequenceOfGenerator(Generator):
 
     type_name = "sequence_of"
     config_keys = frozenset(("count", "separator", "spec"))
+
+    def partition(self, spec: Mapping[str, Any], offset: int) -> PartitionSpec:
+        count = coerce_int(spec, "count", type_name=self.type_name, default=0)
+        return PartitionSpec(child_offsets={("spec",): offset * count})
 
     def nested_specs(
         self, spec: Mapping[str, Any]

@@ -20,6 +20,14 @@ class OwnedChild:
     spec: Mapping[str, Any]
     owner: Generator | Transform
     owner_spec: Mapping[str, Any]
+    owner_location: SpecPath
+
+
+@dataclass(frozen=True)
+class TransformOwner:
+    location: SpecPath
+    spec: Mapping[str, Any]
+    extension: Transform
 
 
 @dataclass(frozen=True)
@@ -27,6 +35,7 @@ class FieldOwnership:
     uses_source: bool
     source_children: tuple[OwnedChild, ...]
     transform_children: tuple[OwnedChild, ...]
+    transform_owners: tuple[TransformOwner, ...]
 
 
 def resolve_generator(
@@ -47,16 +56,17 @@ def field_ownership(
     """Describe ownership without deciding whether inactive sources need preparation."""
     uses_source = True
     children: list[OwnedChild] = []
-    for index, transform_spec, transform in _transform_owners(spec, transforms):
-        if index == 0:
-            uses_source = transform.requires_source
-        children.extend(_owned_children(transform, transform_spec, ("transforms", index)))
+    owners = tuple(_transform_owners(spec, transforms))
+    for owner in owners:
+        if owner.location == ("transforms", 0):
+            uses_source = owner.extension.requires_source
+        children.extend(_owned_children(owner.extension, owner.spec, owner.location))
     source = (
         _owned_children(generator, spec, ())
         if generator is not None and (uses_source or include_inactive_source)
         else ()
     )
-    return FieldOwnership(uses_source, source, tuple(children))
+    return FieldOwnership(uses_source, source, tuple(children), owners)
 
 
 def _owned_children(
@@ -65,7 +75,7 @@ def _owned_children(
     prefix: SpecPath,
 ) -> tuple[OwnedChild, ...]:
     return tuple(
-        OwnedChild(prefix + location, child, owner, spec)
+        OwnedChild(prefix + location, child, owner, spec, prefix)
         for location, child in owner.nested_specs(spec)
     )
 
@@ -73,7 +83,7 @@ def _owned_children(
 def _transform_owners(
     spec: Mapping[str, Any],
     registry: Mapping[str, Transform],
-) -> Iterator[tuple[int, Mapping[str, Any], Transform]]:
+) -> Iterator[TransformOwner]:
     raw = spec.get("transforms", [])
     if not isinstance(raw, list):
         return
@@ -85,4 +95,4 @@ def _transform_owners(
             continue
         transform = resolve_reference(registry, reference)
         if transform is not None:
-            yield index, transform_spec, transform
+            yield TransformOwner(("transforms", index), transform_spec, transform)

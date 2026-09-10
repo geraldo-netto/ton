@@ -409,6 +409,25 @@ for row in eng:
 
 Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so adjacent workers do not see correlated streams. An `engine_forked` log event is emitted with `worker_id` / `parent_seed` so multi-process runs stay distinguishable in the structured log stream.
 
+Generators and transforms can implement the optional `api.Partitionable` capability:
+`partition(spec, offset)` returns an `api.PartitionSpec`. The offset counts draw
+slots reserved for earlier workers, including repeated template references and
+parent multiplicities. For a composite drawing its `spec` child `count` times:
+
+```python
+def partition(self, spec, offset):
+    return api.PartitionSpec(child_offsets={("spec",): offset * spec["count"]})
+```
+
+Child locations match the tuples declared by `nested_specs`, relative to that
+extension's own spec. Unlisted children inherit the incoming offset. Stateful
+leaves can return `updates`, for example `{"start": spec["start"] + offset * spec["step"]}`.
+Updates must preserve the type, pipeline stages, and owned child containers;
+unknown child locations and negative/non-integer offsets are rejected. Partition
+hooks run on worker-owned copies of supplied plugins. Built-in `sequence` and
+`sequence_of` use this same capability; custom stateful generators must declare
+their own partition behavior when they require disjoint ranges.
+
 ## Config format
 
 ```json

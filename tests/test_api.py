@@ -34,6 +34,8 @@ EXPECTED_PUBLIC_API = {
     "OutputEncodingError",
     "OutputPublishedError",
     "PairedGenerator",
+    "Partitionable",
+    "PartitionSpec",
     "PartialOutputCommitError",
     "PipelineStageError",
     "PreparationContext",

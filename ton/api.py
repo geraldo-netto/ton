@@ -72,6 +72,7 @@ from ._output import (
     inspect_staged_outputs,
     open_output_path,
 )
+from ._partition import Partitionable, PartitionSpec
 from ._proof import ProofFailure, ProofResult, ProvenanceRecord
 from ._proofcheck import ProofFailureSink
 from ._references import RegistryError, normalize_reference
@@ -106,6 +107,8 @@ __all__ = [
     "OutputEncodingError",
     "OutputPublishedError",
     "PairedGenerator",
+    "Partitionable",
+    "PartitionSpec",
     "PartialOutputCommitError",
     "StagedOutput",
     "PipelineStageError",

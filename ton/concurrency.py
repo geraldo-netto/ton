@@ -51,17 +51,15 @@ from ._engine import Engine, EngineOptions, TemplateError
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._output import open_output_path
+from ._partition import Partitionable, PartitionSpec
 from ._proofcheck import ProofFailureSink
-from ._registry import default_transforms, make_registry
-from ._scalars import coerce_int
-from ._specgraph import field_ownership, resolve_generator
+from ._registry import default_transforms, make_registry, snapshot_inputs
+from ._specgraph import FieldOwnership, OwnedChild, field_ownership, resolve_generator
 from ._specpath import SpecPath, format_spec_path
 from ._specsnapshot import snapshot_spec
 from ._template import parse
 from ._transforms import Transform
 from ._validation import Validator
-from .generators.sequence import SequenceGenerator
-from .generators.sequence_of import SequenceOfGenerator
 
 _UINT64_MODULUS = 1 << 64
 
@@ -146,6 +144,7 @@ def fork_engine(
     offset = worker_id * worker_rows
     if workers is not None:
         offset = _chunk_offset(total_rows, workers, worker_id)
+    registry, transforms, validators = snapshot_inputs(registry, transforms, validators)
     config = _offset_sequences(config, offset, registry, transforms)
     if rows is not None:
         config = {**config, "rows": rows}
@@ -236,6 +235,9 @@ def _offset_sequences(
     for token in parse(str(copied.get("format", ""))):
         occurrences[token.type_key] = occurrences.get(token.type_key, 0) + 1
     for type_key, count in occurrences.items():
+        count = _field_draws_per_row(
+            copied["types"][type_key], count, generators, transform_registry
+        )
         copied["types"][type_key] = _offset_sequence_spec(
             copied["types"][type_key],
             offset * count,
@@ -244,6 +246,19 @@ def _offset_sequences(
             path=f"types.{type_key}",
         )
     return copied
+
+
+def _field_draws_per_row(
+    spec: Mapping[str, Any],
+    occurrences: int,
+    registry: Mapping[str, Generator],
+    transforms: Mapping[str, Transform],
+) -> int:
+    generator = resolve_generator(spec, registry)
+    if generator is None or not generator.is_paired:
+        return occurrences
+    ownership = field_ownership(spec, generator, transforms, include_inactive_source=False)
+    return 1 if ownership.uses_source else occurrences
 
 
 def _offset_sequence_spec(
@@ -269,15 +284,8 @@ def _offset_sequence_spec(
         pending.append((original, spec, child_offset, child_path, True))
         generator = resolve_generator(spec, registry)
         ownership = field_ownership(spec, generator, transforms, include_inactive_source=False)
-        children = [
-            (child.location, child.spec, child_offset) for child in ownership.transform_children
-        ]
-        if generator is not None and ownership.uses_source:
-            amount = _offset_source_spec(spec, child_offset, generator)
-            children.extend(
-                (child.location, child.spec, amount) for child in ownership.source_children
-            )
         owned: set[SpecPath] = set()
+        children = _partition_children(spec, child_offset, generator, ownership, owned)
         for location, child, amount in children:
             child_copy = dict(child)
             _replace_owned_child(spec, location, child_copy, owned)
@@ -301,12 +309,72 @@ def _replace_owned_child(
     target[location[-1]] = child
 
 
-def _offset_source_spec(value: Any, offset: int, generator: Generator) -> int:
-    """Apply built-in sequence semantics to the effective generator implementation."""
-    if isinstance(generator, SequenceGenerator):
-        start = coerce_int(value, "start", type_name="sequence", default=0)
-        step = coerce_int(value, "step", type_name="sequence", default=1)
-        value["start"] = start + offset * step
-    if isinstance(generator, SequenceOfGenerator):
-        offset *= coerce_int(value, "count", type_name="sequence_of", default=0)
-    return offset
+def _partition_children(
+    spec: dict[str, Any],
+    offset: int,
+    generator: Generator | None,
+    ownership: FieldOwnership,
+    copied: set[SpecPath],
+) -> list[tuple[SpecPath, Mapping[str, Any], int]]:
+    children = (*ownership.transform_children, *ownership.source_children)
+    locations = _owner_child_locations(children)
+    plans: dict[SpecPath, PartitionSpec] = {}
+    if generator is not None and ownership.uses_source:
+        plans[()] = _partition_settings(generator, spec, offset, locations.get((), set()))
+        spec.update(plans[()].updates)
+    for owner in ownership.transform_owners:
+        plan = _partition_settings(
+            owner.extension, owner.spec, offset, locations.get(owner.location, set())
+        )
+        plans[owner.location] = plan
+        if plan.updates:
+            _replace_owned_child(spec, owner.location, {**owner.spec, **plan.updates}, copied)
+            copied.add(owner.location)
+    return [
+        (
+            child.location,
+            child.spec,
+            plans[child.owner_location].child_offsets.get(
+                child.location[len(child.owner_location) :],
+                offset,
+            ),
+        )
+        for child in children
+    ]
+
+
+def _owner_child_locations(children: tuple[OwnedChild, ...]) -> dict[SpecPath, set[SpecPath]]:
+    result: dict[SpecPath, set[SpecPath]] = {}
+    for child in children:
+        result.setdefault(child.owner_location, set()).add(
+            child.location[len(child.owner_location) :]
+        )
+    return result
+
+
+def _partition_settings(
+    extension: Generator | Transform,
+    spec: Mapping[str, Any],
+    offset: int,
+    locations: set[SpecPath],
+) -> PartitionSpec:
+    if not isinstance(extension, Partitionable):
+        return PartitionSpec()
+    plan = extension.partition(spec, offset)
+    if not isinstance(plan, PartitionSpec):
+        raise TypeError("partition hook must return PartitionSpec")
+    protected = {"type", "transforms", "validators", *(path[0] for path in locations)}
+    if protected.intersection(plan.updates):
+        raise ValueError(
+            "partition updates cannot replace pipeline stages or owned child containers"
+        )
+    _validate_child_offsets(plan.child_offsets, locations)
+    return plan
+
+
+def _validate_child_offsets(offsets: Mapping[SpecPath, int], locations: set[SpecPath]) -> None:
+    if not set(offsets).issubset(locations):
+        raise ValueError("partition child_offsets must name declared child locations")
+    for amount in offsets.values():
+        if isinstance(amount, bool) or not isinstance(amount, int) or amount < 0:
+            raise ValueError("partition child offsets must be non-negative integers")

@@ -82,6 +82,11 @@ Compilation and worker partitioning use the same ownership records from
 Preparation includes declared source children; workers traverse only children
 that execute when a transform replaces the source. Their traversal policies
 remain separate while resolution and ownership stay consistent.
+Worker partitioning calls the optional `Partitionable.partition(spec, offset)`
+capability on sources and transforms. `PartitionSpec` carries owner-setting
+updates and child offsets keyed by declared locations. This replaces concrete
+generator checks, preserves opaque metadata, and supports custom multiplicities
+and stateful transforms without changes to the worker traversal.
 
 ## Transform Contract
 

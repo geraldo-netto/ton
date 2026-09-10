@@ -30,7 +30,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| ARCH-006 | open | high | medium | Architecture/data governance: `_proofcheck._audit_spec` creates a separate but mutable dict shared by retained failures and the sink. A sink changing `failure.spec['values'][0]` changes earlier and later retained records; `_proofaudit` still reuses the fingerprint of the pre-mutation serialization. Audit content must remain immutable. Resolve by preventing sink/consumer mutation from altering retained audit content or its fingerprint; test record contents and serialized references, not only generated rows. |
 
 ### Plugin extensibility
 

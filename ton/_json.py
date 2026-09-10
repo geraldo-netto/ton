@@ -7,6 +7,7 @@ from collections.abc import Iterator, Mapping
 from decimal import Decimal
 from typing import Any
 
+from ._specsnapshot import FrozenSequence
 from .generators.base import int_to_str
 
 
@@ -25,7 +26,7 @@ def iter_json(value: Any, *, sort_keys: bool = False) -> Iterator[str]:
             continue
         if literal:
             yield item
-        elif isinstance(item, (Mapping, list, tuple)):
+        elif isinstance(item, (Mapping, list, tuple, FrozenSequence)):
             if id(item) in active:
                 raise ValueError("Circular reference detected")
             active.add(id(item))

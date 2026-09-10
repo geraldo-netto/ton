@@ -152,7 +152,7 @@ class ProofChecker:
         """
         retained = self._audit_specs.get(type_key)
         if retained is None:
-            retained = snapshot_spec(spec)
+            retained = snapshot_spec(spec, immutable=True)
             self._audit_specs[type_key] = retained
         return retained
 

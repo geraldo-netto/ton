@@ -448,7 +448,8 @@ def test_sink_mutation_cannot_reach_the_engine_snapshot() -> None:
     def _mutating_sink(failure: ProofFailure) -> None:
         if failure.spec is not None:
             seen.append(failure.spec)
-            failure.spec["values"].append("FROM_SINK")
+            with pytest.raises(AttributeError):
+                failure.spec["values"].append("FROM_SINK")
 
     engine.set_proof_failure_sink(_mutating_sink)
     list(engine)
@@ -502,3 +503,34 @@ def test_audit_writes_arbitrary_integer_fields_and_seed(sign) -> None:
     assert records[0]["spec_ref"] == records[1]["spec_ref"] == expected
     assert records[1]["spec"] is None
     assert sys.get_int_max_str_digits() == before
+
+
+def test_audit_specs_resist_sink_and_consumer_mutation() -> None:
+    """ARCH-006: all retained content and its serialized reference stay immutable."""
+    import pickle
+
+    engine = _rejecting_engine(["a"])
+    stream = io.StringIO()
+    writer = ProofAuditWriter(stream)
+    seen = []
+
+    def sink(failure):
+        seen.append(failure)
+        writer(failure)
+        with pytest.raises(TypeError):
+            failure.spec["values"][0] = "CORRUPTED"
+        with pytest.raises(TypeError):
+            failure.spec["type"] = "changed"
+
+    engine.set_proof_failure_sink(sink)
+    assert list(engine) == ["a"] * 3
+    records = [json.loads(line) for line in stream.getvalue().splitlines()]
+    original = records[0]["spec"]
+    assert all(failure.spec == original for failure in engine.proof_failures)
+    assert all(failure.spec == original for failure in seen)
+    assert records[0]["spec_ref"] == proofaudit._spec_reference(original)
+    assert all(record["spec_ref"] == records[0]["spec_ref"] for record in records)
+    restored = pickle.loads(pickle.dumps(seen[0]))
+    assert restored.spec == original
+    with pytest.raises(TypeError):
+        restored.spec["values"][0] = "changed"

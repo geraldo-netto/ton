@@ -1,14 +1,15 @@
 """Helpers for safely sharing TON across worker processes / threads.
 
-`random.Random` is not thread-safe and a single seeded RNG cannot be
-reused across workers without losing reproducibility. This module
-provides the two primitives a parallel runner needs:
+Each worker owns its RNG state so scheduling cannot change which worker
+receives a particular random draw. CPython's core random draws are thread-safe,
+but sharing a seeded RNG does not give deterministic worker streams. This
+module provides the two primitives a parallel runner needs:
 
 * :func:`derive_rng` -- deterministic per-worker RNG derived from the
   parent seed plus a worker id (so worker 0 always sees the same
   stream regardless of how many other workers run);
 * :func:`fork_engine` -- convenience builder returning a fresh
-  :class:`ton.engine.Engine` whose RNG is derived for ``worker_id``.
+  :class:`ton.api.Engine` whose RNG is derived for ``worker_id``.
 
 A multi-process generator can stream each worker directly to its own shard::
 

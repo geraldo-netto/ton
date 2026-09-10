@@ -63,7 +63,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| DOC-042 | open | low | small | Documentation: `ton.concurrency` states `random.Random` is not thread-safe, while the supported CPython standard-library implementation documents its core random draw as thread-safe. Sharing an RNG does compromise deterministic worker stream assignment, which already justifies TON's per-worker RNGs. Correct the rationale to distinguish reproducibility and state ownership from an unconditional thread-safety claim, and replace the stale `ton.engine.Engine` reference with the public API. |
 | DOC-043 | open | low | small | Documentation/distribution: README says an entry with omitted `weight` samples uniformly at 1/N, but `_distribution._coerce_weight` assigns weight 1.0 and sampling remains proportional to all effective weights. With two choices weighted 9 and omitted, the omitted choice has probability 1/10, not 1/2. Document the default weight and say uniform sampling applies when all effective weights are equal; cover a mixed explicit/default example. |
 
 ## Blocked / Deferred

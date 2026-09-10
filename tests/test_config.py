@@ -482,9 +482,40 @@ def test_validate_config_rejects_weighted_choice_wrapper_typo() -> None:
 
     with pytest.raises(
         ConfigError,
-        match=r"weighted\.choices\[0\]\.weigth.*Did you mean 'weight'",
+        match=r"types\.value\.choices\[0\]\.weigth.*Did you mean 'weight'",
     ):
         api.validate_config(payload)
+
+
+@pytest.mark.parametrize("transform", [False, True])
+def test_nested_choice_typo_reports_complete_owning_path(transform) -> None:
+    """CFG-030: nested wrapper diagnostics identify the full configuration location."""
+    import re
+
+    distribution = {
+        "type": "weighted",
+        "choices": [
+            {"weigth": 2, "spec": {"type": "string", "values": ["x"]}},
+            {"spec": {"type": "string", "values": ["y"]}},
+        ],
+    }
+    child = distribution
+    suffix = "choices[0].weigth"
+    if transform:
+        distribution["type"] = "distribution"
+        child = {"type": "string", "values": ["x"], "transforms": [distribution]}
+        suffix = "transforms[0]." + suffix
+    config = {
+        "rows": 1,
+        "format": "$outer$",
+        "types": {
+            "outer": {"type": "oneOf", "choices": [child]},
+        },
+    }
+    with pytest.raises(
+        ConfigError, match=re.escape("types.outer.choices[0]." + suffix) + ".*Did you mean 'weight'"
+    ):
+        api.validate_config(config)
 
 
 def test_plugin_generator_may_own_custom_keys() -> None:

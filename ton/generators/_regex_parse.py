@@ -26,6 +26,8 @@ import enum
 import re
 from typing import Any
 
+from .base import str_to_int
+
 
 class RegexParseError(ValueError):
     """Raised when a pattern is outside the supported regex subset."""
@@ -212,13 +214,13 @@ class _Parser:
             return None  # '{}' has no comma: re treats it as literal text
         # '{,}' omits both bounds, which re reads as '{0,}' -- an unbounded
         # repeat, not literal text (REL-025).
-        lo = int(match.group(1) or 0)
+        lo = str_to_int(match.group(1) or "0")
         if match.group(2) is None:
             hi: Any = lo
         elif match.group(3) == "":
             hi = MAXREPEAT
         else:
-            hi = int(match.group(3))
+            hi = str_to_int(match.group(3))
         if hi is not MAXREPEAT and hi < lo:
             raise RegexParseError("min repeat greater than max repeat")
         self.pos = match.end()

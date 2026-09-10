@@ -117,6 +117,17 @@ def test_row_width_guards_composite_and_unknown_width_values() -> None:
 BIG = 10**4300
 
 
+@pytest.mark.parametrize("suffix", ["", ",", "," + "1" + "0" * 4300])
+def test_regex_prepares_arbitrary_size_repeat_counts(suffix: str) -> None:
+    """SCALE-010: preparing a zero-row job must not expand or cap repeats."""
+    before = sys.get_int_max_str_digits()
+    count = "1" + "0" * 4300
+    pattern = "a{" + count + suffix + "}"
+    config = {"rows": 0, "format": "$x$", "types": {"x": {"type": "regex", "pattern": pattern}}}
+    assert list(api.generate(config)) == []
+    assert sys.get_int_max_str_digits() == before
+
+
 @pytest.mark.parametrize("sign", [-1, 1])
 @pytest.mark.parametrize("padding", [False, True])
 def test_decimal_accepts_arbitrary_integer_bounds(sign: int, padding: bool) -> None:

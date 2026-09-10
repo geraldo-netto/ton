@@ -101,7 +101,7 @@ class RegexGenerator(Generator):
         prepared = _prepare_nodes(parsed)
         try:
             re.compile(pattern)
-        except (RecursionError, OverflowError):
+        except (RecursionError, OverflowError, ValueError):
             # The iterative vendored parser already validated deep nesting and
             # large repeat counts; re's own limits are not TON's (SCALE-006).
             pass

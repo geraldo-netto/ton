@@ -27,7 +27,9 @@ def test_json_does_not_import_generator_implementations():
     assert completed.returncode == 0, completed.stderr
 
 
-@pytest.mark.parametrize("module", ["_contracts", "_references", "_pipeline", "_distribution"])
+@pytest.mark.parametrize(
+    "module", ["_contracts", "_references", "_pipeline", "_distribution", "_specgraph"]
+)
 def test_extension_foundations_do_not_load_catalogs(module):
     """ARCH-026: contracts/runtime foundations never depend on concrete catalogs."""
     completed = subprocess.run(

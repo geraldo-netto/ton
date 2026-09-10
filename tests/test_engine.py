@@ -545,7 +545,12 @@ def test_transform_child_discovery_ignores_malformed_specs(transforms: Any) -> N
     }
     compiler = EngineCompiler(config, None, None, None)
 
-    assert compiler._transform_child_specs({"transforms": transforms}) == ()
+    from ton._specgraph import field_ownership
+
+    assert (
+        field_ownership({"transforms": transforms}, None, compiler.transforms).transform_children
+        == ()
+    )
 
 
 def test_engine_preserves_paired_value_through_identity_transform() -> None:

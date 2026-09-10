@@ -77,6 +77,11 @@ The compiler prepares declared children before their parents using an explicit
 work stack. Built-in composites use work stacks for generation and proof too;
 nesting has no estimated stack ceiling and does not change the process recursion
 limit. Cyclic generator ownership is rejected with its configuration path.
+Compilation and worker partitioning use the same ownership records from
+`ton._specgraph`: literal child locations, owning extensions, and owner specs.
+Preparation includes declared source children; workers traverse only children
+that execute when a transform replaces the source. Their traversal policies
+remain separate while resolution and ownership stay consistent.
 
 ## Transform Contract
 

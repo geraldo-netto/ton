@@ -52,9 +52,9 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._output import open_output_path
 from ._proofcheck import ProofFailureSink
-from ._references import resolve_reference
 from ._registry import default_transforms, make_registry
 from ._scalars import coerce_int
+from ._specgraph import field_ownership, resolve_generator
 from ._specpath import SpecPath, format_spec_path
 from ._specsnapshot import snapshot_spec
 from ._template import parse
@@ -267,11 +267,16 @@ def _offset_sequence_spec(
             raise TemplateError(f"Cyclic generator specification at {child_path}")
         active.add(id(original))
         pending.append((original, spec, child_offset, child_path, True))
-        uses_source, children = _transform_sequence_children(spec, child_offset, transforms)
-        reference = spec.get("type")
-        generator = resolve_reference(registry, reference) if isinstance(reference, str) else None
-        if generator is not None and uses_source:
-            children.extend(_offset_source_spec(spec, child_offset, generator))
+        generator = resolve_generator(spec, registry)
+        ownership = field_ownership(spec, generator, transforms, include_inactive_source=False)
+        children = [
+            (child.location, child.spec, child_offset) for child in ownership.transform_children
+        ]
+        if generator is not None and ownership.uses_source:
+            amount = _offset_source_spec(spec, child_offset, generator)
+            children.extend(
+                (child.location, child.spec, amount) for child in ownership.source_children
+            )
         owned: set[SpecPath] = set()
         for location, child, amount in children:
             child_copy = dict(child)
@@ -296,9 +301,7 @@ def _replace_owned_child(
     target[location[-1]] = child
 
 
-def _offset_source_spec(
-    value: Any, offset: int, generator: Generator
-) -> list[tuple[SpecPath, Any, int]]:
+def _offset_source_spec(value: Any, offset: int, generator: Generator) -> int:
     """Apply built-in sequence semantics to the effective generator implementation."""
     if isinstance(generator, SequenceGenerator):
         start = coerce_int(value, "start", type_name="sequence", default=0)
@@ -306,26 +309,4 @@ def _offset_source_spec(
         value["start"] = start + offset * step
     if isinstance(generator, SequenceOfGenerator):
         offset *= coerce_int(value, "count", type_name="sequence_of", default=0)
-    return [(location, child, offset) for location, child in generator.nested_specs(value)]
-
-
-def _transform_sequence_children(
-    value: Mapping[str, Any], offset: int, registry: Mapping[str, Transform]
-) -> tuple[bool, list[tuple[SpecPath, Any, int]]]:
-    uses_source = True
-    children: list[tuple[SpecPath, Any, int]] = []
-    specs = value.get("transforms", [])
-    if not isinstance(specs, list):
-        return uses_source, children
-    for index, spec in enumerate(specs):
-        if not isinstance(spec, Mapping) or not isinstance(spec.get("type"), str):
-            continue
-        transform = resolve_reference(registry, spec["type"])
-        if transform is not None:
-            if index == 0:
-                uses_source = transform.requires_source
-            children.extend(
-                (("transforms", index, *location), child, offset)
-                for location, child in transform.nested_specs(spec)
-            )
-    return uses_source, children
+    return offset

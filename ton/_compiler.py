@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -19,6 +19,7 @@ from ._registry import (
     plugin_provenance,
     snapshot_inputs,
 )
+from ._specgraph import field_ownership, resolve_generator
 from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
 from ._specpath import SpecPath, format_spec_path
 from ._specsnapshot import snapshot_spec
@@ -155,32 +156,10 @@ class EngineCompiler:
             type_name = runtime_type_name(spec.get("type"))
             needed.add(type_name)
             generator = make_registry((type_name,)).get(type_name)
-            if generator is not None:
-                pending.extend(child for _location, child in generator.nested_specs(spec))
-            pending.extend(child for _location, child in self._transform_child_specs(spec))
+            ownership = field_ownership(spec, generator, self.transforms)
+            pending.extend(child.spec for child in ownership.source_children)
+            pending.extend(child.spec for child in ownership.transform_children)
         return needed
-
-    def _transform_child_specs(
-        self,
-        field_spec: Mapping[str, Any],
-    ) -> tuple[tuple[SpecPath, Mapping[str, Any]], ...]:
-        children: list[tuple[SpecPath, Mapping[str, Any]]] = []
-        transforms = field_spec.get("transforms", [])
-        if not isinstance(transforms, list):
-            return ()
-        for index, transform_spec in enumerate(transforms):
-            if not isinstance(transform_spec, Mapping):
-                continue
-            reference = transform_spec.get("type")
-            if not isinstance(reference, str):
-                continue
-            transform = resolve_reference(self.transforms, reference)
-            if transform is not None:
-                children.extend(
-                    (("transforms", index, *location), child)
-                    for location, child in transform.nested_specs(transform_spec)
-                )
-        return tuple(children)
 
     def _validate(self) -> None:
         for type_key in self.field_keys:
@@ -243,12 +222,13 @@ class EngineCompiler:
                 )
             active.add(id(child_spec))
             pending.append((child_path, child_spec, child, True))
-            nested = (*child.nested_specs(child_spec), *self._transform_child_specs(child_spec))
-            for location, nested_spec, nested_generator in self._resolved_children(
-                child_path, nested
-            ):
-                if not nested_generator.is_paired:
-                    pending.append((location, nested_spec, nested_generator, False))
+            ownership = field_ownership(child_spec, child, self.transforms)
+            for owned in (*ownership.source_children, *ownership.transform_children):
+                nested_generator = resolve_generator(owned.spec, self.registry)
+                if nested_generator is not None and not nested_generator.is_paired:
+                    pending.append(
+                        (child_path + owned.location, owned.spec, nested_generator, False)
+                    )
 
     def _prepare_tree(
         self, path: str, spec: Mapping[str, Any], generator: Generator
@@ -320,20 +300,6 @@ class EngineCompiler:
         error = extension_key_error(path, spec, generator.config_keys, COMMON_FIELD_KEYS)
         if error is not None:
             raise TemplateError(error)
-
-    def _resolved_children(
-        self,
-        path: SpecPath,
-        nested: Iterable[tuple[SpecPath, Mapping[str, Any]]],
-    ) -> Iterator[tuple[SpecPath, Mapping[str, Any], Generator]]:
-        """Pair each declared child spec with its registered generator."""
-        for location, nested_spec in nested:
-            reference = nested_spec.get("type")
-            if not isinstance(reference, str):
-                continue
-            child = resolve_reference(self.registry, reference)
-            if child is not None:
-                yield path + location, nested_spec, child
 
     def _prepare_transforms(
         self,

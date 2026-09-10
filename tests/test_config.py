@@ -841,3 +841,22 @@ def test_qualified_only_registry_prepares_deep_owned_children_iteratively() -> N
     before = sys.getrecursionlimit()
     assert list(api.generate(config, registry=registry, proof_mode="all")) == ["x"]
     assert sys.getrecursionlimit() == before
+
+
+@pytest.mark.parametrize("kind", ["identity", "distribution"])
+@pytest.mark.parametrize("qualified_reference", [False, True])
+@pytest.mark.parametrize("qualified_key", [False, True])
+def test_transform_aliases_resolve_and_discover_children(kind, qualified_reference, qualified_key):
+    """CFG-027: transform lookup and lazy child discovery share namespace rules."""
+    reference = f"core.{kind}" if qualified_reference else kind
+    key = f"core.{kind}" if qualified_key else kind
+    transform = {"type": reference}
+    expected = "source"
+    if kind == "distribution":
+        child = {"type": "integer", "minValue": 7, "maxValue": 7}
+        transform["choices"] = [{"spec": child}, {"spec": child}]
+        expected = "7"
+    field = {"type": "string", "values": ["source"], "transforms": [transform]}
+    config = {"rows": 2, "format": "$x$", "types": {"x": field}}
+    transforms = {key: api.build_extension_catalog().get_transform(kind)}
+    assert list(api.generate(config, transforms=transforms, proof_mode="all")) == [expected] * 2

@@ -179,9 +179,7 @@ class EngineCompiler:
             reference = transform_spec.get("type")
             if not isinstance(reference, str):
                 continue
-            transform = self.transforms.get(normalize_reference(reference)) or self.transforms.get(
-                reference
-            )
+            transform = resolve_reference(self.transforms, reference)
             if transform is not None:
                 children.extend(
                     (f"transforms[{index}].{location}", child)
@@ -420,8 +418,7 @@ class EngineCompiler:
         return raw
 
     def _resolve_transform(self, type_key: str, reference: str) -> Transform:
-        normalized = normalize_reference(reference)
-        transform = self.transforms.get(normalized) or self.transforms.get(reference)
+        transform = resolve_reference(self.transforms, reference)
         if transform is None:
             raise TemplateError(
                 f"Unknown transform {reference!r} for variable {type_key!r}. "

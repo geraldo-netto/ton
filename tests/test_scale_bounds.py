@@ -260,6 +260,38 @@ def test_spec_snapshot_is_stack_safe_independently_of_the_limit() -> None:
     assert clone is not original
 
 
+def test_snapshot_preserves_shared_subgraphs_with_linear_copy_work() -> None:
+    """SCALE-012: copy each distinct container once and isolate caller mutations."""
+    visits = []
+
+    class CountedDict(dict):
+        def items(self):
+            visits.append(id(self))
+            return super().items()
+
+    node = CountedDict(values=["original"])
+    leaf = node
+    for _ in range(14):
+        node = CountedDict(left=node, right=node)
+    clone = snapshot_spec(node)
+    assert len(visits) == len(set(visits)) == 15
+    for _ in range(14):
+        assert clone["left"] is clone["right"]
+        clone = clone["left"]
+    leaf["values"].append("mutated")
+    assert clone["values"] == ["original"]
+
+
+def test_snapshot_preserves_cyclic_metadata_without_recursion() -> None:
+    """SCALE-012: cycles refer to the isolated copy, never the caller's graph."""
+    original = {"children": []}
+    original["children"].append(original)
+    clone = snapshot_spec(original)
+    assert clone is not original
+    assert clone["children"] is not original["children"]
+    assert clone["children"][0] is clone
+
+
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX resource module (PLAT-015)")
 def test_unlimited_stack_falls_back_to_an_assumed_size(monkeypatch) -> None:
     """An unlimited RLIMIT_STACK still yields a usable depth (SCALE-007)."""

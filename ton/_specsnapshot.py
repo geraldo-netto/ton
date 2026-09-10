@@ -27,15 +27,21 @@ def snapshot_spec(value: Any) -> Any:
     recursion head-room, so it must not recurse itself (SCALE-007).
     """
     root: list[Any] = [None]
+    # Preserve aliases and cycles within the isolated graph (SCALE-012).
+    memo: dict[int, Any] = {}
     pending: list[tuple[Any, Any, Any]] = [(root, 0, value)]
     while pending:
         target, key, item = pending.pop()
-        if isinstance(item, Mapping):
+        if id(item) in memo:
+            target[key] = memo[id(item)]
+        elif isinstance(item, Mapping):
             copied: Any = {}
+            memo[id(item)] = copied
             target[key] = copied
             pending.extend((copied, item_key, sub) for item_key, sub in item.items())
         elif isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)):
             copied = [None] * len(item)
+            memo[id(item)] = copied
             target[key] = copied
             pending.extend((copied, index, sub) for index, sub in enumerate(item))
         else:

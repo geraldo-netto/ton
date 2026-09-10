@@ -118,6 +118,27 @@ BIG = 10**4300
 
 
 @pytest.mark.parametrize("sign", [-1, 1])
+@pytest.mark.parametrize("padding", [False, True])
+def test_decimal_accepts_arbitrary_integer_bounds(sign: int, padding: bool) -> None:
+    """SCALE-009: exact integer bounds must never pass through limited str(int)."""
+    before = sys.get_int_max_str_digits()
+    bound = sign * BIG
+    spec = {
+        "type": "decimal",
+        "minValue": bound,
+        "maxValue": bound,
+        "decimals": 2,
+        "padWithZero": padding,
+    }
+    config = {"rows": 0, "format": "$x$", "types": {"x": spec}}
+    assert list(api.generate(config)) == []
+    config["rows"] = 2
+    expected = ("-" if sign < 0 else "") + "1" + "0" * 4300 + ".00"
+    assert list(api.generate(config, proof_mode="all")) == [expected] * 2
+    assert sys.get_int_max_str_digits() == before
+
+
+@pytest.mark.parametrize("sign", [-1, 1])
 @pytest.mark.parametrize("rows", [0, 2])
 def test_large_padded_integer_bounds(sign: int, rows: int) -> None:
     """SCALE-005: padding must use arbitrary-size conversion during preparation."""

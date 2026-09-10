@@ -113,7 +113,7 @@ def _coerce_decimal(spec: Mapping[str, Any], key: str) -> Decimal:
     if isinstance(raw, bool):
         raise ValueError(f"decimal {key!r} must be a number (got {raw!r})")
     try:
-        value = Decimal(str(raw))
+        value = Decimal(raw) if isinstance(raw, int) else Decimal(str(raw))
     except (InvalidOperation, ValueError) as exc:
         raise ValueError(f"decimal {key!r} must be a number (got {raw!r})") from exc
     if not value.is_finite():

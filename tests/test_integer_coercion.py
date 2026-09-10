@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 
 from ton import api
+from ton._scalars import coerce_int
 from ton.cli import main
 from ton.concurrency import fork_engine
-from ton.generators.base import coerce_int
 
 FRACTIONAL_DECIMALS = [
     "1.5",

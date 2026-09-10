@@ -8,17 +8,16 @@ from random import Random
 from typing import Any
 
 from .._proof import ProofResult
-from .._transforms import TransformResult
-from .base import (
-    Generator,
+from .._scalars import (
     coerce_bool,
     coerce_int,
     int_to_str,
     pad_with_zero,
-    proof_result,
     require_min_le_max,
     str_to_int,
 )
+from .._transforms import TransformResult
+from .base import Generator, proof_result
 
 
 @dataclass(frozen=True)

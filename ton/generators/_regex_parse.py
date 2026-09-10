@@ -26,7 +26,7 @@ import enum
 import re
 from typing import Any
 
-from .base import str_to_int
+from .._scalars import str_to_int
 
 
 class RegexParseError(ValueError):

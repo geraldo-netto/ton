@@ -26,8 +26,9 @@ from random import Random
 from typing import Any
 
 from .._proof import ProofResult
+from .._scalars import coerce_bool, coerce_int
 from .._transforms import TransformResult
-from .base import Generator, coerce_bool, coerce_int, proof_result
+from .base import Generator, proof_result
 
 _SUPPORTED_VERSIONS = (1, 4)
 

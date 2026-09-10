@@ -18,9 +18,10 @@ from random import Random
 from typing import Any
 
 from .._proof import ProofResult
+from .._scalars import coerce_bool, coerce_int, require_string_tuple
 from .._transforms import TransformResult
 from ._md4 import md4 as _pure_md4
-from .base import PairedGenerator, coerce_bool, coerce_int, proof_result, require_string_tuple
+from .base import PairedGenerator, proof_result
 
 
 def _select_md4_backend() -> Callable[[bytes], bytes]:

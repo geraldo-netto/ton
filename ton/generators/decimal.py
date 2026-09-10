@@ -10,16 +10,9 @@ from random import Random
 from typing import Any
 
 from .._proof import ProofResult
+from .._scalars import coerce_bool, coerce_int, int_to_str, pad_with_zero, require_min_le_max
 from .._transforms import TransformResult
-from .base import (
-    Generator,
-    coerce_bool,
-    coerce_int,
-    int_to_str,
-    pad_with_zero,
-    proof_result,
-    require_min_le_max,
-)
+from .base import Generator, proof_result
 
 
 @dataclass(frozen=True)

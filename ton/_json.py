@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from ._scalars import int_to_str, str_to_int
 from ._specsnapshot import FrozenSequence
-from .generators.base import int_to_str, str_to_int
 
 _SCALAR_DECODER = json.JSONDecoder(parse_int=str_to_int, parse_float=Decimal)
 _SPACE = re.compile(r"[ \t\n\r]*")

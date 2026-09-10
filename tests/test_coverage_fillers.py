@@ -63,14 +63,14 @@ def test_ton_main_executes_inprocess(monkeypatch) -> None:
 
 
 def test_require_non_empty_values_accepts_list() -> None:
-    from ton.generators.base import require_non_empty_values
+    from ton._scalars import require_non_empty_values
 
     assert require_non_empty_values({"values": [1, 2, 3]}) == [1, 2, 3]
 
 
 @pytest.mark.parametrize("spec", [{}, {"values": None}, {"values": []}, {"values": "abc"}])
 def test_require_non_empty_values_rejects_bad_input(spec: dict) -> None:
-    from ton.generators.base import require_non_empty_values
+    from ton._scalars import require_non_empty_values
 
     with pytest.raises(ValueError):
         require_non_empty_values(spec)

@@ -20,8 +20,9 @@ from random import Random
 from typing import Any
 
 from .._proof import ProofResult
+from .._scalars import coerce_int
 from .._transforms import TransformResult
-from .base import Generator, coerce_int, proof_result
+from .base import Generator, proof_result
 
 
 def _encode_hex(raw: bytes) -> str:

@@ -33,8 +33,9 @@ from random import Random
 from typing import Any
 
 from .._proof import ProofResult
+from .._scalars import coerce_bool
 from .._transforms import TransformResult
-from .base import Generator, coerce_bool, proof_result
+from .base import Generator, proof_result
 
 # ---------------------------------------------------------------------------
 # IPv4 / IPv6

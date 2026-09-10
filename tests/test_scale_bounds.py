@@ -14,9 +14,9 @@ import pytest
 
 from ton import api
 from ton._engine import Engine, TemplateError
+from ton._scalars import int_to_str, str_to_int
 from ton._specsnapshot import snapshot_spec
 from ton.generators import Generator
-from ton.generators.base import int_to_str, str_to_int
 from ton.generators.bytes import BytesGenerator
 from ton.generators.char import CharGenerator
 from ton.generators.regex import RegexGenerator

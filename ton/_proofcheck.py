@@ -21,10 +21,10 @@ from typing import Any
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import PreparedField, ProofFailure, TransformStep
+from ._scalars import coerce_int
 from ._specsnapshot import snapshot_spec
 from ._steps import OperationError
 from ._transforms import TransformResult
-from .generators.base import coerce_int
 
 #: Upper bound on the number of detailed audit failures retained in
 #: memory. Beyond this the total count and per-type tallies keep

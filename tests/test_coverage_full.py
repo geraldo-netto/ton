@@ -26,10 +26,10 @@ from ton._registry import (
     _entry_point_dist,
     clear_default_registry_cache,
 )
+from ton._scalars import coerce_int
 from ton._template import Token, split_segments
 from ton.cli import main as cli_main
 from ton.generators import Generator
-from ton.generators.base import coerce_int
 
 # ---------------------------------------------------------------------------
 # _template.split_segments: ``$$`` literal continue branch

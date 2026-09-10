@@ -487,7 +487,7 @@ def test_audit_writes_arbitrary_integer_fields_and_seed(sign) -> None:
     import sys
     from dataclasses import replace
 
-    from ton.generators.base import str_to_int
+    from ton._scalars import str_to_int
 
     before = sys.get_int_max_str_digits()
     digits = ("-" if sign < 0 else "") + "1" + "0" * 4300

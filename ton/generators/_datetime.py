@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from random import Random
 from typing import Any
 
-from .base import require_min_le_max
+from .._scalars import require_min_le_max
 
 
 def parse_iso_bounds(

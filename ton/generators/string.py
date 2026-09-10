@@ -8,8 +8,9 @@ from random import Random
 from typing import Any
 
 from .._proof import ProofResult
+from .._scalars import require_string_tuple
 from .._transforms import TransformResult
-from .base import Generator, proof_result, require_string_tuple
+from .base import Generator, proof_result
 
 
 @dataclass(frozen=True)

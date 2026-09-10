@@ -52,13 +52,13 @@ from ._logging import logger as _logger
 from ._output import open_output_path
 from ._proofcheck import ProofFailureSink
 from ._registry import default_transforms, make_registry, resolve_reference
+from ._scalars import coerce_int
 from ._specpath import SpecPath, format_spec_path
 from ._specsnapshot import snapshot_spec
 from ._template import parse
 from ._transforms import Transform
 from ._validation import Validator
 from .generators import Generator
-from .generators.base import coerce_int
 from .generators.sequence import SequenceGenerator
 from .generators.sequence_of import SequenceOfGenerator
 

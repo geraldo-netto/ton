@@ -23,6 +23,7 @@ from ._output import (
 )
 from ._proofaudit import ProofAuditWriteError, ProofAuditWriter
 from ._proofcheck import PROOF_MODES, ProofFailureSinkError
+from ._scalars import str_to_int
 from .api import (
     ConfigError,
     Engine,
@@ -36,7 +37,6 @@ from .api import (
     configure_stderr,
 )
 from .api import logger as _logger
-from .generators.base import str_to_int
 
 _progress_logger = logging.getLogger("ton.progress")
 

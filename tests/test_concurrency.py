@@ -414,3 +414,71 @@ def test_partitioned_workers_emit_disjoint_sequences(label: str, field: dict) ->
     emitted = [value for shard in shards for value in shard]
     assert len(emitted) == config["rows"]
     assert len(set(emitted)) == len(emitted)
+
+
+@pytest.mark.parametrize("replacing", [False, True])
+def test_worker_offsets_only_declared_plugin_children(replacing) -> None:
+    """CONC-018: metadata resembling sequence specs stays opaque to worker offsets."""
+    from ton import api
+
+    class MetadataGenerator(api.Generator):
+        type_name = "metadata"
+
+        def nested_specs(self, spec):
+            return (("child", spec["child"]),) if "child" in spec else ()
+
+        def prepare(self, spec, context=None):
+            child = (
+                context.prepare_child(self.type_name, "child", spec["child"])
+                if "child" in spec
+                else None
+            )
+            return spec["metadata"]["start"], child
+
+        def generate(self, prepared, rng):
+            start, child = prepared
+            return str(start) if child is None else f"{start}:{child[0].generate(child[1], rng)}"
+
+    field = {
+        "type": "plugin.metadata",
+        "metadata": {"type": "sequence", "start": 100},
+        "child": {"type": "sequence", "start": 0},
+    }
+    expected = ["100:2", "100:3"]
+    if replacing:
+        field = {
+            "type": "sequence",
+            "start": 500,
+            "transforms": [
+                {
+                    "type": "distribution",
+                    "choices": [
+                        {"weight": 1, "spec": field},
+                        {"weight": 0, "spec": {"type": "string", "values": ["x"]}},
+                    ],
+                }
+            ],
+        }
+    config = {"rows": 4, "format": "$x$", "types": {"x": field}}
+    original = pickle.loads(pickle.dumps(config))
+    registry = api.build_extension_catalog().generators()
+    registry["plugin.metadata"] = MetadataGenerator()
+    engine = fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=2, registry=registry)
+    assert list(engine) == expected
+    assert config == original
+
+
+@pytest.mark.parametrize("transforms", ["invalid", [None], [{"type": "missing"}]])
+def test_worker_owned_children_retain_transform_validation(transforms) -> None:
+    """CONC-018: malformed owned pipelines still reach the canonical compiler checks."""
+    from ton import api
+
+    config = {
+        "rows": 2,
+        "format": "$x$",
+        "types": {
+            "x": {"type": "oneOf", "choices": [{"type": "sequence", "transforms": transforms}]}
+        },
+    }
+    with pytest.raises(api.TemplateError, match="[Tt]ransform"):
+        fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=1)

@@ -52,12 +52,14 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._output import open_output_path
 from ._proofcheck import ProofFailureSink
-from ._registry import runtime_type_name
+from ._registry import default_transforms, make_registry, resolve_reference
 from ._template import parse
 from ._transforms import Transform
 from ._validation import Validator
 from .generators import Generator
 from .generators.base import coerce_int
+from .generators.sequence import SequenceGenerator
+from .generators.sequence_of import SequenceOfGenerator
 
 _UINT64_MODULUS = 1 << 64
 
@@ -133,7 +135,7 @@ def fork_engine(
     offset = worker_id * worker_rows
     if workers is not None:
         offset = _chunk_offset(total_rows, workers, worker_id)
-    config = _offset_sequences(config, offset)
+    config = _offset_sequences(config, offset, registry, transforms)
     if rows is not None:
         config = {**config, "rows": rows}
     engine = Engine.from_options(
@@ -210,49 +212,63 @@ def _chunk_offset(total_rows: int, workers: int, worker_id: int) -> int:
     return worker_id * base + min(worker_id, remainder)
 
 
-def _offset_sequences(config: Mapping[str, Any], offset: int) -> dict[str, Any]:
+def _offset_sequences(
+    config: Mapping[str, Any],
+    offset: int,
+    registry: Mapping[str, Generator] | None = None,
+    transforms: Mapping[str, Transform] | None = None,
+) -> dict[str, Any]:
     copied = deepcopy(dict(config))
+    generators = registry if registry is not None else make_registry()
+    transform_registry = transforms if transforms is not None else default_transforms()
     occurrences: dict[str, int] = {}
     for token in parse(str(copied.get("format", ""))):
         occurrences[token.type_key] = occurrences.get(token.type_key, 0) + 1
     for type_key, spec in copied.get("types", {}).items():
-        _offset_sequence_spec(spec, offset * occurrences.get(type_key, 0))
+        _offset_sequence_spec(
+            spec, offset * occurrences.get(type_key, 0), generators, transform_registry
+        )
     return copied
 
 
-def _offset_sequence_spec(value: Any, offset: int) -> None:
-    """Offset every generated sequence reachable from ``value``.
-
-    A field's nominal source is not the only place a sequence can live: a
-    replacing transform (``distribution``) carries its own child specs, and
-    returning as soon as the source was recognized left those un-offset --
-    so two workers emitted identical ids (CONC-005). Source and transform
-    children are therefore traversed independently.
-    """
-    if isinstance(value, list):
-        for nested in value:
-            _offset_sequence_spec(nested, offset)
-        return
-    if not isinstance(value, dict):
-        return
-    _offset_source_spec(value, offset)
-    _offset_sequence_spec(value.get("transforms"), offset)
+def _offset_sequence_spec(
+    value: Any, offset: int, registry: Mapping[str, Generator], transforms: Mapping[str, Transform]
+) -> None:
+    """Visit only declared generator children, preserving opaque plugin metadata (CONC-018)."""
+    uses_source, children = _transform_sequence_children(value, offset, transforms)
+    reference = value.get("type")
+    generator = resolve_reference(registry, reference) if isinstance(reference, str) else None
+    if generator is not None and uses_source:
+        children.extend(_offset_source_spec(value, offset, generator))
+    for child, child_offset in children:
+        _offset_sequence_spec(child, child_offset, registry, transforms)
 
 
-def _offset_source_spec(value: dict[str, Any], offset: int) -> None:
-    """Offset the sequences reachable through a spec's own source shape."""
-    type_name = runtime_type_name(value.get("type"))
-    if type_name == "sequence":
-        # Use the generator's own numeric rule so a worker never renders
-        # a spec ordinary generation would reject (CONC-004).
+def _offset_source_spec(value: Any, offset: int, generator: Generator) -> list[tuple[Any, int]]:
+    """Apply built-in sequence semantics to the effective generator implementation."""
+    if isinstance(generator, SequenceGenerator):
         start = coerce_int(value, "start", type_name="sequence", default=0)
         step = coerce_int(value, "step", type_name="sequence", default=1)
         value["start"] = start + offset * step
-        return
-    if type_name == "sequence_of":
-        count = coerce_int(value, "count", type_name="sequence_of", default=0)
-        _offset_sequence_spec(value.get("spec"), offset * count)
-        return
-    for key, nested in value.items():
-        if key != "transforms":
-            _offset_sequence_spec(nested, offset)
+    if isinstance(generator, SequenceOfGenerator):
+        offset *= coerce_int(value, "count", type_name="sequence_of", default=0)
+    return [(child, offset) for _location, child in generator.nested_specs(value)]
+
+
+def _transform_sequence_children(
+    value: Mapping[str, Any], offset: int, registry: Mapping[str, Transform]
+) -> tuple[bool, list[tuple[Any, int]]]:
+    uses_source = True
+    children: list[tuple[Any, int]] = []
+    specs = value.get("transforms", [])
+    if not isinstance(specs, list):
+        return uses_source, children
+    for index, spec in enumerate(specs):
+        if not isinstance(spec, Mapping) or not isinstance(spec.get("type"), str):
+            continue
+        transform = resolve_reference(registry, spec["type"])
+        if transform is not None:
+            if index == 0:
+                uses_source = transform.requires_source
+            children.extend((child, offset) for _location, child in transform.nested_specs(spec))
+    return uses_source, children

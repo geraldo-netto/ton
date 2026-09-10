@@ -23,7 +23,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| CONC-018 | open | high | medium | Concurrency/plugin ownership: `concurrency._offset_source_spec` recursively interprets arbitrary plugin metadata as generator specs, bypassing the `Generator.nested_specs` ownership contract. A plugin rendering `metadata.start` with metadata `{'type': 'sequence', 'start': 100}` emits 100 directly but 102 in worker 1 when four total rows are split between two workers. Resolve sequence offset discovery through declared generator/transform child locations and the effective catalog; preserve opaque metadata and the caller's config. Cover custom plugins and replacing transforms. |
 
 ### Architecture / modularity / SOLID
 

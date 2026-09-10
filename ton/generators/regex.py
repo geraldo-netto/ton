@@ -25,7 +25,6 @@ on 3.13 (DEP-001).
 
 from __future__ import annotations
 
-import re
 import string
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
@@ -99,14 +98,6 @@ class RegexGenerator(Generator):
             raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
         _validate_anchors(parsed)
         prepared = _prepare_nodes(parsed)
-        try:
-            re.compile(pattern)
-        except (RecursionError, OverflowError, ValueError):
-            # The iterative vendored parser already validated deep nesting and
-            # large repeat counts; re's own limits are not TON's (SCALE-006).
-            pass
-        except re.error as exc:
-            raise ValueError(f"regex 'pattern' is not a valid regex: {exc}") from exc
         return RegexSpec(pattern=pattern, parsed=prepared, matcher=_build_matcher(prepared))
 
     def generate(self, prepared: RegexSpec, rng: Random) -> str:

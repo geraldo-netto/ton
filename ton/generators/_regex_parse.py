@@ -175,10 +175,13 @@ class _Parser:
         if char in "^$":
             self.pos += 1
             return (AT, char)
-        if char in "*+?":
-            raise RegexParseError(f"nothing to repeat at position {self.pos}")
+        self._reject_bare_quantifier(char)
         self.pos += 1
         return (LITERAL, ord(char))
+
+    def _reject_bare_quantifier(self, char: str) -> None:
+        if char in "*+?" or (char == "{" and self._read_brace() is not None):
+            raise RegexParseError(f"nothing to repeat at position {self.pos}")
 
     def _apply_quantifier(self, atom: Node) -> Node:
         bounds = self._read_quantifier()
@@ -255,18 +258,13 @@ class _Parser:
 
     def _parse_class_member(self) -> Node:
         item = self._parse_class_atom()
-        if (
-            item[0] is LITERAL
-            and self._peek() == "-"
-            and self.text[self.pos + 1 : self.pos + 2]
-            not in (
-                "]",
-                "",
-            )
+        if self._peek() == "-" and self.text[self.pos + 1 : self.pos + 2] not in (
+            "]",
+            "",
         ):
             self.pos += 1  # consume '-'
             hi = self._parse_class_atom()
-            if hi[0] is not LITERAL:
+            if item[0] is not LITERAL or hi[0] is not LITERAL:
                 raise RegexParseError("bad character range")
             if hi[1] < item[1]:
                 raise RegexParseError("bad character range")

@@ -448,3 +448,42 @@ def test_unicode_brace_literals_survive_json_loading(
 
     assert rows == [pattern, pattern]
     assert all(re.fullmatch(pattern, row) is not None for row in rows)
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    ["a{2}", "a{4294967296}", "(" * 2000 + "a" + ")" * 2000],
+    ids=["small", "huge", "deep"],
+)
+@pytest.mark.parametrize("invalid", ["a{2}{3}", r"[\d-a]", r"[a-\d]", "{2}", "a**", "a{1,0}"])
+def test_regex_syntax_validation_is_independent_of_stdlib_limits(prefix, invalid):
+    """REL-054: huge valid prefixes cannot mask later malformed regex syntax."""
+    config = {
+        "rows": 0,
+        "format": "$x$",
+        "types": {"x": {"type": "regex", "pattern": prefix + "(?:" + invalid + ")"}},
+    }
+    with pytest.raises(TemplateError, match="regex"):
+        list(api.generate(config))
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "a{4294967296}",
+        "a{4294967296}?",
+        r"a{4294967296}[\d-]",
+        "a{4294967296}{}",
+        "a{4294967296}{word}",
+    ],
+)
+def test_regex_large_valid_repeats_still_prepare(pattern):
+    """REL-054: syntax validation introduces no repetition or workload ceiling."""
+    assert (
+        list(
+            api.generate(
+                {"rows": 0, "format": "$x$", "types": {"x": {"type": "regex", "pattern": pattern}}}
+            )
+        )
+        == []
+    )

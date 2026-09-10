@@ -533,3 +533,60 @@ def test_sequence_of_proves_every_element_it_generated(separator: str) -> None:
 
     with pytest.raises(ProofError, match="sequence_of element failed its own proof"):
         list(engine)
+
+
+def test_stack_dispatch_respects_overridden_plugin_operations() -> None:
+    """SCALE-007: cooperative base hooks must not bypass a plugin's overrides."""
+
+    class Override(OneOfGenerator):
+        def generate(self, prepared, rng):
+            return "override"
+
+        def prove(self, prepared, result):
+            return ProofResult(result.value == "override")
+
+    registry = _registry()
+    registry["override"] = Override()
+    child = {"type": "override", "choices": [{"type": "string", "values": ["wrong"]}]}
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "oneOf", "choices": [child]}}}
+    assert list(Engine(config, registry=registry, proof_mode="all")) == ["override"]
+
+
+def test_standalone_distribution_preserves_selected_child_proof() -> None:
+    """SCALE-007: direct distribution operations use the same work-stack semantics."""
+    prepared = WeightedGenerator().prepare({"choices": [{"spec": {"type": "reject"}}]}, _context())
+    value = prepared.distribution.choose(Random(0))
+    proof = prepared.distribution.prove(TransformResult(value))
+    assert value == "x"
+    assert not proof.ok
+    assert proof.reason == "always rejects"
+
+
+def test_nested_generator_exception_unwinds_the_work_stack() -> None:
+    """SCALE-007: leaf exceptions propagate once through nested runtime operations."""
+    from ton import api
+    from ton._proof import _trace_enabled
+
+    calls = []
+
+    class Broken(Generator):
+        def generate(self, prepared, rng):
+            calls.append("called")
+            raise RuntimeError("leaf generation failed")
+
+    registry = _registry()
+    registry["broken"] = Broken()
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {
+            "x": {
+                "type": "oneOf",
+                "choices": [{"type": "weighted", "choices": [{"spec": {"type": "broken"}}]}],
+            }
+        },
+    }
+    with pytest.raises(api.GeneratorExecutionError, match="leaf generation failed"):
+        list(Engine(config, registry=registry, proof_mode="all"))
+    assert calls == ["called"]
+    assert _trace_enabled.get() is True

@@ -59,6 +59,11 @@ Prepared specs are cached during engine construction. Row generation only
 performs required draws, transform application, rendering, and optional proof
 checks.
 
+The compiler prepares declared children before their parents using an explicit
+work stack. Built-in composites use work stacks for generation and proof too;
+nesting has no estimated stack ceiling and does not change the process recursion
+limit. Cyclic generator ownership is rejected with its configuration path.
+
 ## Transform Contract
 
 Transforms declare whether they accept paired inputs and whether they preserve

@@ -797,3 +797,22 @@ def test_mixed_nested_transform_errors_preserve_field_path(entry, key) -> None:
         else:
             api.validate_config(config)
     assert f"types.{key}.choices[0].transforms[0].choices[0].spec.minvalue" in str(error.value)
+
+
+def test_preparation_cache_cannot_alias_a_different_field_path() -> None:
+    """SCALE-007: path-like field names cannot borrow another field's prepared child."""
+    config = {
+        "rows": 1,
+        "format": "$x$:$x.choices[0]$",
+        "types": {
+            "x": {
+                "type": "oneOf",
+                "choices": [
+                    {"type": "oneOf", "choices": [{"type": "string", "values": ["valid"]}]}
+                ],
+            },
+            "x.choices[0]": {"type": "oneOf", "choices": [{}]},
+        },
+    }
+    with pytest.raises(TemplateError, match="must be an object with a 'type' field"):
+        list(api.generate(config))

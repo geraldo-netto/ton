@@ -9,7 +9,6 @@ from typing import Any
 from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._proof import PreparedField, PreparedTransform
-from ._recursion import NestingTooDeepError, ensure_depth_headroom
 from ._registry import (
     RegisteredExtensions,
     RegistryError,
@@ -30,7 +29,7 @@ from .generators.base import (
     ChildPipelineGenerator,
     ChildPipelineSpec,
     PreparationContext,
-    prepare_child_spec,
+    resolve_child_spec,
 )
 
 
@@ -45,7 +44,6 @@ class CompiledPlan:
     has_paired: bool
     literals: tuple[str, ...]
     resolved_tokens: tuple[ResolvedToken, ...]
-    has_child_pipelines: bool = False
 
 
 @dataclass(frozen=True)
@@ -78,8 +76,7 @@ class EngineCompiler:
         # changed an already-recorded audit failure (ARCH-006).
         self.types: Mapping[str, Mapping[str, Any]] = snapshot_spec(config["types"])
         self.rows = int(config["rows"])
-        self.has_child_pipelines = False
-        self.max_nesting_depth = 0
+        self._child_prepared: dict[str, tuple[Generator, Any]] = {}
         self.tokens = tuple(parse(self.template))
         self.field_keys = (
             tuple(self.types)
@@ -116,12 +113,6 @@ class EngineCompiler:
         self.registry = self._resolve_registry(registry)
 
     def compile(self) -> CompiledPlan:
-        # Preparation and row generation both descend once per nesting level;
-        # discovery already measured how deep this config goes (SCALE-007).
-        try:
-            ensure_depth_headroom(self.max_nesting_depth)
-        except NestingTooDeepError as exc:
-            raise TemplateError(str(exc)) from exc
         self._validate()
         prepared = self._build_prepared()
         self._validate_id_references(prepared)
@@ -138,7 +129,6 @@ class EngineCompiler:
             has_paired=any(prepared[token.type_key].source_is_paired for token in self.tokens),
             literals=tuple(literals),
             resolved_tokens=resolved_tokens,
-            has_child_pipelines=self.has_child_pipelines,
         )
 
     def _resolve_registry(
@@ -157,36 +147,32 @@ class EngineCompiler:
         self,
         root_specs: list[Mapping[str, Any]],
     ) -> set[str]:
-        """Collect every referenced type name and record the nesting depth.
-
-        The walk is iterative, so discovery itself has no nesting ceiling and
-        can measure the depth that preparation and row generation will
-        descend (SCALE-007).
-        """
+        """Discover declared references iteratively, visiting each shared spec once."""
         needed: set[str] = set()
-        pending = [(spec, 1) for spec in root_specs]
+        seen: set[int] = set()
+        pending = list(root_specs)
         while pending:
-            spec, depth = pending.pop()
-            self.max_nesting_depth = max(self.max_nesting_depth, depth)
+            spec = pending.pop()
+            if id(spec) in seen:
+                continue
+            seen.add(id(spec))
             type_name = runtime_type_name(spec.get("type"))
             needed.add(type_name)
             generator = make_registry((type_name,)).get(type_name)
             if generator is not None:
-                pending.extend(
-                    (child, depth + 1) for _location, child in generator.nested_specs(spec)
-                )
-            pending.extend((child, depth + 1) for child in self._transform_child_specs(spec))
+                pending.extend(child for _location, child in generator.nested_specs(spec))
+            pending.extend(child for _location, child in self._transform_child_specs(spec))
         return needed
 
     def _transform_child_specs(
         self,
         field_spec: Mapping[str, Any],
-    ) -> tuple[Mapping[str, Any], ...]:
-        children: list[Mapping[str, Any]] = []
+    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        children: list[tuple[str, Mapping[str, Any]]] = []
         transforms = field_spec.get("transforms", [])
         if not isinstance(transforms, list):
             return ()
-        for transform_spec in transforms:
+        for index, transform_spec in enumerate(transforms):
             if not isinstance(transform_spec, Mapping):
                 continue
             reference = transform_spec.get("type")
@@ -197,7 +183,8 @@ class EngineCompiler:
             )
             if transform is not None:
                 children.extend(
-                    child for _location, child in transform.nested_specs(transform_spec)
+                    (f"transforms[{index}].{location}", child)
+                    for location, child in transform.nested_specs(transform_spec)
                 )
         return tuple(children)
 
@@ -221,24 +208,11 @@ class EngineCompiler:
     def _build_prepared(self) -> dict[str, PreparedField]:
         prepared: dict[str, PreparedField] = {}
         for type_key in self.field_keys:
-            context = PreparationContext(self.registry, self._prepare_child, path=type_key)
+            self._child_prepared.clear()
             spec = self.types[type_key]
             generator = self.registry[runtime_type_name(spec["type"])]
             try:
-                self._validate_generator_keys(f"types.{type_key}", spec, generator)
-                transforms, is_paired, uses_source = self._prepare_transforms(
-                    type_key, spec, generator, context
-                )
-                prepared[type_key] = PreparedField(
-                    generator=generator,
-                    source_prepared=context.prepare_generator(generator, spec),
-                    transforms=transforms,
-                    is_paired=is_paired,
-                    source_is_paired=bool(generator.is_paired and uses_source),
-                    uses_source=uses_source,
-                    validators=self._resolve_validators(type_key, spec),
-                    provider=plugin_provenance(self.registry, spec["type"]),
-                )
+                prepared[type_key] = self._prepare_tree(type_key, spec, generator)
             except Exception as exc:  # noqa: BLE001
                 _logger.warning(
                     "prepare_failed type_key=%s generator_type=%s error_type=%s",
@@ -257,6 +231,65 @@ class EngineCompiler:
                 ) from exc
         return prepared
 
+    def _preparation_order(
+        self, path: str, spec: Mapping[str, Any], generator: Generator
+    ) -> Iterator[tuple[str, Mapping[str, Any], Generator]]:
+        pending = [(path, spec, generator, False)]
+        active: set[int] = set()
+        while pending:
+            child_path, child_spec, child, ready = pending.pop()
+            if ready:
+                active.remove(id(child_spec))
+                yield child_path, child_spec, child
+                continue
+            if id(child_spec) in active:
+                raise TemplateError(f"Cyclic generator specification at types.{child_path}")
+            active.add(id(child_spec))
+            pending.append((child_path, child_spec, child, True))
+            nested = (*child.nested_specs(child_spec), *self._transform_child_specs(child_spec))
+            for location, nested_spec, nested_generator in self._resolved_children(
+                child_path, nested
+            ):
+                if not nested_generator.is_paired:
+                    pending.append((location, nested_spec, nested_generator, False))
+
+    def _prepare_tree(
+        self, path: str, spec: Mapping[str, Any], generator: Generator
+    ) -> PreparedField:
+        field: PreparedField | None = None
+        for child_path, child_spec, child in self._preparation_order(path, spec, generator):
+            context = PreparationContext(self.registry, self._prepare_child, path=child_path)
+            self._validate_generator_keys(f"types.{child_path}", child_spec, child)
+            transforms, is_paired, uses_source = self._prepare_transforms(
+                child_path, child_spec, child, context
+            )
+            field = PreparedField(
+                generator=child,
+                source_prepared=context.prepare_generator(child, child_spec),
+                transforms=transforms,
+                is_paired=is_paired,
+                source_is_paired=bool(child.is_paired and uses_source),
+                uses_source=uses_source,
+                validators=self._resolve_validators(child_path, child_spec),
+                provider=plugin_provenance(self.registry, child_spec["type"]),
+            )
+            if child_path != path:
+                self._child_prepared[child_path] = self._as_child(field)
+        assert field is not None
+        return field
+
+    @staticmethod
+    def _as_child(field: PreparedField) -> tuple[Generator, Any]:
+        if not field.transforms and not field.validators:
+            return field.generator, field.source_prepared
+        return ChildPipelineGenerator(), ChildPipelineSpec(
+            field.generator,
+            field.source_prepared,
+            field.transforms,
+            field.uses_source,
+            field.validators,
+        )
+
     def _prepare_child(
         self,
         context: PreparationContext,
@@ -264,29 +297,11 @@ class EngineCompiler:
         location: str,
         nested_spec: Any,
     ) -> tuple[Generator, Any]:
-        child_path = f"{context.path}.{location.strip(chr(39))}"
-        context = replace(context, path=child_path)
-        child, source_prepared = prepare_child_spec(
-            parent_type,
-            location,
-            nested_spec,
-            self.registry,
-            context,
-        )
-        transforms, _is_paired, uses_source = self._prepare_transforms(
-            child_path, nested_spec, child, context
-        )
-        validators = self._resolve_validators(child_path, nested_spec)
-        if not transforms and not validators:
-            return child, source_prepared
-        self.has_child_pipelines = True
-        return ChildPipelineGenerator(), ChildPipelineSpec(
-            generator=child,
-            source_prepared=source_prepared,
-            transforms=transforms,
-            uses_source=uses_source,
-            validators=validators,
-        )
+        child_path = ".".join((context.path, location.strip("'")))
+        if child_path in self._child_prepared:
+            return self._child_prepared[child_path]
+        child = resolve_child_spec(parent_type, location, nested_spec, self.registry)
+        return self._as_child(self._prepare_tree(child_path, nested_spec, child))
 
     def _validate_id_references(self, prepared: Mapping[str, PreparedField]) -> None:
         for token in self.tokens:
@@ -302,31 +317,9 @@ class EngineCompiler:
         spec: Mapping[str, Any],
         generator: Generator,
     ) -> None:
-        self._validate_child_keys(path, ((None, spec, generator),))
-
-    def _validate_child_keys(
-        self,
-        path: str,
-        seeded: Iterable[tuple[str | None, Mapping[str, Any], Generator]] | None = None,
-        nested: Iterable[tuple[str, Mapping[str, Any]]] | None = None,
-    ) -> None:
-        """Key-check a spec and every child it declares, whoever owns them.
-
-        Generators and transforms both declare children through
-        ``nested_specs``, so both reach this one boundary with path-specific
-        diagnostics (CFG-004). The walk is iterative so nesting depth costs
-        no stack (SCALE-007).
-        """
-        pending: list[tuple[str, Mapping[str, Any], Generator]] = []
-        for location, spec, generator in seeded or ():
-            pending.append((path if location is None else f"{path}.{location}", spec, generator))
-        pending.extend(self._resolved_children(path, nested or ()))
-        while pending:
-            child_path, spec, generator = pending.pop()
-            error = extension_key_error(child_path, spec, generator.config_keys, COMMON_FIELD_KEYS)
-            if error is not None:
-                raise TemplateError(error)
-            pending.extend(self._resolved_children(child_path, generator.nested_specs(spec)))
+        error = extension_key_error(path, spec, generator.config_keys, COMMON_FIELD_KEYS)
+        if error is not None:
+            raise TemplateError(error)
 
     def _resolved_children(
         self,
@@ -385,10 +378,6 @@ class EngineCompiler:
             )
             if error is not None:
                 raise TemplateError(error)
-            self._validate_child_keys(
-                f"types.{type_key}.transforms[{index}]",
-                nested=transform.nested_specs(transform_spec),
-            )
             prepared.append(
                 PreparedTransform(
                     transform,

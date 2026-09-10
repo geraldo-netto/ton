@@ -2,62 +2,11 @@
 
 ## Open
 
-### Reliability / correctness
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
-### Scalability
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| SCALE-007 | open | high | large | Scalability: `AGENTS.md` forbids workload caps, but `_recursion.max_supported_depth` derives a hard nesting ceiling from an assumed 8,192 bytes per level and `ensure_depth_headroom` rejects valid specs above it, even with zero rows; a 1,026-level spec fails on the local 8 MB stack. It also changes the process-global recursion limit instead of implementing the approved iterative preparation. Resolve by making nested preparation/generation stack-safe without an estimated depth gate or global-limit mutation; cover default and explicitly supplied catalogs. |
-
-### Performance
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
-### Concurrency
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
-### Architecture / modularity / SOLID
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
-### Plugin extensibility
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
-### Configuration discoverability
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
-### Observability
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
-### Platform
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
-### Documentation
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
 ## Blocked / Deferred
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| PLAT-015 | blocked | high | small | Platform: verify the Windows CI lane with the Windows-only skip on `tests/test_scale_bounds.py::test_unlimited_stack_falls_back_to_an_assumed_size`. Blocked pending Windows CI results confirming that this test skips and the remaining suite passes; local Linux results cannot supply that evidence. Missing-module fallback coverage is tracked independently as PLAT-016. |
+| PLAT-015 | blocked | high | small | Platform: verify Windows CI skips `tests/test_scale_bounds.py::test_nested_generation_needs_no_finite_stack_report` and the remaining suite passes. Blocked pending Windows CI results; local Linux runs cannot provide this evidence. |
 
 ## Rejected / Won't fix
 

@@ -10,7 +10,7 @@ from random import Random
 
 import pytest
 
-from ton import _recursion, api
+from ton import api
 from ton._engine import Engine, TemplateError
 from ton._specsnapshot import snapshot_spec
 from ton.generators import Generator
@@ -259,27 +259,26 @@ def test_deeply_nested_composites_prepare_and_generate() -> None:
     assert list(api.generate(_nested_one_of(600), seed=1, proof_mode="all")) == ["x"]
 
 
-def test_nesting_beyond_the_process_stack_reports_the_operator_remedy() -> None:
-    """Past what the stack supports TON explains the fix; it does not crash."""
-    too_deep = _recursion.max_supported_depth() + 50
+def test_nesting_has_no_estimated_process_stack_ceiling() -> None:
+    """SCALE-007: valid specs exceed the removed 1,024-level estimate."""
+    before = sys.getrecursionlimit()
+    assert list(api.generate(_nested_one_of(1500), seed=1, proof_mode="all")) == ["x"]
+    assert sys.getrecursionlimit() == before
 
-    with pytest.raises(TemplateError, match="TON imposes no nesting limit of its own"):
-        list(api.generate(_nested_one_of(too_deep), seed=1))
 
-
-def test_depth_headroom_only_ever_raises_the_limit() -> None:
+def test_nested_generation_preserves_a_callers_larger_recursion_limit() -> None:
     """A caller that already raised the limit keeps its own setting."""
     original = sys.getrecursionlimit()
     sys.setrecursionlimit(original + 50_000)
     try:
-        _recursion.ensure_depth_headroom(10)
+        assert list(api.generate(_nested_one_of(600))) == ["x"]
         assert sys.getrecursionlimit() == original + 50_000
     finally:
         sys.setrecursionlimit(original)
 
 
 def test_spec_snapshot_is_stack_safe_independently_of_the_limit() -> None:
-    """Snapshotting runs before head-room is sized, so it must not recurse."""
+    """SCALE-007: snapshotting must be stack-safe independently of preparation."""
     spec: dict = {"type": "string", "values": ["x"]}
     for _ in range(5_000):
         spec = {"type": "oneOf", "choices": [spec]}
@@ -331,20 +330,101 @@ def test_snapshot_preserves_cyclic_metadata_without_recursion() -> None:
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Windows has no POSIX resource module (PLAT-015)")
-def test_unlimited_stack_falls_back_to_an_assumed_size(monkeypatch) -> None:
-    """An unlimited RLIMIT_STACK still yields a usable depth (SCALE-007)."""
+def test_nested_generation_needs_no_finite_stack_report(monkeypatch) -> None:
+    """SCALE-007: an unlimited POSIX stack needs no estimate to generate nested values."""
     import resource
 
     monkeypatch.setattr(
         resource, "getrlimit", lambda _which: (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
     )
 
-    assert _recursion._stack_bytes() == _recursion.DEFAULT_STACK_BYTES
-    assert _recursion.max_supported_depth() > 0
+    before = sys.getrecursionlimit()
+    assert list(api.generate(_nested_one_of(600), proof_mode="all")) == ["x"]
+    assert sys.getrecursionlimit() == before
 
 
-def test_missing_resource_module_has_a_usable_stack_fallback(monkeypatch) -> None:
-    """PLAT-016: exercise the non-POSIX branch without importing POSIX modules."""
+def test_nested_generation_works_without_resource_module(monkeypatch) -> None:
+    """PLAT-016: nested generation works without importing POSIX modules."""
     monkeypatch.setitem(sys.modules, "resource", None)
-    assert _recursion._stack_bytes() == _recursion.DEFAULT_STACK_BYTES
-    assert _recursion.max_supported_depth() > 0
+    before = sys.getrecursionlimit()
+    assert list(api.generate(_nested_one_of(600), proof_mode="all")) == ["x"]
+    assert sys.getrecursionlimit() == before
+
+
+@pytest.mark.parametrize("catalog", [False, True])
+@pytest.mark.parametrize("rows", [0, 1])
+def test_deep_composites_are_stack_safe_without_global_mutation(catalog, rows) -> None:
+    """SCALE-007: arbitrary nesting works with both catalogs without changing process limits."""
+    import subprocess
+
+    program = f"""
+import sys
+from ton import api
+before = sys.getrecursionlimit()
+leaf = {{"type": "string", "values": ["x"]}}
+spec = leaf
+for index in range(1500):
+    if index % 4 == 0:
+        spec = {{"type": "oneOf", "choices": [spec]}}
+    elif index % 4 == 1:
+        spec = {{"type": "weighted", "choices": [{{"spec": spec}}]}}
+    elif index % 4 == 2:
+        spec = {{"type": "sequence_of", "count": 1, "spec": spec}}
+    else:
+        spec = {{**leaf, "transforms": [{{"type": "distribution", "choices": [
+            {{"weight": 1, "spec": spec}}, {{"weight": 0, "spec": leaf}}]}}]}}
+config = {{"rows": {rows}, "format": "$x$", "types": {{"x": spec}}}}
+registry = api.build_extension_catalog().generators() if {catalog!r} else None
+assert list(api.generate(config, registry=registry, proof_mode="all")) == ["x"] * {rows}
+assert sys.getrecursionlimit() == before
+print("ok")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", program], capture_output=True, text=True, timeout=60
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"
+
+
+@pytest.mark.parametrize("catalog", [False, True])
+def test_cyclic_generator_specs_report_the_owning_path(catalog) -> None:
+    """SCALE-007: a cyclic ownership graph cannot be prepared as a finite spec tree."""
+    spec = {"type": "oneOf", "choices": []}
+    spec["choices"].append(spec)
+    config = {"rows": 0, "format": "$x$", "types": {"x": spec}}
+    registry = api.build_extension_catalog().generators() if catalog else None
+    with pytest.raises(
+        api.TemplateError, match=r"Cyclic generator specification at types.x.choices\[0\]"
+    ):
+        list(api.generate(config, registry=registry))
+
+
+def test_deep_composite_failure_can_be_audited() -> None:
+    """SCALE-007: rejection and audit serialization remain stack-safe at depth."""
+    import io
+
+    from ton._proofaudit import ProofAuditWriter
+
+    class Reject(Generator):
+        def generate(self, prepared, rng):
+            return "x"
+
+        def prove(self, prepared, result):
+            return api.ProofResult(False, "deep rejection")
+
+    config = _nested_one_of(1200)
+    leaf = config["types"]["x"]
+    while leaf["type"] == "oneOf":
+        leaf = leaf["choices"][0]
+    leaf["type"] = "reject"
+    registry = api.build_extension_catalog().generators()
+    registry["reject"] = Reject()
+    stream = io.StringIO()
+    engine = api.Engine(
+        config, registry=registry, proof_mode="audit", proof_failure_sink=ProofAuditWriter(stream)
+    )
+    assert list(engine) == ["x"]
+    assert engine.proof_failure_count == 1
+    assert engine.proof_failures[0].reason.endswith("deep rejection")
+    assert stream.getvalue().endswith("}\n")
+    assert '"schema":"ton.proof-audit/v2"' in stream.getvalue()

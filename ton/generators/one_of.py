@@ -24,9 +24,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any
+from typing import Any, cast
 
 from .._proof import ProofResult
+from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
 from .base import Generator, PreparationContext, drawn, prove_draws, proven_draws
 
@@ -66,19 +67,30 @@ class OneOfGenerator(Generator):
         )
         return OneOfSpec(children=children)
 
+    @cooperative
     def generate(self, prepared: OneOfSpec, rng: Random) -> str:
-        child_gen, child_prepared = rng.choice(prepared.children)
-        return drawn(child_gen, child_prepared, child_gen.generate(child_prepared, rng), prepared)
+        return cast(str, run_steps(self, "generate", prepared, rng))
 
+    def _generate_steps(self, prepared: OneOfSpec, rng: Random) -> Steps:
+        child_gen, child_prepared = rng.choice(prepared.children)
+        value = yield Call(child_gen, "generate", (child_prepared, rng))
+        return drawn(child_gen, child_prepared, value, prepared)
+
+    @cooperative
     def prove(self, prepared: OneOfSpec, result: TransformResult) -> ProofResult:
+        return cast(ProofResult, run_steps(self, "prove", prepared, result))
+
+    def _prove_steps(self, prepared: OneOfSpec, result: TransformResult) -> Steps:
         # Prove the branch that actually ran. Asking every child instead let a
         # permissive sibling mask the selected child's failure (REL-021).
         draws = proven_draws(result, prepared)
         if draws is not None:
-            return prove_draws(draws, "oneOf choice")
+            return (yield from prove_draws(draws, "oneOf choice"))
         # A value TON did not draw here (external or re-derived): it is valid
         # if any choice accepts it; permissive children never false-fail.
-        proofs = tuple(gen.prove(prep, result) for gen, prep in prepared.children)
+        proofs = []
+        for gen, prep in prepared.children:
+            proofs.append((yield Call(gen, "prove", (prep, result))))
         if any(proof.ok for proof in proofs):
             return ProofResult(ok=True)
         detail = next((proof.reason for proof in proofs if proof.reason), "")

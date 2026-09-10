@@ -33,9 +33,10 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from random import Random
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from .._proof import PreparedTransform, ProofResult, TransformStep, _trace_enabled
+from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
 from .._validation import ValidationError
 
@@ -213,10 +214,10 @@ def proven_draws(result: TransformResult, owner: object) -> tuple[ChildDraw, ...
     return value.draws
 
 
-def prove_draws(draws: tuple[ChildDraw, ...], label: str) -> ProofResult:
+def prove_draws(draws: tuple[ChildDraw, ...], label: str) -> Steps:
     """Prove every recorded draw against the child that produced it."""
     for draw in draws:
-        proof = draw.generator.prove(draw.prepared, TransformResult(draw.value))
+        proof = yield Call(draw.generator, "prove", (draw.prepared, TransformResult(draw.value)))
         if not proof.ok:
             reason = f"{label} failed its own proof"
             return ProofResult(
@@ -262,9 +263,13 @@ class ChildPipelineGenerator(Generator):
 
     type_name = "child_pipeline"
 
+    @cooperative
     def generate(self, prepared: ChildPipelineSpec, rng: Random) -> str:
+        return cast(str, run_steps(self, "generate", prepared, rng))
+
+    def _generate_steps(self, prepared: ChildPipelineSpec, rng: Random) -> Steps:
         source = TransformResult(
-            prepared.generator.generate(prepared.source_prepared, rng)
+            (yield Call(prepared.generator, "generate", (prepared.source_prepared, rng)))
             if prepared.uses_source
             else ""
         )
@@ -272,7 +277,7 @@ class ChildPipelineGenerator(Generator):
         steps: list[TransformStep] | None = [] if _trace_enabled.get() else None
         for transform in prepared.transforms:
             before = result
-            result = transform.transform.apply(transform.prepared, before, rng)
+            result = yield Call(transform.transform, "apply", (transform.prepared, before, rng))
             if steps is not None:
                 steps.append(TransformStep(transform, before, result))
         for validator in prepared.validators:
@@ -282,19 +287,23 @@ class ChildPipelineGenerator(Generator):
             return result.value
         return _GeneratedChildValue(result.value, prepared, source, tuple(steps))
 
+    @cooperative
     def prove(self, prepared: ChildPipelineSpec, result: TransformResult) -> ProofResult:
+        return cast(ProofResult, run_steps(self, "prove", prepared, result))
+
+    def _prove_steps(self, prepared: ChildPipelineSpec, result: TransformResult) -> Steps:
         value = result.value
         if not isinstance(value, _GeneratedChildValue) or value.pipeline is not prepared:
             return ProofResult(ok=True)
         if prepared.uses_source:
-            source_proof = prepared.generator.prove(prepared.source_prepared, value.source)
+            source_proof = yield Call(
+                prepared.generator, "prove", (prepared.source_prepared, value.source)
+            )
             if not source_proof.ok:
                 return source_proof
         for step in value.steps:
-            proof = step.prepared.transform.prove(
-                step.prepared.prepared,
-                step.before,
-                step.after,
+            proof = yield Call(
+                step.prepared.transform, "prove", (step.prepared.prepared, step.before, step.after)
             )
             if not proof.ok:
                 return ProofResult(ok=False, reason=proof.reason)
@@ -511,6 +520,15 @@ def prepare_child_spec(
     unknown type, or names a paired generator (which would silently
     lose its ``[id]`` half once nested -- REL-019).
     """
+    child = resolve_child_spec(parent_type, location, nested_spec, registry)
+    preparation = context or PreparationContext(registry)
+    return child, preparation.prepare_generator(child, nested_spec)
+
+
+def resolve_child_spec(
+    parent_type: str, location: str, nested_spec: Any, registry: Mapping[str, Generator]
+) -> Generator:
+    """Resolve and validate a child before iterative preparation schedules it."""
     if not isinstance(nested_spec, Mapping) or "type" not in nested_spec:
         raise ValueError(f"{parent_type} {location} must be an object with a 'type' field")
     from .._registry import resolve_reference
@@ -525,5 +543,4 @@ def prepare_child_spec(
             "paired generators cannot be nested inside a composite generator "
             "(the [id] half would be unreachable)"
         )
-    preparation = context or PreparationContext(registry)
-    return child, preparation.prepare_generator(child, nested_spec)
+    return child

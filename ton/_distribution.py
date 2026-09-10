@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from ._proof import ProofResult
 from ._speckeys import require_known_keys
+from ._steps import Call, Steps, cooperative, run_steps
 
 _CHOICE_KEYS = frozenset(("weight", "spec"))
 
@@ -32,27 +33,38 @@ class WeightedChoiceSet:
     cum_weights: tuple[float, ...]
     children: tuple[tuple[Any, Any], ...]
 
+    @cooperative
     def choose(self, rng: Random) -> str:
+        return cast(str, run_steps(self, "choose", rng))
+
+    def _choose_steps(self, rng: Random) -> Steps:
         from .generators.base import drawn
 
         index = weighted_index(self.cum_weights, rng)
         generator, prepared = self.children[index]
-        return drawn(generator, prepared, cast(str, generator.generate(prepared, rng)), self)
+        value = yield Call(generator, "generate", (prepared, rng))
+        return drawn(generator, prepared, value, self)
 
+    @cooperative
     def prove(self, result: Any) -> ProofResult:
+        return cast(ProofResult, run_steps(self, "prove", result))
+
+    def _prove_steps(self, result: Any) -> Steps:
         """Evaluate each selected child once and carry its original rejection (REL-038)."""
         from .generators.base import proven_draws
 
         draws = proven_draws(result, self)
         if draws is not None:
             for draw in draws:
-                proof = draw.generator.prove(draw.prepared, _as_result(draw.value))
+                proof = yield Call(draw.generator, "prove", (draw.prepared, _as_result(draw.value)))
                 if not proof.ok:
                     return proof
             return ProofResult(True)
-        return ProofResult(
-            any(generator.prove(prepared, result).ok for generator, prepared in self.children)
-        )
+        for generator, prepared in self.children:
+            proof = yield Call(generator, "prove", (prepared, result))
+            if proof.ok:
+                return ProofResult(True)
+        return ProofResult(False)
 
 
 def prepare_distribution(

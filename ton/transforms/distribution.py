@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from random import Random
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from .._distribution import WeightedChoiceSet, prepare_distribution
+from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import BaseTransform, TransformCapabilities, TransformProof, TransformResult
 from ..generators.base import PreparationContext
 
@@ -45,25 +46,36 @@ class DistributionTransform(BaseTransform):
             context=context,
         )
 
+    @cooperative
     def apply(
         self,
         prepared: WeightedChoiceSet,
         value: TransformResult,
         rng: Random,
     ) -> TransformResult:
-        del value
-        return TransformResult(prepared.choose(rng))
+        return cast(TransformResult, run_steps(self, "apply", prepared, value, rng))
 
+    def _apply_steps(
+        self, prepared: WeightedChoiceSet, value: TransformResult, rng: Random
+    ) -> Steps:
+        return TransformResult((yield Call(prepared, "choose", (rng,))))
+
+    @cooperative
     def prove(
         self,
         prepared: WeightedChoiceSet,
         before: TransformResult,
         after: TransformResult,
     ) -> TransformProof:
+        return cast(TransformProof, run_steps(self, "prove", prepared, before, after))
+
+    def _prove_steps(
+        self, prepared: WeightedChoiceSet, before: TransformResult, after: TransformResult
+    ) -> Steps:
         # apply() discards the source value and emits a child draw, so the
         # emitted value -- not the source -- is what must be proven (REL-001).
         del before
-        proof = prepared.prove(after)
+        proof = yield Call(prepared, "prove", (after,))
         if proof.ok:
             return TransformProof(ok=True)
         detail = proof.reason

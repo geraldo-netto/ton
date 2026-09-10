@@ -23,9 +23,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any
+from typing import Any, cast
 
 from .._proof import ProofResult, _trace_enabled
+from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
 from .base import (
     ChildDraw,
@@ -70,9 +71,15 @@ class SequenceOfGenerator(Generator):
         child = context.prepare_child("sequence_of", "'spec'", spec.get("spec"))
         return SequenceOfSpec(count=count, separator=separator, child=child)
 
+    @cooperative
     def generate(self, prepared: SequenceOfSpec, rng: Random) -> str:
+        return cast(str, run_steps(self, "generate", prepared, rng))
+
+    def _generate_steps(self, prepared: SequenceOfSpec, rng: Random) -> Steps:
         child_gen, child_prepared = prepared.child
-        parts = [child_gen.generate(child_prepared, rng) for _ in range(prepared.count)]
+        parts = []
+        for _ in range(prepared.count):
+            parts.append((yield Call(child_gen, "generate", (child_prepared, rng))))
         if not _trace_enabled.get():
             return prepared.separator.join(parts)
         # Keep every element's own draw: joining into plain text dropped the
@@ -83,12 +90,16 @@ class SequenceOfGenerator(Generator):
             prepared,
         )
 
+    @cooperative
     def prove(self, prepared: SequenceOfSpec, result: TransformResult) -> ProofResult:
+        return cast(ProofResult, run_steps(self, "prove", prepared, result))
+
+    def _prove_steps(self, prepared: SequenceOfSpec, result: TransformResult) -> Steps:
         # Elements TON generated carry their own draws, so every element is
         # proven even with an empty or ambiguous separator (REL-023).
         draws = proven_draws(result, prepared)
         if draws is not None:
-            return prove_draws(draws, "sequence_of element")
+            return (yield from prove_draws(draws, "sequence_of element"))
         # A value TON did not generate here can only be split heuristically:
         # attempt it when a non-empty separator yields exactly ``count`` parts,
         # otherwise stay permissive rather than risk a false failure.
@@ -99,7 +110,7 @@ class SequenceOfGenerator(Generator):
         if len(parts) != prepared.count:
             return ProofResult(ok=True)
         for part in parts:
-            proof = child_gen.prove(child_prepared, TransformResult(part))
+            proof = yield Call(child_gen, "prove", (child_prepared, TransformResult(part)))
             if not proof.ok:
                 return ProofResult(ok=False, reason=f"sequence_of element failed: {proof.reason}")
         return ProofResult(ok=True)

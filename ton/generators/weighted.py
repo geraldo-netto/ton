@@ -28,13 +28,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from random import Random
-from typing import Any
+from typing import Any, cast
 
 from .._distribution import (
     WeightedChoiceSet,
     prepare_distribution,
 )
 from .._proof import ProofResult
+from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import TransformResult
 from .base import Generator, PreparationContext
 
@@ -81,12 +82,20 @@ class WeightedGenerator(Generator):
             distribution=distribution,
         )
 
+    @cooperative
     def generate(self, prepared: WeightedSpec, rng: Random) -> str:
-        return prepared.distribution.choose(rng)
+        return cast(str, run_steps(self, "generate", prepared, rng))
 
+    def _generate_steps(self, prepared: WeightedSpec, rng: Random) -> Steps:
+        return (yield Call(prepared.distribution, "choose", (rng,)))
+
+    @cooperative
     def prove(self, prepared: WeightedSpec, result: TransformResult) -> ProofResult:
+        return cast(ProofResult, run_steps(self, "prove", prepared, result))
+
+    def _prove_steps(self, prepared: WeightedSpec, result: TransformResult) -> Steps:
         # Recurse into the child that was drawn (REL-001, REL-022).
-        proof = prepared.distribution.prove(result)
+        proof = yield Call(prepared.distribution, "prove", (result,))
         if proof.ok:
             return ProofResult(ok=True)
         detail = proof.reason

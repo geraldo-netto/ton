@@ -202,3 +202,26 @@ def test_plain_composites_allocate_traces_only_on_checked_rows(kind, mode, check
         100 if kind == "sequence_of" else 1
     )
     assert _trace_enabled.get() is True
+
+
+def test_interrupted_composite_unwinds_work_stack_and_trace_context() -> None:
+    """SCALE-007: an interruption closes nested tasks and restores caller state."""
+
+    class Interrupted(api.Generator):
+        def generate(self, prepared, rng):
+            raise KeyboardInterrupt
+
+    registry = api.build_extension_catalog().generators()
+    registry["interrupt"] = Interrupted()
+    config = {
+        "rows": 1,
+        "format": "$x$",
+        "types": {"x": {"type": "oneOf", "choices": [{"type": "interrupt"}]}},
+    }
+    engine = api.Engine(config, registry=registry, proof_mode="all")
+    with pytest.raises(KeyboardInterrupt):
+        list(engine)
+    assert _trace_enabled.get() is True
+    assert engine.rows_emitted == 0
+    assert engine._iteration_lock.acquire(blocking=False)
+    engine._iteration_lock.release()

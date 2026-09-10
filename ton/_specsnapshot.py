@@ -54,8 +54,8 @@ def snapshot_spec(value: Any, *, immutable: bool = False) -> Any:
     """Return a deep, independently owned copy, optionally through read-only containers.
 
     Copying iteratively keeps engine construction stack-safe for deeply
-    nested composite specs: this runs before the compiler can size its
-    recursion head-room, so it must not recurse itself (SCALE-007).
+    nested composite specs, independently of the caller's recursion limit
+    and the compiler's preparation work stack (SCALE-007).
     """
     root: list[Any] = [None]
     # Preserve aliases and cycles within the isolated graph (SCALE-012).

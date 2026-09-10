@@ -1081,3 +1081,35 @@ def test_nested_generator_crash_preserves_origin(location, proof_mode, caplog):
     with caplog.at_level("ERROR", logger="ton"), pytest.raises(GeneratorExecutionError) as error:
         next(rows)
     _assert_originating_failure(error.value, cause, caplog, "Generator", "CrashGenerator")
+
+
+@pytest.mark.parametrize("location", ["root", "oneOf", "sequence_of", "weighted", "distribution"])
+@pytest.mark.parametrize("proof_mode", ["off", "all"])
+def test_nested_transform_crash_preserves_origin(location, proof_mode, caplog):
+    """REL-056: a child transform crash remains a transform error at every depth."""
+    from ton import api
+    from ton._registry import default_transforms
+
+    cause = RuntimeError("transform boom")
+
+    class CrashTransform(BaseTransform):
+        type_name = "crash"
+
+        def __init__(self):
+            self.calls = 0
+
+        def apply(self, prepared, value, rng):
+            self.calls += 1
+            if self.calls == 2:
+                raise cause
+            return value
+
+    transforms = {**default_transforms(), "crash": CrashTransform()}
+    child = {"type": "string", "values": ["x"], "transforms": [{"type": "crash"}]}
+    field = _nested_failure_field(child, location)
+    config = {"rows": 3, "format": "$x$", "types": {"x": field}}
+    rows = api.generate(config, transforms=transforms, proof_mode=proof_mode)
+    assert next(rows) == "x"
+    with caplog.at_level("ERROR", logger="ton"), pytest.raises(TransformExecutionError) as error:
+        next(rows)
+    _assert_originating_failure(error.value, cause, caplog, "Transform", "crash")

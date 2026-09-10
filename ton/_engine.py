@@ -87,6 +87,12 @@ class ValidatorExecutionError(PipelineStageError):
     """A validator raised instead of returning a result."""
 
 
+_OPERATION_ERROR_TYPES = {
+    "Generator": GeneratorExecutionError,
+    "Transform": TransformExecutionError,
+}
+
+
 @dataclass(frozen=True)
 class EngineOptions:
     """Bundle of engine construction options (DEC-001).
@@ -562,7 +568,7 @@ class Engine:
         redact: bool = False,
     ) -> NoReturn:
         if isinstance(cause, OperationError):
-            error_type, stage = GeneratorExecutionError, cause.stage
+            error_type, stage = _OPERATION_ERROR_TYPES[cause.stage], cause.stage
             reference, cause = cause.reference, cause.cause
         if isinstance(cause, ValidatorHookError):
             error_type, stage = ValidatorExecutionError, "Validator"

@@ -2,12 +2,6 @@
 
 ## Open
 
-### Reliability / correctness
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| REL-056 | open | medium | medium | Reliability/correctness: preserve nested transform exception attribution in `ChildPipelineGenerator._generate_steps` and engine error translation. A transform raising `RuntimeError` produces `TransformExecutionError(reference='crash')` at the root, but becomes `GeneratorExecutionError(reference='OneOfGenerator')` inside oneOf or is attributed to the outer distribution transform. Add permanent root/nested regressions for public error type, transform reference, cause and row log context before fixing. |
-
 ### Observability
 
 | id | status | severity | effort | description |

@@ -83,4 +83,6 @@ def _attribute_error(request: Call, error: Exception) -> Exception:
         return error
     if request.operation == "generate":
         return OperationError("Generator", type(request.target).__name__, error)
+    if request.operation == "apply":
+        return OperationError("Transform", request.target.type_name, error)
     return error

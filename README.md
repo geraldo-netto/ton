@@ -365,7 +365,11 @@ for row in api.generate(config_dict,
 
 `ExtensionCatalog` treats registered generator instances as prototypes. Each
 `catalog.generators()` call returns fresh deep-copied instances, so reusing a
-catalog across Engines does not share generator state. Generator attributes
+catalog across Engines does not share generator state. Engine construction also
+copies supplied registry, transform, and validator mappings together, so reusing
+an `EngineOptions` or registry mapping is safe. Read-only mapping containers are
+accepted; registered aliases and shared dependencies stay shared within one
+Engine. Supplied plugin instances remain unchanged. Generator attributes
 must therefore support `copy.deepcopy`. Use `catalog.snapshot()` when combining
 generators, transforms, and validators: it clones all three kinds atomically and
 preserves dependencies shared between them within that snapshot.

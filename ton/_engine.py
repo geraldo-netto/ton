@@ -124,7 +124,8 @@ class Engine:
 
     An Engine is a single-shot iterator. Construct a new Engine for each
     pass so seeded RNG and generator-owned prepared state have one clear
-    lifecycle.
+    lifecycle. Supplied extension mappings contain prototypes: their instances
+    are copied together for each Engine, preserving shared dependencies locally.
     """
 
     def __init__(

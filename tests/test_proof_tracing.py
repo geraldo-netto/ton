@@ -74,6 +74,15 @@ def test_traces_follow_sampling_without_changing_draws_or_validators(
         )
     )
     transform, validator = RecordingTransform(), RecordingValidator()
+    engine = api.Engine.from_config(
+        config,
+        seed=7,
+        transforms={"record": transform},
+        validators={"record": validator},
+        proof_mode=mode,
+        proof_sample_rate=3,
+    )
+    field = engine._plan.prepared["x"]
     with (
         mock.patch("ton._engine.TransformStep", wraps=TransformStep) as root_trace,
         mock.patch("ton._pipeline.TransformStep", wraps=TransformStep) as child_trace,
@@ -81,21 +90,13 @@ def test_traces_follow_sampling_without_changing_draws_or_validators(
             _GeneratedChildValue, "__new__", wraps=_GeneratedChildValue.__new__
         ) as child_value,
     ):
-        generated = list(
-            api.generate(
-                config,
-                seed=7,
-                transforms={"record": transform},
-                validators={"record": validator},
-                proof_mode=mode,
-                proof_sample_rate=3,
-            )
-        )
+        generated = list(engine)
 
     assert generated == expected
-    assert validator.values[1::2] == expected
-    assert len(validator.values) == 20
-    assert len(transform.proven) == checked_rows * 2
+    assert field.validators[0].values[1::2] == expected
+    assert len(field.validators[0].values) == 20
+    assert len(field.transforms[0].transform.proven) == checked_rows * 2
+    assert validator.values == transform.proven == []  # ARCH-030: supplied objects are prototypes.
     assert root_trace.call_count == child_trace.call_count == child_value.call_count == checked_rows
 
 
@@ -104,17 +105,17 @@ def test_unchecked_nested_rows_still_run_failing_validators(mode: str) -> None:
     config = _nested_config(rows=1)
     validator = mock.Mock(type_name="record")
     validator.validate.return_value = False
+    engine = api.Engine.from_config(
+        config,
+        transforms={"record": RecordingTransform()},
+        validators={"record": validator},
+        proof_mode=mode,
+        proof_sample_rate=3,
+    )
     with pytest.raises(api.ValidationError, match="Nested value failed validator"):
-        list(
-            api.generate(
-                config,
-                transforms={"record": RecordingTransform()},
-                validators={"record": validator},
-                proof_mode=mode,
-                proof_sample_rate=3,
-            )
-        )
-    validator.validate.assert_called_once()
+        list(engine)
+    engine._plan.prepared["x"].validators[0].validate.assert_called_once()
+    validator.validate.assert_not_called()
     assert _trace_enabled.get() is True
 
 
@@ -135,7 +136,8 @@ def test_trace_context_resets_before_yield_and_preserves_standalone_proofs() -> 
     result = child.generate(prepared, Random(0))
     assert isinstance(result, _GeneratedChildValue)
     assert child.prove(prepared, TransformResult(result)).ok
-    assert transform.proven == [result]
+    assert prepared.transforms[0].transform.proven == [result]
+    assert transform.proven == []
 
 
 class ReentrantGenerator(api.Generator):
@@ -157,20 +159,20 @@ def test_nested_engine_restores_the_parent_proof_decision() -> None:
     config = _nested_config(rows=1)
     config["types"]["x"]["choices"][0] = {"type": "reentrant", "transforms": [{"type": "record"}]}
     transform = RecordingTransform()
-    rows = list(
-        api.generate(
-            config,
-            registry={
-                "oneOf": api.build_extension_catalog().get_data_type("oneOf"),
-                "reentrant": ReentrantGenerator(),
-            },
-            transforms={"record": transform},
-            validators={"record": RecordingValidator()},
-            proof_mode="all",
-        )
+    engine = api.Engine.from_config(
+        config,
+        registry={
+            "oneOf": api.build_extension_catalog().get_data_type("oneOf"),
+            "reentrant": ReentrantGenerator(),
+        },
+        transforms={"record": transform},
+        validators={"record": RecordingValidator()},
+        proof_mode="all",
     )
+    rows = list(engine)
     assert len(rows) == 1
-    assert len(transform.proven) == 2
+    assert len(engine._plan.prepared["x"].transforms[0].transform.proven) == 2
+    assert transform.proven == []
     assert _trace_enabled.get() is True
 
 

@@ -2,6 +2,9 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
+from types import MappingProxyType
+
+import pytest
 
 from ton import api
 
@@ -116,3 +119,80 @@ def test_catalog_snapshot_waits_for_catalog_mutation_lock():
             catalog.register_validator("example", "new", IssuedValidator(set()))
         result = future.result(timeout=5)
     assert "example.new" in result.validators
+
+
+class Counter(api.Generator):
+    type_name = "counter"
+
+    def __init__(self):
+        self.count = 0
+
+    def generate(self, prepared, rng):
+        value = self.count
+        self.count += 1
+        return str(value)
+
+
+class CountingTransform(IssuedTransform):
+    type_name = "count"
+
+    def __init__(self):
+        self.count = 0
+
+    def apply(self, prepared, value, rng):
+        result = api.TransformResult(f"{value.value}:{self.count}")
+        self.count += 1
+        return result
+
+
+class TwoRowsValidator:
+    type_name = "two_rows"
+
+    def __init__(self):
+        self.count = 0
+
+    def validate(self, value):
+        self.count += 1
+        return self.count <= 2
+
+
+@pytest.mark.parametrize("mapping", [dict, MappingProxyType])
+@pytest.mark.parametrize("worker", [False, True])
+def test_engine_construction_owns_supplied_extension_state(mapping, worker):
+    """ARCH-030: reused input mappings/options are prototypes, not shared runtime state."""
+    generator, transform, validator = Counter(), CountingTransform(), TwoRowsValidator()
+    options = api.EngineOptions(
+        registry=mapping({"example.counter": generator}),
+        transforms=mapping({"example.count": transform}),
+        validators=mapping({"example.two_rows": validator}),
+        seed=42,
+    )
+    config = {
+        "rows": 2,
+        "format": "$x$",
+        "types": {
+            "x": {
+                "type": "example.counter",
+                "transforms": [{"type": "example.count"}],
+                "validators": ["example.two_rows"],
+            }
+        },
+    }
+
+    def build(index):
+        if worker:
+            return api.fork_engine(
+                config,
+                parent_seed=42,
+                worker_id=index,
+                registry=options.registry,
+                transforms=options.transforms,
+                validators=options.validators,
+            )
+        return api.Engine.from_options(config, options)
+
+    first, second = build(0), build(1)
+    assert list(first) == ["0:0", "1:1"]
+    assert list(second) == ["0:0", "1:1"]
+    assert list(build(2)) == ["0:0", "1:1"]
+    assert generator.count == transform.count == validator.count == 0

@@ -109,6 +109,32 @@ class CatalogSnapshot:
     validators: Mapping[str, Validator]
 
 
+def snapshot_inputs(
+    generators: Mapping[str, Generator] | None,
+    transforms: Mapping[str, Transform] | None,
+    validators: Mapping[str, Validator] | None,
+) -> tuple[
+    Mapping[str, Generator] | None,
+    Mapping[str, Transform] | None,
+    Mapping[str, Validator] | None,
+]:
+    """Give one Engine ownership of all supplied prototypes in a single copy graph."""
+    return deepcopy(
+        (
+            _input_mapping(generators),
+            _input_mapping(transforms),
+            _input_mapping(validators),
+        )
+    )
+
+
+def _input_mapping[T](values: Mapping[str, T] | None) -> Mapping[str, T] | None:
+    """Normalize read-only containers without losing aliases or provider records."""
+    if values is None:
+        return None
+    return values.copy() if isinstance(values, RegisteredExtensions) else dict(values)
+
+
 class ExtensionCatalog:
     """Namespaced catalog for data types, transforms, and validators."""
 

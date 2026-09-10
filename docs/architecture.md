@@ -51,6 +51,11 @@ within that snapshot while isolating mutable extension state between Engines.
 Use `catalog.snapshot()` to obtain all three kinds under one lock with a shared
 copy memo, preserving dependencies between a generator, transform, and validator.
 Its `CatalogSnapshot` exposes `generators`, `transforms`, and `validators` mappings.
+Engine construction treats supplied mappings as prototypes too, normalizing their
+containers and copying all three extension kinds with one memo. Reusing mappings
+or `EngineOptions` therefore creates independent runtime state without breaking
+within-engine aliases or shared dependencies. Plugin attributes must support
+deep copying; runtime mutations do not change the caller's supplied prototypes.
 
 ## Generation Pipeline
 

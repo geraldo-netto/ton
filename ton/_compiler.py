@@ -13,11 +13,11 @@ from ._pipeline import ChildPipelineGenerator, ChildPipelineSpec
 from ._proof import PreparedField, PreparedTransform
 from ._references import RegistryError, normalize_reference, resolve_reference, runtime_type_name
 from ._registry import (
-    RegisteredExtensions,
     default_transforms,
     default_validators,
     make_registry,
     plugin_provenance,
+    snapshot_inputs,
 )
 from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
 from ._specpath import SpecPath, format_spec_path
@@ -65,6 +65,7 @@ class EngineCompiler:
         validators: Mapping[str, Validator] | None,
         prepare_all_fields: bool = False,
     ) -> None:
+        registry, transforms, validators = snapshot_inputs(registry, transforms, validators)
         self.template = str(config["format"])
         # One isolated snapshot per engine: the plan retained the caller's
         # nested mappings, so mutating a values list after the first row
@@ -130,7 +131,7 @@ class EngineCompiler:
         self, registry: Mapping[str, Generator] | None
     ) -> Mapping[str, Generator]:
         if registry is not None:
-            return registry.copy() if isinstance(registry, RegisteredExtensions) else dict(registry)
+            return registry
         root_specs: list[Mapping[str, Any]] = []
         for type_key in self.field_keys:
             spec = self.types.get(type_key)

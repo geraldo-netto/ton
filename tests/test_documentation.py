@@ -7,6 +7,7 @@ import json
 import re
 import tomllib
 from pathlib import Path
+from textwrap import dedent
 
 import pytest
 
@@ -21,14 +22,19 @@ PRE_COMMIT = (ROOT / ".githooks" / "pre-commit").read_text(encoding="utf-8")
 SEQUENCE_MODULE = (ROOT / "ton" / "generators" / "sequence.py").read_text(encoding="utf-8")
 
 
-def test_library_streaming_example_preserves_record_boundaries() -> None:
+@pytest.mark.parametrize("documentation", [README, api.__doc__], ids=["readme", "api"])
+def test_library_streaming_example_preserves_record_boundaries(documentation) -> None:
     """Running the documented snippet must yield separable records (DOC-009).
 
     Counting the literal only proved the text was present; rows carry no
     terminator, so the previous snippet concatenated every record.
     """
-    snippet = README.split("# Streaming form for large outputs", 1)[1].split("```", 1)[0]
-    assert 'sink.write(f"{row}\\n")' in snippet
+    match = re.search(
+        r"(?m)^([ \t]*)for row in api.generate\(config_dict, seed=42\):\n\1    sink.write[^\n]+",
+        documentation,
+    )
+    assert match is not None
+    snippet = dedent(match.group())
 
     config = {
         "rows": 3,
@@ -36,8 +42,7 @@ def test_library_streaming_example_preserves_record_boundaries() -> None:
         "types": {"x": {"type": "integer", "minValue": 1, "maxValue": 9}},
     }
     sink = io.StringIO()
-    for row in api.generate(config, seed=42):
-        sink.write(f"{row}\n")
+    exec(snippet, {"api": api, "config_dict": config, "sink": sink})
 
     assert sink.getvalue().splitlines() == list(api.generate(config, seed=42))
 

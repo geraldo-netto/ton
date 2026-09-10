@@ -31,7 +31,7 @@ Typical use::
 
     # Streaming form for large outputs:
     for row in api.generate(config_dict, seed=42):
-        sink.write(row)
+        sink.write(f"{row}\\n")
 
     # Opt into third-party entry points when you trust the installed packages:
     catalog = api.build_extension_catalog(include_entry_points=True)

@@ -14,12 +14,6 @@
 |---|---|---|---|---|
 | CFG-029 | open | medium | small | Configuration discoverability: reject the bcrypt-only `rounds` option for other algorithms in `ton/generators/hash.py::HashGenerator.prepare`, as already done for `cache`. `algorithm="sha256", rounds="invalid"` currently validates and silently ignores the option. Add direct, catalog-validation, and CLI regressions for irrelevant rounds before fixing. |
 
-### Scalability
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| SCALE-016 | open | high | medium | Scalability: preserve finite decimal weights in `ton/_distribution.py::coerce_weight`, `validate_weights`, and cumulative sampling. Equal positive weights `Decimal("1e-400")` become zero and reject the job; `Decimal("1e400")` becomes infinity and also rejects it. Use exact proportional arithmetic without float precision or exponent ceilings. Add permanent JSON and in-memory regressions for tiny/large equal weights, mixed magnitudes, zero weights, and deterministic selection thresholds for both weighted generators and distribution transforms. |
-
 ### Concurrency
 
 | id | status | severity | effort | description |

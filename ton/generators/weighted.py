@@ -27,6 +27,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from fractions import Fraction
 from random import Random
 from typing import Any, cast
 
@@ -42,8 +43,8 @@ from .base import Generator, PreparationContext
 
 @dataclass(frozen=True)
 class WeightedSpec:
-    weights: tuple[float, ...]
-    cum_weights: tuple[float, ...]
+    weights: tuple[Fraction, ...]
+    cum_weights: tuple[int, ...]
     distribution: WeightedChoiceSet
 
 

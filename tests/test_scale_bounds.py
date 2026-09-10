@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import sys
 from decimal import Decimal, localcontext
@@ -117,6 +118,54 @@ def test_row_width_guards_composite_and_unknown_width_values() -> None:
 
 
 BIG = 10**4300
+
+
+@pytest.mark.parametrize("as_json", [False, True])
+@pytest.mark.parametrize("transform", [False, True])
+@pytest.mark.parametrize(
+    "weights,draws",
+    [
+        (("1e-400", "1e-400"), [(0, "v1"), (1, "v2")]),
+        (("1e400", "1e400"), [(0, "v1"), (1, "v2")]),
+        (("1e-400", "1e400"), [(0, "v1"), (1, "v2"), (10**800, "v2")]),
+    ],
+)
+def test_exact_weight_thresholds_preserve_all_positive_choices(
+    as_json, transform, weights, draws, tmp_path
+) -> None:
+    """SCALE-016: exact integer draws preserve tiny, huge and zero-weight intervals."""
+
+    class Draw(Random):
+        def __init__(self, value):
+            super().__init__(0)
+            self.value = value
+
+        def randrange(self, stop):
+            assert 0 <= self.value < stop
+            return self.value
+
+    weights = ("0", *weights, "0")
+    distribution = {
+        "type": "weighted",
+        "choices": [
+            {"weight": Decimal(weight), "spec": {"type": "string", "values": [f"v{index}"]}}
+            for index, weight in enumerate(weights)
+        ],
+    }
+    field = distribution
+    if transform:
+        distribution["type"] = "distribution"
+        field = {"type": "string", "values": ["unused"], "transforms": [distribution]}
+    config = {"rows": 1, "format": "$x$", "types": {"x": field}}
+    if as_json:
+        payload = json.dumps(config, default=str)
+        for weight in weights:
+            payload = payload.replace(json.dumps(weight), weight)
+        path = tmp_path / "weights.json"
+        path.write_text(payload)
+        config = api.load_config(path)
+    for draw, expected in draws:
+        assert list(api.Engine(config, rng=Draw(draw), proof_mode="all")) == [expected]
 
 
 @pytest.mark.parametrize("sign", ["", "+", "-"])

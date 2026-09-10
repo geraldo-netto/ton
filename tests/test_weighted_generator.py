@@ -24,6 +24,13 @@ def _choices(*weights: object) -> dict[str, object]:
     }
 
 
+@pytest.mark.parametrize("value", [None, {}, [], "not-numeric"])
+def test_exact_weights_reject_non_numeric_inputs(value) -> None:
+    """SCALE-016: exact arithmetic retains contextual numeric validation."""
+    with pytest.raises(ValueError, match="must be numeric"):
+        WeightedGenerator().prepare(_choices(value, 1), PreparationContext(make_registry()))
+
+
 def test_weighted_rejects_empty_choices() -> None:
     """REL-048: validate current choices with a real composite context."""
     generator = WeightedGenerator()

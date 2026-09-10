@@ -5,7 +5,10 @@ from __future__ import annotations
 from bisect import bisect
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from math import isfinite
+from decimal import Decimal, InvalidOperation
+from fractions import Fraction
+from itertools import accumulate
+from math import gcd, lcm
 from random import Random
 from typing import TYPE_CHECKING, Any, cast
 
@@ -29,8 +32,8 @@ def _as_result(value: str) -> Any:
 class WeightedChoiceSet:
     """Weights paired with prepared child generators."""
 
-    weights: tuple[float, ...]
-    cum_weights: tuple[float, ...]
+    weights: tuple[Fraction, ...]
+    cum_weights: tuple[int, ...]
     children: tuple[tuple[Any, Any], ...]
 
     @cooperative
@@ -80,7 +83,7 @@ def prepare_distribution(
     raw_choices = spec.get("choices")
     if not isinstance(raw_choices, list) or len(raw_choices) < min_choices:
         raise ValueError(_choices_error(label, min_choices))
-    weights: list[float] = []
+    weights: list[Fraction] = []
     children: list[tuple[Any, Any]] = []
     preparation = context or PreparationContext(registry)
     for index, choice in enumerate(raw_choices):
@@ -96,7 +99,7 @@ def _prepare_choice(
     choice: Any,
     context: Any,
     label: str,
-) -> tuple[float, tuple[Any, Any]]:
+) -> tuple[Fraction, tuple[Any, Any]]:
     if not isinstance(choice, Mapping):
         raise ValueError(
             f"{label} 'choices[{index}]' must be an object with 'weight' and 'spec' keys"
@@ -108,59 +111,47 @@ def _prepare_choice(
     return weight, child
 
 
-def _coerce_weight(index: int, choice: Mapping[str, Any], label: str) -> float:
+def _coerce_weight(index: int, choice: Mapping[str, Any], label: str) -> Fraction:
     if "weight" not in choice:
-        return 1.0
+        return Fraction(1)
     return coerce_weight(choice["weight"], f"{label} 'choices[{index}].weight'")
 
 
-def coerce_weight(value: Any, location: str) -> float:
+def coerce_weight(value: Any, location: str) -> Fraction:
     """Convert a configured weight without accepting JSON booleans as numbers."""
     if isinstance(value, bool):
         raise ValueError(f"{location} must be numeric")
     try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
+        value = Decimal(value) if isinstance(value, str) else value
+    except InvalidOperation as exc:
         raise ValueError(f"{location} must be numeric") from exc
+    try:
+        return Fraction(value)
+    except TypeError as exc:
+        raise ValueError(f"{location} must be numeric") from exc
+    except (ValueError, OverflowError) as exc:
+        raise ValueError(f"{location} must be finite") from exc
 
 
-def validate_weights(weights: Sequence[float], label: str) -> None:
-    """Reject weights that cannot define a proportional distribution.
-
-    Only the inputs themselves are checked. Rejecting a set because its
-    *sum* overflowed turned away finite, representable weights such as
-    [1e308, 1e308], contrary to proportional-weight behavior (SCALE-008);
-    accumulation is scaled instead, so the total never overflows.
-    """
-    if not all(isfinite(weight) for weight in weights):
-        raise ValueError(f"{label} 'weights' must be finite")
+def validate_weights(weights: Sequence[Fraction], label: str) -> None:
+    """Reject exact weights that cannot define a proportional distribution."""
     if any(weight < 0 for weight in weights):
         raise ValueError(f"{label} 'weights' must be non-negative")
     if not any(weight > 0 for weight in weights):
         raise ValueError(f"{label} 'weights' must sum to a positive number")
 
 
-def cumulative_weights(weights: Sequence[float]) -> tuple[float, ...]:
-    """Accumulate ``weights`` scaled by the largest of them.
-
-    Scaling keeps every partial sum finite for any finite input while
-    preserving the ratios that define the distribution -- summing raw
-    weights overflowed to infinity for values near the float maximum
-    (SCALE-008). ``validate_weights`` runs first, so the maximum is
-    positive.
-    """
-    scale = max(weights)
-    total = 0.0
-    cumulative: list[float] = []
-    for weight in weights:
-        total += weight / scale
-        cumulative.append(total)
-    return tuple(cumulative)
+def cumulative_weights(weights: Sequence[Fraction]) -> tuple[int, ...]:
+    """Build the smallest integer intervals preserving every exact ratio."""
+    denominator = lcm(*(weight.denominator for weight in weights))
+    integers = [weight.numerator * (denominator // weight.denominator) for weight in weights]
+    divisor = gcd(*integers)
+    return tuple(accumulate(weight // divisor for weight in integers))
 
 
-def weighted_index(cum_weights: tuple[float, ...], rng: Random) -> int:
+def weighted_index(cum_weights: tuple[int, ...], rng: Random) -> int:
     """Draw an index without allocating the temporary objects used by ``choices``."""
-    return bisect(cum_weights, rng.random() * cum_weights[-1], 0, len(cum_weights) - 1)
+    return bisect(cum_weights, rng.randrange(cum_weights[-1]), 0, len(cum_weights) - 1)
 
 
 def _choices_error(label: str, min_choices: int) -> str:

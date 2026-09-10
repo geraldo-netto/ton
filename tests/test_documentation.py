@@ -212,8 +212,8 @@ def test_documented_mixed_default_weights() -> None:
             super().__init__(0)
             self.quantile = quantile
 
-        def random(self):
-            return self.quantile
+        def randrange(self, stop):
+            return int(self.quantile * stop)
 
     example = README.split("For example, the omitted weight below is 1", 1)[1]
     field = json.loads(example.split("```json\n", 1)[1].split("```", 1)[0])

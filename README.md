@@ -557,6 +557,9 @@ AMD
 
 #### `weighted`
 
+Sampling uses exact proportional weights and integer draws. Finite decimal weights
+retain their ratios at any magnitude; zero-weight choices are never selected.
+
 Pick one alternative with probability proportional to its effective weight.
 Omitted `weight` defaults to `1.0`. Sampling is uniform (1/N per entry) when
 all effective weights are equal.
@@ -589,8 +592,8 @@ Any registered generator can be weighted, not just literal strings:
 ```
 common
 common
+97
 60
-common
 ```
 
 Composite `choices` may themselves nest `weighted` / `oneOf` / `sequence_of`. Paired generators (`hash`) cannot be used as a composite child — the `[id]` half would be unreachable from outside the wrapper, so the engine rejects such configs at construction time.

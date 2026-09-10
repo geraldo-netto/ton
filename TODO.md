@@ -12,7 +12,6 @@
 | id | status | severity | effort | description |
 |---|---|---|---|---|
 | SCALE-007 | open | high | large | Scalability: `AGENTS.md` forbids workload caps, but `_recursion.max_supported_depth` derives a hard nesting ceiling from an assumed 8,192 bytes per level and `ensure_depth_headroom` rejects valid specs above it, even with zero rows; a 1,026-level spec fails on the local 8 MB stack. It also changes the process-global recursion limit instead of implementing the approved iterative preparation. Resolve by making nested preparation/generation stack-safe without an estimated depth gate or global-limit mutation; cover default and explicitly supplied catalogs. |
-| SCALE-011 | open | high | medium | Scalability/concurrency: `concurrency._offset_sequences` still uses recursive `deepcopy` and recursive offset traversal. In a fresh process, `fork_engine` on a valid 600-level oneOf chain raises raw `RecursionError` before the compiler's depth handling; direct generation supports that depth. Resolve worker config copying and owned-child traversal iteratively, without nesting caps or reliance on another engine first raising a global limit. Verify fresh-process worker construction and generation. |
 
 ### Performance
 

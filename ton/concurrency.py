@@ -42,7 +42,6 @@ from __future__ import annotations
 import hashlib
 import struct
 from collections.abc import Mapping
-from copy import deepcopy
 from random import Random
 from typing import Any, cast
 
@@ -53,6 +52,7 @@ from ._logging import logger as _logger
 from ._output import open_output_path
 from ._proofcheck import ProofFailureSink
 from ._registry import default_transforms, make_registry, resolve_reference
+from ._specsnapshot import snapshot_spec
 from ._template import parse
 from ._transforms import Transform
 from ._validation import Validator
@@ -218,7 +218,7 @@ def _offset_sequences(
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
 ) -> dict[str, Any]:
-    copied = deepcopy(dict(config))
+    copied: dict[str, Any] = snapshot_spec(config)
     generators = registry if registry is not None else make_registry()
     transform_registry = transforms if transforms is not None else default_transforms()
     occurrences: dict[str, int] = {}
@@ -235,13 +235,15 @@ def _offset_sequence_spec(
     value: Any, offset: int, registry: Mapping[str, Generator], transforms: Mapping[str, Transform]
 ) -> None:
     """Visit only declared generator children, preserving opaque plugin metadata (CONC-018)."""
-    uses_source, children = _transform_sequence_children(value, offset, transforms)
-    reference = value.get("type")
-    generator = resolve_reference(registry, reference) if isinstance(reference, str) else None
-    if generator is not None and uses_source:
-        children.extend(_offset_source_spec(value, offset, generator))
-    for child, child_offset in children:
-        _offset_sequence_spec(child, child_offset, registry, transforms)
+    pending = [(value, offset)]
+    while pending:
+        spec, child_offset = pending.pop()
+        uses_source, children = _transform_sequence_children(spec, child_offset, transforms)
+        reference = spec.get("type")
+        generator = resolve_reference(registry, reference) if isinstance(reference, str) else None
+        if generator is not None and uses_source:
+            children.extend(_offset_source_spec(spec, child_offset, generator))
+        pending.extend(children)
 
 
 def _offset_source_spec(value: Any, offset: int, generator: Generator) -> list[tuple[Any, int]]:

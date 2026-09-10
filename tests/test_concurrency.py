@@ -482,3 +482,25 @@ def test_worker_owned_children_retain_transform_validation(transforms) -> None:
     }
     with pytest.raises(api.TemplateError, match="[Tt]ransform"):
         fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=1)
+
+
+def test_fork_engine_deep_config_in_a_fresh_process() -> None:
+    """SCALE-011: worker copying/traversal must not depend on prior recursion-limit changes."""
+    import subprocess
+    import sys
+
+    program = """
+from ton import api
+spec = {"type": "string", "values": ["x"]}
+for _ in range(600):
+    spec = {"type": "oneOf", "choices": [spec]}
+config = {"rows": 2, "format": "$x$", "types": {"x": spec}}
+worker = api.fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=1)
+assert list(worker) == ["x"]
+print("ok")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", program], capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"

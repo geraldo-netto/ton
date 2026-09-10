@@ -119,6 +119,25 @@ def test_row_width_guards_composite_and_unknown_width_values() -> None:
 BIG = 10**4300
 
 
+@pytest.mark.parametrize("sign", ["", "+", "-"])
+@pytest.mark.parametrize("kind", ["integer", "sequence"])
+def test_arbitrary_size_integer_text_settings(sign, kind) -> None:
+    """SCALE-015: valid integer text has no process conversion-limit ceiling."""
+    before = sys.get_int_max_str_digits()
+    value = sign + "1" + "0" * 4999
+    options = {"minValue": value, "maxValue": value} if kind == "integer" else {"start": value}
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": kind, **options}}}
+    assert list(api.generate(config, proof_mode="all")) == [value.removeprefix("+")]
+    assert sys.get_int_max_str_digits() == before
+
+
+@pytest.mark.parametrize("value", ["1" * 5000 + ".0", "1" * 5000 + "x", "1__0"])
+def test_arbitrary_size_integer_text_rejects_malformed_input(value) -> None:
+    """SCALE-015: the unlimited parser retains strict integer syntax."""
+    with pytest.raises(ValueError, match="must be an integer"):
+        SequenceGenerator().prepare({"start": value})
+
+
 @pytest.mark.parametrize("value", [Fraction(3, 2), Fraction(-3, 2)])
 @pytest.mark.parametrize("kind", ["integer", "text", "sequence"])
 def test_fractional_integer_settings_are_rejected(value, kind) -> None:

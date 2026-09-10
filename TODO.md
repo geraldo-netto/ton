@@ -29,7 +29,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| SCALE-015 | open | medium | small | Scalability: route integer text through the arbitrary-size parser in `ton/generators/base.py::coerce_int`. A valid 5,000-digit decimal string used for equal integer bounds fails the interpreter conversion limit, although the equivalent integer object and JSON integer work. Add permanent signed-string bounds and sequence-start regressions, retaining malformed-input rejection and the unchanged process digit limit. |
 | SCALE-016 | open | high | medium | Scalability: preserve finite decimal weights in `ton/_distribution.py::coerce_weight`, `validate_weights`, and cumulative sampling. Equal positive weights `Decimal("1e-400")` become zero and reject the job; `Decimal("1e400")` becomes infinity and also rejects it. Use exact proportional arithmetic without float precision or exponent ceilings. Add permanent JSON and in-memory regressions for tiny/large equal weights, mixed magnitudes, zero weights, and deterministic selection thresholds for both weighted generators and distribution transforms. |
 
 ### Concurrency

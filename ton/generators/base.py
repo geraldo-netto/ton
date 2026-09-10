@@ -469,7 +469,7 @@ def coerce_int(
             return int(raw)
         raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})")
     try:
-        return int(raw)
+        return str_to_int(raw) if isinstance(raw, str) else int(raw)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{type_name} {key!r} must be an integer (got {raw!r})") from exc
 

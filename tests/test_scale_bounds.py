@@ -117,6 +117,24 @@ def test_row_width_guards_composite_and_unknown_width_values() -> None:
 BIG = 10**4300
 
 
+@pytest.mark.parametrize("sign", [-1, 1])
+@pytest.mark.parametrize("rows", [0, 2])
+def test_large_padded_integer_bounds(sign: int, rows: int) -> None:
+    """SCALE-005: padding must use arbitrary-size conversion during preparation."""
+    before = sys.get_int_max_str_digits()
+    bound = sign * BIG
+    config = {
+        "rows": rows,
+        "format": "$x$",
+        "types": {
+            "x": {"type": "integer", "minValue": bound, "maxValue": bound, "padWithZero": True}
+        },
+    }
+    expected = ("-" if sign < 0 else "") + "1" + "0" * 4300
+    assert list(api.generate(config, proof_mode="all")) == [expected] * rows
+    assert sys.get_int_max_str_digits() == before
+
+
 @pytest.mark.parametrize(
     ("label", "spec"),
     [

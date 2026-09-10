@@ -42,7 +42,7 @@ class IntegerGenerator(Generator):
             # Width must cover the widest possible rendering so a positive
             # value and the corresponding negative line up in fixed-width
             # output (REL-014).
-            pad_width = max(len(str(min_value)), len(str(max_value)))
+            pad_width = max(len(int_to_str(min_value)), len(int_to_str(max_value)))
         return IntegerSpec(min_value=min_value, max_value=max_value, pad_width=pad_width)
 
     def generate(self, prepared: IntegerSpec, rng: Random) -> str:

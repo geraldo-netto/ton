@@ -68,8 +68,10 @@ constructs a fresh Engine and reproduces seeded output.
 - `Engine.provenance` returns immutable `ProvenanceRecord` entries containing
   each field's source type, transform chain, proof settings/failure count, and
   plugin package/version when available.
-- `ProofFailure` is the immutable audit record delivered to the public
-  `ProofFailureSink` callback type.
+- `ProofFailure` is the frozen audit record delivered to the public
+  `ProofFailureSink` callback type. Its spec mappings and sequences are read-only;
+  opaque plugin metadata is separately copied, following its own mutability
+  rules (see [extension ownership](extensions.md)).
 
 `OutputEncodingError` is the public output-domain error for a value that a
 configured text codec cannot represent. Its `encoding` attribute names the

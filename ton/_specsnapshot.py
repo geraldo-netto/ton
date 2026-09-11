@@ -15,6 +15,7 @@ TON's JSON encoder, preventing consumers from mutating retained content.
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Mapping, Sequence
+from copy import deepcopy
 from typing import Any, cast
 
 
@@ -71,6 +72,7 @@ def snapshot_spec(value: Any, *, immutable: bool = False) -> Any:
     # Computed containers can release children as iteration advances. Keep
     # memoized sources alive so their IDs cannot alias later children (REL-057).
     sources: list[Any] = []
+    opaque: list[tuple[Any, Any, Any]] = []
     # Keep one iterator per active container, not one queued task per entry.
     pending: list[tuple[Any, Iterator[tuple[Any, Any]]]] = [(root, iter(((0, value),)))]
     while pending:
@@ -96,6 +98,25 @@ def snapshot_spec(value: Any, *, immutable: bool = False) -> Any:
             memo[id(item)] = view
             target[key] = view
             pending.append((copied, enumerate(item)))
-        else:
+        elif type(item) in (str, bytes, int, float, bool, type(None)):
             target[key] = item
+        else:
+            opaque.append((target, key, item))
+    _copy_opaque(opaque, memo)
     return root[0]
+
+
+def _copy_opaque(entries: list[tuple[Any, Any, Any]], memo: dict[int, Any]) -> None:
+    """Copy plugin state after normal containers have all acquired memo entries.
+
+    Forward references from opaque objects then resolve to the same normalized
+    containers, including read-only audit views, as direct references (REL-059).
+    Custom objects retain their own deepcopy protocol and type.
+    """
+    for target, key, item in entries:
+        try:
+            target[key] = deepcopy(item, memo)
+        except Exception as exc:
+            raise ValueError(
+                f"Cannot snapshot opaque config value of type {type(item).__name__}"
+            ) from exc

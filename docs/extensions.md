@@ -114,6 +114,14 @@ must therefore support `copy.deepcopy`. Use `catalog.snapshot()` when combining
 generators, transforms, and validators: it clones all three kinds atomically and
 preserves dependencies shared between them within that snapshot.
 
+Configuration mappings and sequences are also copied for each Engine. Opaque
+plugin settings, such as bytearrays, sets and custom objects, must support
+`copy.deepcopy`; their aliases and cycles are preserved within the owned graph.
+Audit specs have separately owned metadata and read-only mapping/sequence
+containers. Opaque objects retain their own mutability rules; changing an audit
+object cannot change the Engine's prepared configuration. JSON proof reports
+require JSON-serializable settings.
+
 Plugins implement their protocols entirely against `ton.api`: alongside `Generator`
 and `PairedGenerator`, the facade exports the contract types a transform, validator,
 or proof hook has to name — `PreparationContext`, `TransformResult`, `TransformProof`,

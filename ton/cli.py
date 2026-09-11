@@ -328,7 +328,7 @@ def _map_config_errors[T](operation: Callable[[], T]) -> T | int:
     """
     try:
         return operation()
-    except FileNotFoundError as exc:
+    except OSError as exc:
         return _fail_before_generation("output", 1, exc, f"ton: {exc}")
     except RegistryError as exc:
         return _fail_before_generation("validation", 2, exc, f"ton: plugin error: {exc}")

@@ -101,6 +101,29 @@ def test_cli_structured_log_marks_unexpected_crash(monkeypatch, write_config, ca
     assert failures[0].error_category == "unexpected"
 
 
+@pytest.mark.parametrize("options", [[], ["--validate"]])
+@pytest.mark.parametrize("error", [PermissionError("config denied"), OSError("config read failed")])
+def test_config_read_io_errors_use_the_io_exit_path(options, error, monkeypatch, caplog, capsys):
+    """CLI-023: unreadable configs yield one terminal I/O failure before any rows."""
+
+    def unreadable(path):
+        raise error
+
+    monkeypatch.setattr(api, "load_config", unreadable)
+    with caplog.at_level(logging.ERROR, logger="ton"):
+        assert main(["config.json", *options]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == f"ton: {error}\n"
+    failures = [record for record in caplog.records if getattr(record, "event", "") == "cli_failed"]
+    assert len(failures) == 1
+    assert failures[0].error_category == "output"
+    assert failures[0].rows_written == failures[0].total_rows == 0
+    assert not any(
+        getattr(record, "event", "") == "cli_unexpected_error" for record in caplog.records
+    )
+
+
 def test_cli_writes_rows_to_stdout(write_config, capsys: pytest.CaptureFixture[str]) -> None:
     config = write_config()
     exit_code = main([str(config), "--seed", "0"])

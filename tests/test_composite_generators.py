@@ -536,7 +536,12 @@ def test_plugin_composite_uses_public_preparation_context() -> None:
 
     assert list(Engine(config, registry=registry)) == ["[0]", "[1]", "[2]", "[3]"]
     worker = api.fork_engine(
-        config, registry=registry, parent_seed=0, worker_id=1, workers=2, rows=2
+        config,
+        parent_seed=0,
+        worker_id=1,
+        workers=2,
+        rows=2,
+        options=api.EngineOptions(registry=registry),
     )
     assert list(worker) == ["[2]", "[3]"]
 

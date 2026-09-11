@@ -87,6 +87,11 @@ capability on sources and transforms. `PartitionSpec` carries owner-setting
 updates and child offsets keyed by declared locations. This replaces concrete
 generator checks, preserves opaque metadata, and supports custom multiplicities
 and stateful transforms without changes to the worker traversal.
+Both `fork_engine` and `write_shard` consume `EngineOptions`. Worker construction
+copies the extension graph for partition hooks and replaces only worker-owned
+seed/RNG settings; the full option bundle reaches Engine construction. The shard
+writer adds row partitioning and output management without duplicating plugin,
+proof, or observability options.
 
 ## Transform Contract
 

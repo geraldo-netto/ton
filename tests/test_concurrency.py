@@ -11,7 +11,7 @@ from unittest import mock
 
 import pytest
 
-from ton import concurrency
+from ton import api, concurrency
 from ton._config import ConfigError
 from ton._engine import Engine
 from ton.concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write_shard
@@ -155,7 +155,14 @@ def test_worker_offsets_shared_specs_per_occurrence(nested, repeated) -> None:
         )
     config = {"rows": 4, "format": "$a$:$a$/$b$" if repeated else "$a$/$b$", "types": fields}
     original = pickle.loads(pickle.dumps(config))
-    engine = fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=2, proof_mode="all")
+    engine = fork_engine(
+        config,
+        parent_seed=1,
+        worker_id=1,
+        workers=2,
+        rows=2,
+        options=api.EngineOptions(proof_mode="all"),
+    )
     assert list(engine) == expected
     assert config == original
     assert shared == {"type": "sequence", "start": 0}
@@ -257,8 +264,7 @@ def test_fork_engine_threads_worker_seed_and_proof_options() -> None:
         config,
         parent_seed=5,
         worker_id=1,
-        proof_mode="audit",
-        proof_sample_rate=3,
+        options=api.EngineOptions(proof_mode="audit", proof_sample_rate=3),
     )
     assert engine._seed == derive_seed(parent_seed=5, worker_id=1)
     assert engine._proof.mode == "audit"
@@ -289,9 +295,9 @@ def test_fork_engine_threads_validators_and_redaction() -> None:
         config,
         parent_seed=5,
         worker_id=1,
-        validators={"accept_all": AcceptAll()},
-        proof_mode="audit",
-        redact_proof_failures=True,
+        options=api.EngineOptions(
+            validators={"accept_all": AcceptAll()}, proof_mode="audit", redact_proof_failures=True
+        ),
     )
 
     assert list(engine) != []
@@ -310,8 +316,7 @@ def test_fork_engine_threads_public_proof_failure_sink() -> None:
         config,
         parent_seed=5,
         worker_id=0,
-        proof_mode="audit",
-        proof_failure_sink=failures.append,
+        options=api.EngineOptions(proof_mode="audit", proof_failure_sink=failures.append),
     )
 
     assert engine._proof.failure_sink == failures.append
@@ -521,7 +526,14 @@ def test_worker_offsets_only_declared_plugin_children(replacing, aliased) -> Non
     original = pickle.loads(pickle.dumps(config))
     registry = api.build_extension_catalog().generators()
     registry["plugin.metadata"] = MetadataGenerator()
-    engine = fork_engine(config, parent_seed=1, worker_id=1, workers=2, rows=2, registry=registry)
+    engine = fork_engine(
+        config,
+        parent_seed=1,
+        worker_id=1,
+        workers=2,
+        rows=2,
+        options=api.EngineOptions(registry=registry),
+    )
     assert list(engine) == expected
     assert config == original
 
@@ -658,7 +670,14 @@ def test_worker_plugin_child_keys_are_literal(key):
         "types": {"x": {"type": "literal_child", key: {"type": "sequence"}}},
     }
     assert list(Engine.from_config(config, registry=registry)) == ["0", "1", "2", "3"]
-    worker = fork_engine(config, registry=registry, parent_seed=1, worker_id=1, workers=2, rows=2)
+    worker = fork_engine(
+        config,
+        parent_seed=1,
+        worker_id=1,
+        workers=2,
+        rows=2,
+        options=api.EngineOptions(registry=registry),
+    )
     assert list(worker) == ["2", "3"]
     assert config["types"]["x"][key] == {"type": "sequence"}
 

@@ -388,7 +388,8 @@ Entry points execute installed package code while loading, so TON loads them onl
 Parallel runs use the public `ton.concurrency` helpers re-exported by `ton.api`.
 `write_shard` is the bounded-memory process-pool primitive used in the complete
 merge/cleanup recipe above. It honors the config's output encoding (UTF-8 when
-absent); an explicit `encoding=` overrides that setting. Callers with their own streaming sink can instead
+absent); an explicit `encoding=` overrides that setting. Callers with their own
+streaming sink can instead
 construct one worker engine directly:
 
 ```python
@@ -403,12 +404,19 @@ eng = concurrency.fork_engine(
     worker_id=worker_id,
     workers=workers,
     rows=concurrency.chunk_rows(config["rows"], workers, worker_id),
+    options=api.EngineOptions(proof_mode="all"),
 )
 for row in eng:
     ...
 ```
 
 Each worker derives its RNG from `BLAKE2b(parent_seed, worker_id)` so adjacent workers do not see correlated streams. An `engine_forked` log event is emitted with `worker_id` / `parent_seed` so multi-process runs stay distinguishable in the structured log stream.
+
+Both `fork_engine` and `write_shard` accept `options=api.EngineOptions(...)` for
+registries, transforms, validators, proof checking, audit sinks, and milestones.
+The worker seed and RNG are derived from `parent_seed` and `worker_id`, overriding
+those two option fields; the other options are preserved. Options passed through
+a spawned process pool, including plugin instances and sinks, must be pickleable.
 
 Generators and transforms can implement the optional `api.Partitionable` capability:
 `partition(spec, offset)` returns an `api.PartitionSpec`. The offset counts draw
@@ -707,7 +715,8 @@ CLI streams every failure to the report even after the bounded in-memory
 
 Library callers can stream every audit failure without retaining it in memory
 by passing a callable as `proof_failure_sink` to `EngineOptions`,
-`Engine.from_config`, `api.generate`, or `concurrency.fork_engine`. The sink is
+`Engine.from_config`, or `api.generate`. Worker and shard helpers receive it through
+their `options` parameter. The sink is
 valid only with `proof_mode="audit"`; it must be installed before iteration.
 `Engine.set_proof_failure_sink(...)` supports resources opened after engine
 construction and enforces that lifecycle.

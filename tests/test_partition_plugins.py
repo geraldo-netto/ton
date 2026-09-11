@@ -91,8 +91,7 @@ def test_extension_partitioning_respects_nested_multiplicity(leaf, kind):
             worker_id=worker,
             workers=3,
             rows=api.chunk_rows(7, 3, worker),
-            registry=snapshot.generators,
-            transforms=snapshot.transforms,
+            options=api.EngineOptions(registry=snapshot.generators, transforms=snapshot.transforms),
         )
         for row in engine:
             values.extend(int(value) for value in row.replace("|", ",").split(","))
@@ -142,7 +141,7 @@ def test_leaf_transform_partitions_its_own_settings():
                 worker_id=worker,
                 workers=2,
                 rows=2,
-                transforms={"example.counter": CounterTransform()},
+                options=api.EngineOptions(transforms={"example.counter": CounterTransform()}),
             )
         )
     assert rows == ["100", "101", "102", "103"]
@@ -182,7 +181,9 @@ def test_partition_contract_rejects_invalid_hook_results(plan, error):
         },
     }
     with pytest.raises((TypeError, ValueError), match=error):
-        api.fork_engine(config, parent_seed=0, worker_id=0, registry=registry)
+        api.fork_engine(
+            config, parent_seed=0, worker_id=0, options=api.EngineOptions(registry=registry)
+        )
 
 
 @pytest.mark.parametrize("replaced", [False, True])
@@ -216,8 +217,9 @@ def test_partition_offsets_follow_paired_source_caching(replaced):
                 worker_id=worker,
                 workers=2,
                 rows=2,
-                registry=registry,
-                transforms={"example.repeat": RepeatTransform()},
+                options=api.EngineOptions(
+                    registry=registry, transforms={"example.repeat": RepeatTransform()}
+                ),
             )
         )
     if replaced:

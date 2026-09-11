@@ -218,7 +218,14 @@ def test_integral_rational_settings_preserve_exact_values(kind) -> None:
     }
     config = {"rows": 2, "format": "$x$", "types": {"x": {"type": kind, **options[kind]}}}
     rows = list(
-        fork_engine(config, parent_seed=0, worker_id=1, workers=2, rows=1, proof_mode="all")
+        fork_engine(
+            config,
+            parent_seed=0,
+            worker_id=1,
+            workers=2,
+            rows=1,
+            options=api.EngineOptions(proof_mode="all"),
+        )
     )
     if kind == "text":
         assert len(rows[0].split()) == 3

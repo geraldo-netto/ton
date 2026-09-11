@@ -185,9 +185,11 @@ def test_engine_construction_owns_supplied_extension_state(mapping, worker):
                 config,
                 parent_seed=42,
                 worker_id=index,
-                registry=options.registry,
-                transforms=options.transforms,
-                validators=options.validators,
+                options=api.EngineOptions(
+                    registry=options.registry,
+                    transforms=options.transforms,
+                    validators=options.validators,
+                ),
             )
         return api.Engine.from_options(config, options)
 

@@ -42,6 +42,7 @@ from __future__ import annotations
 import hashlib
 import struct
 from collections.abc import Mapping
+from dataclasses import replace
 from random import Random
 from typing import Any, cast
 
@@ -52,14 +53,12 @@ from ._logging import LogEvent
 from ._logging import logger as _logger
 from ._output import open_output_path
 from ._partition import Partitionable, PartitionSpec
-from ._proofcheck import ProofFailureSink
 from ._registry import default_transforms, make_registry, snapshot_inputs
 from ._specgraph import FieldOwnership, OwnedChild, field_ownership, resolve_generator
 from ._specpath import SpecPath, format_spec_path
 from ._specsnapshot import snapshot_spec
 from ._template import parse
 from ._transforms import Transform
-from ._validation import Validator
 
 _UINT64_MODULUS = 1 << 64
 
@@ -115,28 +114,18 @@ def fork_engine(
     worker_id: int,
     workers: int | None = None,
     rows: int | None = None,
-    registry: Mapping[str, Generator] | None = None,
-    transforms: Mapping[str, Transform] | None = None,
-    validators: Mapping[str, Validator] | None = None,
-    proof_mode: str = "off",
-    proof_sample_rate: int = 1,
-    milestone_rows: int = 0,
-    redact_proof_failures: bool = False,
-    proof_failure_sink: ProofFailureSink | None = None,
+    options: EngineOptions | None = None,
 ) -> Engine:
     """Build an Engine with a per-worker RNG and an optional row override.
 
-    Mirrors the :meth:`Engine.from_config` surface so forked workers can
-    use plugin ``transforms`` and proof-check options the same way the
-    parent process does. The worker's derived seed is threaded into the
-    engine as ``seed`` so proof/provenance records are attributable to
-    the worker (CONC-001).
+    EngineOptions carries plugins, proof checking and observability unchanged.
+    Worker derivation overrides its RNG and seed, keeping provenance attributable
+    to the worker; supplied options and plugin prototypes remain unchanged.
     """
     if rows is not None and workers is None:
         raise ValueError("workers is required when rows overrides a worker shard")
     _validate_worker_coordinates(workers, worker_id)
     seed = derive_seed(parent_seed, worker_id)
-    rng = Random(seed)
     # Validate the caller's config before deriving offsets: coercing first
     # let workers accept values ordinary generation rejects (CONC-004).
     total_rows = validated_total_rows(config)
@@ -144,25 +133,11 @@ def fork_engine(
     offset = worker_id * worker_rows
     if workers is not None:
         offset = _chunk_offset(total_rows, workers, worker_id)
-    registry, transforms, validators = snapshot_inputs(registry, transforms, validators)
-    config = _offset_sequences(config, offset, registry, transforms)
+    worker_options = _worker_options(options, seed)
+    config = _offset_sequences(config, offset, worker_options.registry, worker_options.transforms)
     if rows is not None:
         config = {**config, "rows": rows}
-    engine = Engine.from_options(
-        config,
-        EngineOptions(
-            registry=registry,
-            transforms=transforms,
-            validators=validators,
-            rng=rng,
-            seed=seed,
-            proof_mode=proof_mode,
-            proof_sample_rate=proof_sample_rate,
-            milestone_rows=milestone_rows,
-            redact_proof_failures=redact_proof_failures,
-            proof_failure_sink=proof_failure_sink,
-        ),
-    )
+    engine = Engine.from_options(config, worker_options)
     _logger.info(
         "engine_forked worker_id=%d parent_seed=%d rows=%d",
         worker_id,
@@ -178,6 +153,23 @@ def fork_engine(
     return engine
 
 
+def _worker_options(options: EngineOptions | None, seed: int) -> EngineOptions:
+    supplied = options if options is not None else EngineOptions()
+    registry, transforms, validators = snapshot_inputs(
+        supplied.registry,
+        supplied.transforms,
+        supplied.validators,
+    )
+    return replace(
+        supplied,
+        registry=registry,
+        transforms=transforms,
+        validators=validators,
+        rng=Random(seed),
+        seed=seed,
+    )
+
+
 def write_shard(
     config: Mapping[str, Any],
     path: str,
@@ -186,6 +178,7 @@ def write_shard(
     worker_id: int,
     workers: int,
     encoding: str | None = None,
+    options: EngineOptions | None = None,
 ) -> int:
     """Stream one worker shard, using config encoding unless explicitly overridden."""
     rows = chunk_rows(validated_total_rows(config), workers, worker_id)
@@ -195,6 +188,7 @@ def write_shard(
         worker_id=worker_id,
         workers=workers,
         rows=rows,
+        options=options,
     )
     written = 0
     with open_output_path(

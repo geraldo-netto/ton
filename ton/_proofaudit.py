@@ -89,11 +89,21 @@ def _write_chunks(stream: TextIO, tokens: Iterable[str]) -> None:
             used += len(piece)
             offset += len(piece)
             if used == limit:
-                stream.write("".join(parts))
+                _write_all(stream, "".join(parts))
                 parts.clear()
                 used = 0
     if parts:
-        stream.write("".join(parts))
+        _write_all(stream, "".join(parts))
+
+
+def _write_all(stream: TextIO, text: str) -> None:
+    """Drain a bounded chunk; a short write cannot commit a partial record (ROB-015)."""
+    offset = 0
+    while offset < len(text):
+        written = stream.write(text[offset:])
+        if type(written) is not int or not 0 < written <= len(text) - offset:
+            raise OSError("audit stream write returned invalid progress")
+        offset += written
 
 
 def _spec_reference(spec: object) -> str:

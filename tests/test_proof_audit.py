@@ -72,6 +72,70 @@ def test_proof_audit_writer_emits_clear_json_line() -> None:
     assert stream.getvalue().endswith("\n")
 
 
+@pytest.mark.parametrize("limit", [1, 17, 30000])
+def test_audit_short_writes_preserve_complete_records_and_spec_references(limit):
+    """ROB-015: drain partial writes before committing the emitted fingerprint."""
+    from dataclasses import replace
+
+    failure = replace(_failure(), value="\U0001f600\\\n" * (1 if limit == 1 else 20000))
+    expected = io.StringIO()
+    reference = ProofAuditWriter(expected)
+    reference(failure)
+    reference(failure)
+    received = io.StringIO()
+    completed = 0
+
+    class Partial:
+        def write(self, text):
+            nonlocal completed
+            assert len(text) <= 65536
+            assert bool(writer._emitted_specs) is (completed > 0)
+            accepted = text[:limit]
+            completed += accepted.count("\n")
+            return received.write(accepted)
+
+    writer = ProofAuditWriter(Partial())
+    writer(failure)
+    assert len(writer._emitted_specs) == 1
+    writer(failure)
+    assert received.getvalue() == expected.getvalue()
+
+
+@pytest.mark.parametrize("progress", [0, -1, None, True, 1.5, 999999])
+def test_audit_invalid_progress_after_a_partial_write_is_not_committed(progress):
+    """ROB-015: invalid progress cannot truncate a record silently or loop forever."""
+    calls = []
+
+    class Partial:
+        def write(self, text):
+            calls.append(text)
+            return 1 if len(calls) == 1 else progress
+
+    writer = ProofAuditWriter(Partial())
+    with pytest.raises(ProofAuditWriteError, match="invalid progress"):
+        writer(_failure())
+    assert len(calls) == 2
+    assert not writer._emitted_specs
+
+
+def test_audit_error_after_partial_progress_preserves_unemitted_state():
+    """ROB-015: a later I/O error remains visible after an earlier short write."""
+    calls = []
+
+    class Partial:
+        def write(self, text):
+            calls.append(text)
+            if len(calls) == 1:
+                return 1
+            raise OSError("later short-write failure")
+
+    writer = ProofAuditWriter(Partial())
+    with pytest.raises(ProofAuditWriteError, match="later short-write failure"):
+        writer(_failure())
+    assert len(calls) == 2
+    assert not writer._emitted_specs
+
+
 @pytest.mark.parametrize("number", ["0.10000000000000001", "-1.2300", "1e1000", "0.00000001"])
 def test_audit_decimal_tokens_preserve_numeric_type_and_fingerprint(number) -> None:
     """CFG-007: both report payloads and fingerprints retain exact numeric syntax."""

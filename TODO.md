@@ -6,7 +6,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| PERF-049 | open | medium | medium | Performance: avoid rediscovering every segmentation of generated char values in `ton/generators/char.py::CharGenerator.prove`. With `values=['a','aa']`, proving `'a' * (N + N//2)` examines a growing set of positions for each of N draws; N=250/500/1,000 takes 0.0044/0.0189/0.0776 s for a single valid value. Compile reusable token matching information and/or retain verifiable draw segmentation on checked rows so generated-value proof work does not grow quadratically. Keep acceptance exact for ambiguous, empty and multi-character tokens and arbitrary external strings. Add structural work-count and exhaustive small-pool equivalence regressions, preserving seeded generation. |
 
 ### Scalability
 

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import difflib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 COMMON_FIELD_KEYS = frozenset(("type", "transforms", "validators"))
+type PathLabel = str | Callable[[], str]
 
 
 def unknown_key_message(path: str, key: str, allowed: frozenset[str]) -> str:
@@ -17,7 +18,7 @@ def unknown_key_message(path: str, key: str, allowed: frozenset[str]) -> str:
 
 
 def extension_key_error(
-    path: str,
+    path: PathLabel,
     spec: Mapping[str, Any],
     extension_keys: frozenset[str] | None,
     common_keys: frozenset[str],
@@ -30,11 +31,11 @@ def extension_key_error(
     if not unknown:
         return None
     key = min(unknown)
-    return unknown_key_message(path, key, allowed)
+    return unknown_key_message(path() if callable(path) else path, key, allowed)
 
 
 def require_known_keys(
-    path: str,
+    path: PathLabel,
     spec: Mapping[str, Any],
     allowed: frozenset[str],
 ) -> None:

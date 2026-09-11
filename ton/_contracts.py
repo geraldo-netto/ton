@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from random import Random
 from typing import Any, ClassVar
 
 from ._proof import ProofResult
 from ._references import resolve_reference
-from ._specpath import SpecPath, format_spec_path
+from ._specpath import SpecLocation, SpecPath, format_spec_path
 from ._transforms import TransformResult
 
 ChildPreparer = Callable[
@@ -21,11 +21,15 @@ ChildPreparer = Callable[
 
 @dataclass(frozen=True)
 class PreparationContext:
-    """Registry-aware services available while preparing a generator spec."""
+    """Registry-aware services available while preparing a generator spec.
+
+    ``path`` shares its ancestors. Iterate it (or use ``tuple(context.path)``)
+    for components; append a relative tuple with ``+`` without copying ancestors.
+    """
 
     registry: Mapping[str, Generator]
     child_preparer: ChildPreparer | None = None
-    path: SpecPath = ()
+    path: SpecLocation = field(default_factory=SpecLocation)
 
     def prepare_child(
         self,

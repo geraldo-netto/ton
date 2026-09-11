@@ -102,8 +102,12 @@ def _prepare_choice(
         raise ValueError(
             f"{label} 'choices[{index}]' must be an object with 'weight' and 'spec' keys"
         )
-    owner = f"types.{format_spec_path(context.path)}" if context.path else label
-    require_known_keys(f"{owner}.choices[{index}]", choice, _CHOICE_KEYS)
+
+    def location() -> str:
+        owner = f"types.{format_spec_path(context.path)}" if context.path else label
+        return f"{owner}.choices[{index}]"
+
+    require_known_keys(location, choice, _CHOICE_KEYS)
     weight = _coerce_weight(index, choice, label)
     child = context.prepare_child(label, ("choices", index, "spec"), choice.get("spec"))
     return weight, child

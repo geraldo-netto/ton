@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
+from logging import INFO
 from typing import Any
 
 from ._contracts import Generator, PreparationContext, resolve_child_spec
@@ -21,7 +22,7 @@ from ._registry import (
 )
 from ._specgraph import field_ownership, resolve_generator
 from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
-from ._specpath import SpecPath, format_spec_path
+from ._specpath import SpecLocation, SpecPath, format_spec_path
 from ._specsnapshot import snapshot_fields
 from ._template import Token, parse, split_segments
 from ._transforms import Transform, fold_paired_capabilities
@@ -69,7 +70,7 @@ class EngineCompiler:
         registry, transforms, validators = snapshot_inputs(registry, transforms, validators)
         self.template = str(config["format"])
         self.rows = int(config["rows"])
-        self._child_prepared: dict[SpecPath, tuple[Generator, Any]] = {}
+        self._child_prepared: dict[SpecLocation, tuple[Generator, Any]] = {}
         self.tokens = tuple(parse(self.template))
         self.field_keys = (
             tuple(config["types"])
@@ -206,8 +207,8 @@ class EngineCompiler:
         return prepared
 
     def _preparation_order(
-        self, path: SpecPath, spec: Mapping[str, Any], generator: Generator
-    ) -> Iterator[tuple[SpecPath, Mapping[str, Any], Generator]]:
+        self, path: SpecLocation, spec: Mapping[str, Any], generator: Generator
+    ) -> Iterator[tuple[SpecLocation, Mapping[str, Any], Generator]]:
         pending = [(path, spec, generator, False)]
         active: set[int] = set()
         while pending:
@@ -234,10 +235,11 @@ class EngineCompiler:
         self, path: str, spec: Mapping[str, Any], generator: Generator
     ) -> PreparedField:
         field: PreparedField | None = None
-        for child_path, child_spec, child in self._preparation_order((path,), spec, generator):
+        root_path = SpecLocation() + (path,)
+        for child_path, child_spec, child in self._preparation_order(root_path, spec, generator):
             context = PreparationContext(self.registry, self._prepare_child, path=child_path)
-            label = format_spec_path(child_path)
-            self._validate_generator_keys(f"types.{label}", child_spec, child)
+            label = child_path
+            self._validate_generator_keys(label, child_spec, child)
             transforms, is_paired, uses_source = self._prepare_transforms(
                 label, child_spec, child, context
             )
@@ -251,7 +253,7 @@ class EngineCompiler:
                 validators=self._resolve_validators(label, child_spec),
                 provider=plugin_provenance(self.registry, child_spec["type"]),
             )
-            if child_path != (path,):
+            if child_path is not root_path:
                 self._child_prepared[child_path] = self._as_child(field)
         assert field is not None
         return field
@@ -293,17 +295,19 @@ class EngineCompiler:
 
     def _validate_generator_keys(
         self,
-        path: str,
+        path: SpecLocation,
         spec: Mapping[str, Any],
         generator: Generator,
     ) -> None:
-        error = extension_key_error(path, spec, generator.config_keys, COMMON_FIELD_KEYS)
+        error = extension_key_error(
+            lambda: f"types.{path}", spec, generator.config_keys, COMMON_FIELD_KEYS
+        )
         if error is not None:
             raise TemplateError(error)
 
     def _prepare_transforms(
         self,
-        type_key: str,
+        type_key: SpecLocation,
         spec: Mapping[str, Any],
         generator: Generator,
         context: PreparationContext,
@@ -336,8 +340,12 @@ class EngineCompiler:
         is_paired = bool(generator.is_paired and uses_source)
         prepared: list[PreparedTransform] = []
         for index, (transform_spec, transform) in enumerate(resolved):
+
+            def transform_path(index: int = index) -> str:
+                return f"types.{type_key}.transforms[{index}]"
+
             error = extension_key_error(
-                f"types.{type_key}.transforms[{index}]",
+                transform_path,
                 transform_spec,
                 transform.config_keys,
                 frozenset(("type",)),
@@ -348,28 +356,17 @@ class EngineCompiler:
                 PreparedTransform(
                     transform,
                     transform.prepare(
-                        transform_spec, replace(context, path=(*context.path, "transforms", index))
+                        transform_spec, replace(context, path=context.path + ("transforms", index))
                     ),
                 )
             )
-            _logger.info(
-                "transform_prepared type_key=%s transform=%s paired=%s",
-                type_key,
-                transform.type_name,
-                is_paired,
-                extra={
-                    "event": LogEvent.TRANSFORM_PREPARED.value,
-                    "type_key": type_key,
-                    "transform": transform.type_name,
-                    "paired_input": is_paired,
-                },
-            )
+            _log_transform_prepared(type_key, transform, is_paired)
             is_paired = is_paired and transform.capabilities.preserves_pairing
         return tuple(prepared), capability.preserves_pairing, uses_source
 
     @staticmethod
     def _transform_specs(
-        type_key: str,
+        type_key: SpecLocation,
         spec: Mapping[str, Any],
     ) -> list[Mapping[str, Any]]:
         raw = spec.get("transforms", [])
@@ -383,7 +380,7 @@ class EngineCompiler:
                 )
         return raw
 
-    def _resolve_transform(self, type_key: str, reference: str) -> Transform:
+    def _resolve_transform(self, type_key: SpecLocation, reference: str) -> Transform:
         transform = resolve_reference(self.transforms, reference)
         if transform is None:
             raise TemplateError(
@@ -392,7 +389,9 @@ class EngineCompiler:
             )
         return transform
 
-    def _resolve_validators(self, type_key: str, spec: Mapping[str, Any]) -> tuple[Validator, ...]:
+    def _resolve_validators(
+        self, type_key: SpecLocation, spec: Mapping[str, Any]
+    ) -> tuple[Validator, ...]:
         resolved: list[Validator] = []
         references = spec.get("validators", [])
         if not isinstance(references, list):
@@ -408,6 +407,23 @@ class EngineCompiler:
                 )
             resolved.append(validator)
         return tuple(resolved)
+
+
+def _log_transform_prepared(type_key: SpecLocation, transform: Transform, paired: bool) -> None:
+    if _logger.isEnabledFor(INFO):
+        label = str(type_key)
+        _logger.info(
+            "transform_prepared type_key=%s transform=%s paired=%s",
+            label,
+            transform.type_name,
+            paired,
+            extra={
+                "event": LogEvent.TRANSFORM_PREPARED.value,
+                "type_key": label,
+                "transform": transform.type_name,
+                "paired_input": paired,
+            },
+        )
 
 
 def _available_extensions(kind: str, registry: Mapping[str, Any]) -> str:

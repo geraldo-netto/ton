@@ -80,3 +80,54 @@ def test_generation_does_not_visit_or_retain_unused_field_contents(worker, caplo
     assert constructed.types == 3
     with pytest.raises(AssertionError, match="unused pool was traversed"):
         api.validate_config(config)
+
+
+def test_compile_path_storage_grows_linearly_with_depth():
+    """SCALE-019: compare allocation growth, independent of elapsed machine time."""
+    import gc
+    import tracemalloc
+
+    from ton import api
+
+    peaks = []
+    for depth in (500, 1000):
+        spec = {"type": "sequence"}
+        for _ in range(depth):
+            spec = {"type": "sequence_of", "count": 1, "spec": spec}
+        config = {"rows": 0, "format": "$x$", "types": {"x": spec}}
+        gc.collect()
+        tracemalloc.start()
+        try:
+            engine = api.Engine(config)
+            peaks.append(tracemalloc.get_traced_memory()[1])
+        finally:
+            tracemalloc.stop()
+        assert engine.total_rows == 0
+        del engine
+    assert peaks[1] < peaks[0] * 2.8, peaks
+
+
+def test_compact_paths_preserve_components_hash_collisions_and_serialization():
+    """SCALE-019: tuple boundaries remain distinct and equality checks hash collisions."""
+    import pickle
+
+    from ton._specpath import SpecLocation
+
+    root = SpecLocation()
+    location = root + ("a.b", 0)
+    assert not root and bool(location)
+    assert tuple(location) == ("a.b", 0)
+    assert location == SpecLocation() + ("a.b", 0)
+    assert location != root + ("a", "b", 0)
+    assert location != ("a.b", 0)
+    assert location != root + ("other", 0)
+    assert repr(location) == "'a.b[0]'"
+    assert {location: "value"}[pickle.loads(pickle.dumps(location))] == "value"
+
+    class Colliding(str):
+        def __hash__(self):
+            return 0
+
+    left, right = root + (Colliding("left"),), root + (Colliding("right"),)
+    assert hash(left) == hash(right)
+    assert left != right

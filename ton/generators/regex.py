@@ -164,11 +164,16 @@ class _Continuations:
             WeakValueDictionary()
         )
 
-    def push(self, task: _MatchTask, rest: _MatchStack | None) -> _MatchStack:
+    def push(self, task: _MatchTask, rest: _MatchStack | None) -> _MatchStack | None:
+        minimum = self.plan.minimums[task.sequence]
+        # Completed tasks have no work or identity to retain (PERF-051).
+        if isinstance(task, _SequenceTask) and task.index == len(minimum) - 1:
+            return rest
+        if isinstance(task, _RepeatTask) and task.count == task.maximum:
+            return rest
         key = (task, rest)
         found = self.live.get(key)
         if found is None:
-            minimum = self.plan.minimums[task.sequence]
             own = (
                 minimum[task.index]
                 if isinstance(task, _SequenceTask)
@@ -222,26 +227,35 @@ def _advance_match(
 ) -> tuple[_MatchState, ...]:
     task, rest = tasks.task, tasks.rest
     if isinstance(task, _RepeatTask):
-        return _advance_repeat(stacks, task, rest, position)
+        return _advance_repeat(stacks, value, task, rest, position)
     sequence = stacks.plan.sequences[task.sequence]
-    if task.index == len(sequence):
-        return ((rest, position),)
-    continuation = stacks.push(_SequenceTask(task.sequence, task.index + 1), rest)
+    continuation = rest
+    if task.index + 1 < len(sequence):
+        continuation = stacks.push(_SequenceTask(task.sequence, task.index + 1), rest)
     return _advance_node(stacks, value, sequence[task.index], continuation, position)
 
 
 def _advance_repeat(
-    stacks: _Continuations, task: _RepeatTask, rest: _MatchStack | None, position: int
+    stacks: _Continuations,
+    value: str,
+    task: _RepeatTask,
+    rest: _MatchStack | None,
+    position: int,
 ) -> tuple[_MatchState, ...]:
     states: list[_MatchState] = []
     if task.count >= task.minimum:
         states.append((rest, position))
     if task.maximum is None or task.count < task.maximum:
         next_count = min(task.count + 1, task.minimum) if task.maximum is None else task.count + 1
-        repeat = stacks.push(
-            _RepeatTask(task.sequence, task.minimum, task.maximum, next_count), rest
-        )
-        states.append((stacks.push(_SequenceTask(task.sequence), repeat), position))
+        repeat = rest
+        if next_count != task.maximum:
+            repeat = stacks.push(
+                _RepeatTask(task.sequence, task.minimum, task.maximum, next_count), rest
+            )
+        # The parser repeats one node (possibly a group). Execute that node
+        # directly, without a sequence wrapper or terminal step (PERF-051).
+        node = stacks.plan.sequences[task.sequence][0]
+        states.extend(_advance_node(stacks, value, node, repeat, position))
     return tuple(states)
 
 

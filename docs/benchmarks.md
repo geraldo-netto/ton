@@ -89,6 +89,35 @@ Keep source and dependencies stable throughout a run: boundary checks cannot
 detect a change that is reverted before verification. Comparisons also require
 matching recorded environments.
 
+## Regex continuation follow-up
+
+PERF-051 compares `b11f00c` with the subsequent continuation optimization using
+the same harness: one warmup, five timed samples of 10 rows, and one allocation
+sample of 1 row at sizes 10, 30 and 60. The after report identifies the measured
+working-tree source hashes and marks that source as dirty. All output fingerprints
+match, including the allocation samples.
+
+| Repeat size | Before | After | Runtime change | Runtime allocation change |
+|---|---:|---:|---:|---:|
+| 10 | 8.75 ms | 3.95 ms | -54.9% | -61.8% |
+| 30 | 58.15 ms | 26.19 ms | -55.0% | -58.8% |
+| 60 | 236.63 ms | 105.39 ms | -55.5% | -67.8% |
+
+At size 60, a single seed-42 proof allocates 2,617 continuation nodes instead
+of 6,950 and makes 5,242 interner calls instead of 15,815. Completed tasks and
+single-node repeat bodies avoid temporary sequence states. The existing frontier
+memory, exhaustive matching, nullable repetition and deep nesting tests remain
+in the suite, alongside permanent allocation/work-count checks.
+
+Saved [before](../benchmarks/results/regex-continuations-before.json),
+[after](../benchmarks/results/regex-continuations-after.json) and
+[full comparison](../benchmarks/results/regex-continuations-comparison.md).
+Reproduce the sweep with:
+
+```bash
+uv run --no-sync python benchmarks/run.py --cases regex_proof --sizes 10 30 60 --rows 10 --memory-rows 1 --repeats 5 --output benchmarks/results/regex-continuations-after.json
+```
+
 ## Recorded performance and scalability comparison
 
 The September 11, 2026 run compares `1ccdea4` (the expanded harness, before

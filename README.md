@@ -1221,6 +1221,11 @@ mypy ton                            # strict package type check
 pyright ton
 ```
 
+`ton/py.typed` publishes the inline public API annotations. The normal test suite
+builds a wheel, installs it in an isolated virtual environment, and checks typed
+plugin implementations and invalid API calls from outside the checkout. Hatchling
+is included in the development dependencies; this test builds and installs offline.
+
 Enable the pre-commit gate once per clone so the CI lint + typecheck jobs
 (`ruff check`, `ruff format --check`, `mypy ton`, `pyright ton`) run before
 every commit and block it on failure:

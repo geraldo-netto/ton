@@ -2,12 +2,6 @@
 
 ## Open
 
-### Architecture / modularity
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| ARCH-036 | open | medium | small | Architecture/public typing boundary: the annotated extension API is checked only inside the checkout (`pyproject.toml`, `.github/workflows/ci.yml`); the package has no py.typed marker. In an isolated installed-package layout, mypy reports import-untyped and reveals api.Engine as Any, missing an invalid string seed argument. Adding the marker in that isolated copy restores the expected argument error. Publish the inline typing marker and add an installed-artifact consumer check that exercises public generator/transform/validator contracts, accepts valid implementations, and rejects invalid API calls. Verify the marker is included in the wheel rather than relying only on source-tree type checks. |
-
 ## Blocked / Deferred
 
 | id | status | severity | effort | description |

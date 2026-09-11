@@ -19,6 +19,7 @@ from ._compiler import TemplateError as _TemplateError
 from ._contracts import Generator
 from ._logging import LogEvent
 from ._logging import logger as _logger
+from ._pipeline import TRANSFORM_PIPELINE
 from ._proof import (
     PreparedField,
     ProofFailure,
@@ -29,7 +30,13 @@ from ._proof import (
 from ._proofcheck import ProofChecker, ProofFailureSink, ProofHookError
 from ._steps import OperationError
 from ._transforms import Transform, TransformResult
-from ._validation import ValidationError, Validator, ValidatorHookError, validate_with_reference
+from ._validation import (
+    ValidationError,
+    Validator,
+    ValidatorHookError,
+    validate_pipeline,
+    validation_scope,
+)
 
 TemplateError = _TemplateError
 
@@ -401,9 +408,11 @@ class Engine:
             self._iteration_lock.release()
 
     def _render_row_with_proof_context(self) -> str:
-        token = _trace_enabled.set(self._proof.should_check(self._rows_emitted))
+        checked = self._proof.should_check(self._rows_emitted)
+        token = _trace_enabled.set(checked)
         try:
-            return self._render_row()
+            with validation_scope(checked):
+                return self._render_row()
         finally:
             # Reset before yielding: callers may interleave or nest Engines.
             _trace_enabled.reset(token)
@@ -484,21 +493,12 @@ class Engine:
         return transformed.value
 
     def _run_validators(self, type_key: str, field: PreparedField, value: str) -> None:
-        for validator in field.validators:
-            try:
-                valid = validate_with_reference(validator, value)
-            except Exception as exc:
-                self._raise_pipeline_error(
-                    ValidatorExecutionError,
-                    "Validator",
-                    validator.type_name,
-                    type_key,
-                    exc,
-                )
-            if not valid:
-                raise ValidationError(
-                    f"Value for variable {type_key!r} failed validator {validator.type_name!r}"
-                )
+        try:
+            validate_pipeline(field.validators, value, f"Value for variable {type_key!r}")
+        except ValidatorHookError as exc:
+            self._raise_pipeline_error(
+                ValidatorExecutionError, "Validator", exc.reference, type_key, exc
+            )
 
     def _handle_proof_failures(
         self,
@@ -537,28 +537,16 @@ class Engine:
         field: PreparedField,
         result: TransformResult,
     ) -> tuple[TransformResult, tuple[TransformStep, ...]]:
-        steps: list[TransformStep] | None = (
-            [] if self._proof.should_check(self._rows_emitted) else None
-        )
-        for prepared in field.transforms:
-            before = result
-            try:
-                result = prepared.transform.apply(prepared.prepared, before, self._rng)
-            except ValidationError:
-                # A nested pipeline's validator rejecting a value is a validation
-                # outcome, not a transform crash; surface it like a root validator.
-                raise
-            except Exception as exc:
-                self._raise_pipeline_error(
-                    TransformExecutionError,
-                    "Transform",
-                    prepared.transform.type_name,
-                    type_key,
-                    exc,
-                )
-            if steps is not None:
-                steps.append(TransformStep(prepared=prepared, before=before, after=result))
-        return result, tuple(steps) if steps is not None else ()
+        if not field.transforms:
+            return result, ()
+        try:
+            return TRANSFORM_PIPELINE.apply_chain(field.transforms, result, self._rng)
+        except ValidationError:
+            raise
+        except Exception as exc:
+            self._raise_pipeline_error(
+                TransformExecutionError, "Transform", "pipeline", type_key, exc
+            )
 
     def _raise_pipeline_error(
         self,

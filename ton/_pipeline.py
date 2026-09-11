@@ -7,10 +7,10 @@ from random import Random
 from typing import Any, cast
 
 from ._contracts import Generator
-from ._proof import PreparedTransform, ProofResult, TransformStep, _trace_enabled
+from ._proof import PreparedPipeline, PreparedTransform, ProofResult, TransformStep, _trace_enabled
 from ._steps import Call, Steps, cooperative, run_steps
 from ._transforms import TransformResult
-from ._validation import ValidationError, validate_with_reference
+from ._validation import validate_pipeline
 
 
 @dataclass(frozen=True)
@@ -87,14 +87,14 @@ def prove_draws(draws: tuple[ChildDraw, ...], label: str) -> Steps:
 class _GeneratedChildValue(str):
     """String carrying the exact nested transform trace until proofing."""
 
-    pipeline: ChildPipelineSpec
+    pipeline: PreparedPipeline
     source: TransformResult
     steps: tuple[TransformStep, ...]
 
     def __new__(
         cls,
         value: str,
-        pipeline: ChildPipelineSpec,
+        pipeline: PreparedPipeline,
         source: TransformResult,
         steps: tuple[TransformStep, ...],
     ) -> _GeneratedChildValue:
@@ -108,15 +108,31 @@ class _GeneratedChildValue(str):
         return (str(self), self.pipeline, self.source, self.steps), {}
 
 
-@dataclass(frozen=True)
-class ChildPipelineSpec:
-    """Prepared source and transform stages for one composite child."""
+class TransformPipeline:
+    """Execute the same ordered transform chain for root and child pipelines."""
 
-    generator: Generator
-    source_prepared: Any
-    transforms: tuple[PreparedTransform, ...]
-    uses_source: bool
-    validators: tuple[Any, ...] = ()
+    @cooperative
+    def apply_chain(
+        self, transforms: tuple[PreparedTransform, ...], result: TransformResult, rng: Random
+    ) -> tuple[TransformResult, tuple[TransformStep, ...]]:
+        return cast(
+            tuple[TransformResult, tuple[TransformStep, ...]],
+            run_steps(self, "apply_chain", transforms, result, rng),
+        )
+
+    def _apply_chain_steps(
+        self, transforms: tuple[PreparedTransform, ...], result: TransformResult, rng: Random
+    ) -> Steps:
+        steps: list[TransformStep] | None = [] if _trace_enabled.get() else None
+        for transform in transforms:
+            before = result
+            result = yield Call(transform.transform, "apply", (transform.prepared, before, rng))
+            if steps is not None:
+                steps.append(TransformStep(transform, before, result))
+        return result, tuple(steps) if steps is not None else ()
+
+
+TRANSFORM_PIPELINE = TransformPipeline()
 
 
 class ChildPipelineGenerator(Generator):
@@ -125,34 +141,28 @@ class ChildPipelineGenerator(Generator):
     type_name = "child_pipeline"
 
     @cooperative
-    def generate(self, prepared: ChildPipelineSpec, rng: Random) -> str:
+    def generate(self, prepared: PreparedPipeline, rng: Random) -> str:
         return cast(str, run_steps(self, "generate", prepared, rng))
 
-    def _generate_steps(self, prepared: ChildPipelineSpec, rng: Random) -> Steps:
+    def _generate_steps(self, prepared: PreparedPipeline, rng: Random) -> Steps:
         source = TransformResult(
             (yield Call(prepared.generator, "generate", (prepared.source_prepared, rng)))
             if prepared.uses_source
             else ""
         )
-        result = source
-        steps: list[TransformStep] | None = [] if _trace_enabled.get() else None
-        for transform in prepared.transforms:
-            before = result
-            result = yield Call(transform.transform, "apply", (transform.prepared, before, rng))
-            if steps is not None:
-                steps.append(TransformStep(transform, before, result))
-        for validator in prepared.validators:
-            if not validate_with_reference(validator, result.value):
-                raise ValidationError(f"Nested value failed validator {validator.type_name!r}")
-        if steps is None:
+        result, steps = yield Call(
+            TRANSFORM_PIPELINE, "apply_chain", (prepared.transforms, source, rng)
+        )
+        validate_pipeline(prepared.validators, result.value, "Nested value", defer=True)
+        if not _trace_enabled.get():
             return result.value
-        return _GeneratedChildValue(result.value, prepared, source, tuple(steps))
+        return _GeneratedChildValue(result.value, prepared, source, steps)
 
     @cooperative
-    def prove(self, prepared: ChildPipelineSpec, result: TransformResult) -> ProofResult:
+    def prove(self, prepared: PreparedPipeline, result: TransformResult) -> ProofResult:
         return cast(ProofResult, run_steps(self, "prove", prepared, result))
 
-    def _prove_steps(self, prepared: ChildPipelineSpec, result: TransformResult) -> Steps:
+    def _prove_steps(self, prepared: PreparedPipeline, result: TransformResult) -> Steps:
         value = result.value
         if not isinstance(value, _GeneratedChildValue) or value.pipeline is not prepared:
             return ProofResult(ok=True)

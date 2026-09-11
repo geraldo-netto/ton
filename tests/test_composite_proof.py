@@ -11,8 +11,8 @@ import pytest
 
 from ton._contracts import Generator, PreparationContext
 from ton._engine import Engine, ProofError
-from ton._pipeline import ChildPipelineGenerator, ChildPipelineSpec, DrawnValue
-from ton._proof import ProofResult
+from ton._pipeline import ChildPipelineGenerator, DrawnValue
+from ton._proof import PreparedPipeline, ProofResult
 from ton._transforms import BaseTransform, TransformProof, TransformResult
 from ton._validation import ValidationError
 from ton.generators.one_of import OneOfGenerator
@@ -226,7 +226,7 @@ def test_nested_transform_proof_reports_source_failure() -> None:
 
 def test_nested_pipeline_proof_is_permissive_without_generation_trace() -> None:
     pipeline = ChildPipelineGenerator()
-    prepared = ChildPipelineSpec(_RejectGenerator(), {}, (), True)
+    prepared = PreparedPipeline(_RejectGenerator(), {}, (), True)
 
     assert pipeline.prove(prepared, TransformResult("external")).ok
 

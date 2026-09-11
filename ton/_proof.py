@@ -27,16 +27,22 @@ class PreparedTransform:
 
 
 @dataclass(frozen=True)
-class PreparedField:
-    """Prepared source and proof trace metadata for one template field."""
+class PreparedPipeline:
+    """Shared prepared source, transform and validation stages at every depth."""
 
     generator: Any
     source_prepared: Any
     transforms: tuple[PreparedTransform, ...]
-    is_paired: bool = False
-    source_is_paired: bool = False
     uses_source: bool = True
     validators: tuple[Any, ...] = ()
+
+
+@dataclass(frozen=True)
+class PreparedField(PreparedPipeline):
+    """Pipeline with template pairing and provenance metadata."""
+
+    is_paired: bool = False
+    source_is_paired: bool = False
     provider: tuple[str | None, str | None] = (None, None)
 
     @cached_property

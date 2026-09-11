@@ -84,8 +84,7 @@ def test_traces_follow_sampling_without_changing_draws_or_validators(
     )
     field = engine._plan.prepared["x"]
     with (
-        mock.patch("ton._engine.TransformStep", wraps=TransformStep) as root_trace,
-        mock.patch("ton._pipeline.TransformStep", wraps=TransformStep) as child_trace,
+        mock.patch("ton._pipeline.TransformStep", wraps=TransformStep) as trace,
         mock.patch.object(
             _GeneratedChildValue, "__new__", wraps=_GeneratedChildValue.__new__
         ) as child_value,
@@ -97,7 +96,8 @@ def test_traces_follow_sampling_without_changing_draws_or_validators(
     assert len(field.validators[0].values) == 20
     assert len(field.transforms[0].transform.proven) == checked_rows * 2
     assert validator.values == transform.proven == []  # ARCH-030: supplied objects are prototypes.
-    assert root_trace.call_count == child_trace.call_count == child_value.call_count == checked_rows
+    assert trace.call_count == checked_rows * 2
+    assert child_value.call_count == checked_rows
 
 
 @pytest.mark.parametrize("mode", ["off", "sample", "all"])

@@ -9,8 +9,8 @@ from typing import Any
 from ._contracts import Generator, PreparationContext, resolve_child_spec
 from ._logging import LogEvent
 from ._logging import logger as _logger
-from ._pipeline import ChildPipelineGenerator, ChildPipelineSpec
-from ._proof import PreparedField, PreparedTransform
+from ._pipeline import ChildPipelineGenerator
+from ._proof import PreparedField, PreparedPipeline, PreparedTransform
 from ._references import RegistryError, normalize_reference, resolve_reference, runtime_type_name
 from ._registry import (
     default_transforms,
@@ -260,7 +260,7 @@ class EngineCompiler:
     def _as_child(field: PreparedField) -> tuple[Generator, Any]:
         if not field.transforms and not field.validators:
             return field.generator, field.source_prepared
-        return ChildPipelineGenerator(), ChildPipelineSpec(
+        return ChildPipelineGenerator(), PreparedPipeline(
             field.generator,
             field.source_prepared,
             field.transforms,

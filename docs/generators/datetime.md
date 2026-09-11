@@ -14,6 +14,10 @@ Supported directives are `%a`, `%A`, `%b`, `%B`, `%c`, `%d`, `%H`, `%I`,
 `%z`, `%Z`, `%f`, and `%%`. `%Z` renders `UTC` plus a numeric offset rather
 than a host-specific timezone abbreviation.
 
+Aware bounds are compared as instants and rendered in `minValue`'s timezone.
+Generation and proofs use the interval's representable local datetimes in
+years 1–9999, including when converting `maxValue` would exceed that calendar.
+
 | field       | type   | description                                       |
 |-------------|--------|---------------------------------------------------|
 | `minValue`  | string | ISO 8601 (date or datetime), inclusive            |

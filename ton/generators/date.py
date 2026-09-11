@@ -113,6 +113,7 @@ class DateGenerator(Generator):
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> DateSpec:
         lo, hi = parse_iso_bounds("date", spec)
+        hi = _local_upper_bound(lo, hi)
         fmt = spec.get("format", _DEFAULT_FORMAT)
         format_tokens = _tokenize_format(fmt)
         return DateSpec(
@@ -138,6 +139,19 @@ class DateGenerator(Generator):
             constraints is not None and _matches_interval(prepared, constraints),
             "value has inconsistent date components or is outside the configured date interval",
         )
+
+
+def _local_upper_bound(lo: datetime, hi: datetime) -> datetime:
+    """Intersect with representable local dates before converting zones (REL-061).
+
+    Aware datetime comparisons handle UTC instants outside years 1–9999
+    without materializing them. Conversion is safe only after intersection.
+    Ordered bounds already guarantee the lower endpoint is representable.
+    """
+    if lo.tzinfo is None:
+        return hi
+    ceiling = datetime.max.replace(tzinfo=lo.tzinfo)
+    return min(hi, ceiling).astimezone(lo.tzinfo)
 
 
 def _tokenize_format(fmt: Any) -> tuple[FormatToken, ...]:
@@ -237,8 +251,6 @@ def _months(constraints: dict[str, str]) -> range:
 
 def _matching_dates(prepared: DateSpec, constraints: dict[str, str]) -> Iterator[datetime]:
     lo, hi = prepared.lo, prepared.hi
-    if lo.tzinfo is not None:
-        hi = hi.astimezone(lo.tzinfo)
     for year in _years(constraints, lo.year, hi.year + 1):
         moment = datetime(year, 1, 1, tzinfo=lo.tzinfo)
         if not _components_match(moment, constraints, "Yy"):
@@ -291,8 +303,7 @@ def _time_in_bounds(
     microsecond: int | None,
 ) -> bool:
     lo = max(day, prepared.lo)
-    bound = prepared.hi.astimezone(day.tzinfo) if day.tzinfo is not None else prepared.hi
-    hi = min(day.replace(hour=23, minute=59, second=59, microsecond=999999), bound)
+    hi = min(day.replace(hour=23, minute=59, second=59, microsecond=999999), prepared.hi)
     for hour in hours:
         if not lo.hour <= hour <= hi.hour:
             continue

@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from random import Random
 from typing import Any, cast
+from weakref import WeakValueDictionary
 
 from .._contracts import Generator
 from .._proof import ProofResult, proof_result
@@ -63,15 +64,16 @@ class _MatchNode:
 @dataclass(frozen=True)
 class _MatcherPlan:
     sequences: tuple[tuple[_MatchNode, ...], ...]
+    minimums: tuple[tuple[int, ...], ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _SequenceTask:
     sequence: int
     index: int = 0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class _RepeatTask:
     sequence: int
     minimum: int
@@ -80,7 +82,6 @@ class _RepeatTask:
 
 
 _MatchTask = _SequenceTask | _RepeatTask
-_MatchState = tuple[tuple[_MatchTask, ...], int]
 
 
 class RegexGenerator(Generator):
@@ -128,7 +129,8 @@ def _build_matcher(root: tuple[tuple[Any, Any], ...]) -> _MatcherPlan:
 
     for sequence_id, source in enumerate(sources):
         compiled[sequence_id] = tuple(_compile_match_node(node, register) for node in source)
-    return _MatcherPlan(tuple(sequence or () for sequence in compiled))
+    sequences = tuple(sequence or () for sequence in compiled)
+    return _MatcherPlan(sequences, _minimum_lengths(sequences))
 
 
 def _compile_match_node(
@@ -146,81 +148,148 @@ def _compile_match_node(
     return _MatchNode(op, arg)
 
 
+@dataclass(frozen=True, slots=True, weakref_slot=True, eq=False)
+class _MatchStack:
+    task: _MatchTask
+    rest: _MatchStack | None
+    minimum: int
+
+
+class _Continuations:
+    """Intern live stacks only; consumed frontiers do not retain match history."""
+
+    def __init__(self, plan: _MatcherPlan) -> None:
+        self.plan = plan
+        self.live: WeakValueDictionary[tuple[_MatchTask, _MatchStack | None], _MatchStack] = (
+            WeakValueDictionary()
+        )
+
+    def push(self, task: _MatchTask, rest: _MatchStack | None) -> _MatchStack:
+        key = (task, rest)
+        found = self.live.get(key)
+        if found is None:
+            minimum = self.plan.minimums[task.sequence]
+            own = (
+                minimum[task.index]
+                if isinstance(task, _SequenceTask)
+                else minimum[0] * max(0, task.minimum - task.count)
+            )
+            found = _MatchStack(task, rest, own + (rest.minimum if rest else 0))
+            self.live[key] = found
+        return found
+
+
+_MatchState = tuple[_MatchStack | None, int]
+
+
 def _matches(plan: _MatcherPlan, value: str) -> bool:
-    pending: list[_MatchState] = [((_SequenceTask(0),), 0)]
-    seen: set[_MatchState] = set()
-    while pending:
-        tasks, position = pending.pop()
-        state = (tasks, position)
-        if state in seen:
-            continue
-        seen.add(state)
-        if not tasks:
-            if position == len(value):
-                return True
-            continue
-        pending.extend(_advance_match(plan, value, tasks, position))
+    stacks = _Continuations(plan)
+    frontier: set[_MatchStack | None] = {stacks.push(_SequenceTask(0), None)}
+    position = 0
+    while frontier:
+        accepted, frontier = _match_position(stacks, value, position, frontier)
+        if accepted:
+            return True
+        position += 1
     return False
 
 
+def _match_position(
+    stacks: _Continuations, value: str, position: int, frontier: set[_MatchStack | None]
+) -> tuple[bool, set[_MatchStack | None]]:
+    pending = list(frontier)
+    seen: set[_MatchStack | None] = set()
+    following: set[_MatchStack | None] = set()
+    while pending:
+        tasks = pending.pop()
+        if tasks in seen:
+            continue
+        seen.add(tasks)
+        if tasks is None:
+            if position == len(value):
+                return True, following
+        elif tasks.minimum <= len(value) - position:
+            for continuation, end in _advance_match(stacks, value, tasks, position):
+                if end == position:
+                    pending.append(continuation)
+                else:
+                    following.add(continuation)
+    return False, following
+
+
 def _advance_match(
-    plan: _MatcherPlan,
-    value: str,
-    tasks: tuple[_MatchTask, ...],
-    position: int,
+    stacks: _Continuations, value: str, tasks: _MatchStack, position: int
 ) -> tuple[_MatchState, ...]:
-    task, rest = tasks[0], tasks[1:]
+    task, rest = tasks.task, tasks.rest
     if isinstance(task, _RepeatTask):
-        return _advance_repeat(task, rest, position)
-    sequence = plan.sequences[task.sequence]
+        return _advance_repeat(stacks, task, rest, position)
+    sequence = stacks.plan.sequences[task.sequence]
     if task.index == len(sequence):
         return ((rest, position),)
-    continuation = (_SequenceTask(task.sequence, task.index + 1), *rest)
-    return _advance_node(plan, value, sequence[task.index], continuation, position)
+    continuation = stacks.push(_SequenceTask(task.sequence, task.index + 1), rest)
+    return _advance_node(stacks, value, sequence[task.index], continuation, position)
 
 
 def _advance_repeat(
-    task: _RepeatTask,
-    rest: tuple[_MatchTask, ...],
-    position: int,
+    stacks: _Continuations, task: _RepeatTask, rest: _MatchStack | None, position: int
 ) -> tuple[_MatchState, ...]:
     states: list[_MatchState] = []
     if task.count >= task.minimum:
         states.append((rest, position))
     if task.maximum is None or task.count < task.maximum:
         next_count = min(task.count + 1, task.minimum) if task.maximum is None else task.count + 1
-        states.append(
-            (
-                (
-                    _SequenceTask(task.sequence),
-                    _RepeatTask(task.sequence, task.minimum, task.maximum, next_count),
-                    *rest,
-                ),
-                position,
-            )
+        repeat = stacks.push(
+            _RepeatTask(task.sequence, task.minimum, task.maximum, next_count), rest
         )
+        states.append((stacks.push(_SequenceTask(task.sequence), repeat), position))
     return tuple(states)
 
 
 def _advance_node(
-    plan: _MatcherPlan,
+    stacks: _Continuations,
     value: str,
     node: _MatchNode,
-    rest: tuple[_MatchTask, ...],
+    rest: _MatchStack | None,
     position: int,
 ) -> tuple[_MatchState, ...]:
     if node.op is rx.SUBPATTERN:
-        return (((_SequenceTask(node.arg), *rest), position),)
+        return ((stacks.push(_SequenceTask(node.arg), rest), position),)
     if node.op is rx.BRANCH:
-        return tuple(((_SequenceTask(branch), *rest), position) for branch in node.arg)
+        return tuple((stacks.push(_SequenceTask(branch), rest), position) for branch in node.arg)
     if node.op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
         minimum, maximum, sequence = node.arg
-        return (((_RepeatTask(sequence, minimum, maximum), *rest), position),)
+        # Nullable iterations can always pad a shorter draw to its lower bound.
+        # Only nonempty iterations need representation, at most one per character.
+        if stacks.plan.minimums[sequence][0] == 0:
+            minimum = 0
+            maximum = min(maximum, len(value) - position) if maximum is not None else None
+        return ((stacks.push(_RepeatTask(sequence, minimum, maximum), rest), position),)
     if node.op is rx.AT:
         return ((rest, position),)
     if position < len(value) and _atom_matches(node, value[position]):
         return ((rest, position + 1),)
     return ()
+
+
+def _minimum_lengths(sequences: tuple[tuple[_MatchNode, ...], ...]) -> tuple[tuple[int, ...], ...]:
+    """The parser supplies a tree; registered child sequences follow their parents."""
+    minimums: list[tuple[int, ...]] = [()] * len(sequences)
+    for index in reversed(range(len(sequences))):
+        suffix = [0] * (len(sequences[index]) + 1)
+        for offset in reversed(range(len(sequences[index]))):
+            suffix[offset] = suffix[offset + 1] + _node_minimum(sequences[index][offset], minimums)
+        minimums[index] = tuple(suffix)
+    return tuple(minimums)
+
+
+def _node_minimum(node: _MatchNode, minimums: list[tuple[int, ...]]) -> int:
+    if node.op is rx.SUBPATTERN:
+        return minimums[cast(int, node.arg)][0]
+    if node.op is rx.BRANCH:
+        return min(minimums[branch][0] for branch in cast(tuple[int, ...], node.arg))
+    if node.op in (rx.MAX_REPEAT, rx.MIN_REPEAT):
+        return cast(int, node.arg[0] * minimums[node.arg[2]][0])
+    return 0 if node.op is rx.AT else 1
 
 
 def _atom_matches(node: _MatchNode, char: str) -> bool:

@@ -16,7 +16,7 @@ import tracemalloc
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CASES = (
+DEFAULT_CASES = (
     "import_json",
     "import_api",
     "integer",
@@ -30,69 +30,76 @@ CASES = (
 )
 
 
-def config_for(case: str, rows: int) -> dict:
-    integer = {"type": "integer", "minValue": -1000000, "maxValue": 1000000}
-    config = {"rows": rows, "format": "$x$", "types": {"x": integer}}
-    if case == "mixed":
-        config = json.loads((ROOT / "examples" / "hwmetrics.json").read_text())
-        config["rows"] = rows
-    elif case == "paired_proof":
-        config["format"] = "$x[id]$:$x$"
-        config["types"]["x"] = {
-            "type": "hash",
-            "algorithm": "sha256",
-            "values": [f"value-{i}" for i in range(100)],
-        }
-    elif case in {"nested_proof", "deep_compile"}:
-        for _ in range(8 if case == "nested_proof" else 150):
-            integer = {"type": "oneOf", "choices": [integer]}
-        config["types"]["x"] = integer
-    elif case == "transform_proof":
-        integer["transforms"] = [{"type": "identity"} for _ in range(4)]
-    elif case == "wide_compile":
-        config["types"] = {f"x{i}": dict(integer) for i in range(250)}
-        config["format"] = ",".join(f"$x{i}$" for i in range(250))
-    elif case == "worker":
-        config["types"]["x"] = {
-            "type": "sequence_of",
-            "count": 3,
-            "separator": ",",
-            "spec": {"type": "sequence"},
-        }
-    return config
+# Keep the original quick suite as the default; expensive sweeps are explicit.
+CASES = (
+    *DEFAULT_CASES,
+    "string_proof",
+    "email_proof",
+    "date_proof",
+    "char_proof",
+    "regex_proof",
+    "trace_proof",
+    "snapshot_compile",
+    "unused_compile",
+    "worker_compile",
+    "decimal",
+    "extension_compile",
+    "audit",
+)
 
 
-def measure(case: str, rows: int, memory: bool) -> dict:
+def measure(
+    case: str, rows: int, memory: bool, *, size: int | None = None, width: int = 100000
+) -> dict:
     sys.path.insert(0, str(ROOT))
-    if memory:
-        tracemalloc.start()
     if case.startswith("import_"):
+        if memory:
+            tracemalloc.start()
         started = time.perf_counter()
         importlib.import_module("ton._json" if case == "import_json" else "ton.api")
         result = {"setup_seconds": time.perf_counter() - started, "run_seconds": 0.0}
-    else:
-        result = measure_engine(case, rows)
+        if memory:
+            result.update(setup_peak_bytes=tracemalloc.get_traced_memory()[1], run_peak_bytes=0)
+            tracemalloc.stop()
+        return result
+    return measure_engine(case, rows, memory=memory, size=size, width=width)
+
+
+def measure_engine(case, rows, *, memory=False, size=None, width=100000):
+    from benchmarks.workloads import (
+        DEFAULT_SIZES,
+        DigestSink,
+        build_engine,
+        config_for,
+        options_for,
+    )
+
+    # Input creation and imports are outside both measured phases.
+    size = DEFAULT_SIZES.get(case, 1) if size is None else size
+    config = config_for(case, rows, size, width)
+    options = options_for(case, size)
+    sink = DigestSink()
     if memory:
-        result["peak_traced_bytes"] = tracemalloc.get_traced_memory()[1]
+        tracemalloc.start()
+    started = time.perf_counter()
+    engine = build_engine(case, config, options, size, sink)
+    result = {"setup_seconds": time.perf_counter() - started}
+    if memory:
+        result["setup_peak_bytes"] = tracemalloc.get_traced_memory()[1]
+        tracemalloc.stop()
+        tracemalloc.start()
+    started = time.perf_counter()
+    result.update(consume(engine, case, sink))
+    result["run_seconds"] = time.perf_counter() - started
+    if memory:
+        result["run_peak_bytes"] = tracemalloc.get_traced_memory()[1]
         tracemalloc.stop()
     return result
 
 
-def measure_engine(case: str, rows: int) -> dict:
-    from ton import api
-
-    config = config_for(case, rows)
-    started = time.perf_counter()
-    if case == "worker":
-        engine = api.fork_engine(config, parent_seed=42, worker_id=2, workers=4, rows=rows)
-    else:
-        engine = api.Engine.from_options(
-            config, api.EngineOptions(seed=42, proof_mode="all" if "proof" in case else "off")
-        )
-    setup = time.perf_counter() - started
+def consume(engine, case, sink):
     count = characters = 0
     digest = hashlib.sha256()
-    started = time.perf_counter()
     if not case.endswith("compile"):
         for row in engine:
             count += 1
@@ -100,34 +107,58 @@ def measure_engine(case: str, rows: int) -> dict:
             digest.update(row.encode("utf-8"))
             digest.update(b"\n")
     return {
-        "setup_seconds": setup,
-        "run_seconds": time.perf_counter() - started,
         "rows": count,
         "characters": characters,
         "sha256": digest.hexdigest(),
+        "audit_characters": sink.characters,
+        "audit_sha256": sink.digest.hexdigest(),
     }
 
 
-def sample(case: str, rows: int, *, memory: bool = False) -> dict:
-    command = [sys.executable, str(Path(__file__).resolve()), "--worker", case, "--rows", str(rows)]
+def sample(case, rows, *, memory=False, size=None, width=100000):
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--worker",
+        case,
+        "--rows",
+        str(rows),
+        "--width",
+        str(width),
+    ]
+    if size is not None:
+        command.extend(("--sizes", str(size)))
     if memory:
         command.append("--trace-memory")
     completed = subprocess.run(command, check=True, capture_output=True, text=True, cwd=ROOT)
     return json.loads(completed.stdout)
 
 
-def benchmark(case: str, args: argparse.Namespace) -> dict:
-    sample(case, args.rows)  # Discard one warmup; timings still use fresh interpreters.
-    samples = [sample(case, args.rows) for _ in range(args.repeats)]
-    fingerprints = {(s.get("rows"), s.get("characters"), s.get("sha256")) for s in samples}
-    if len(fingerprints) != 1:
+def fingerprint(sample):
+    return tuple(
+        sample.get(key)
+        for key in ("rows", "characters", "sha256", "audit_characters", "audit_sha256")
+    )
+
+
+def benchmark(case, args, size):
+    sample(case, args.rows, size=size, width=args.width)
+    samples = [sample(case, args.rows, size=size, width=args.width) for _ in range(args.repeats)]
+    if len({fingerprint(s) for s in samples}) != 1:
         raise RuntimeError(f"non-deterministic benchmark output: {case}")
     timings = {}
     for key in ("setup_seconds", "run_seconds"):
         values = [s[key] for s in samples]
         timings[key] = {"median": statistics.median(values), "min": min(values), "max": max(values)}
-    memory = sample(case, min(args.rows, args.memory_rows), memory=True)
-    return {"samples": samples, "timings": timings, "memory_sample": memory}
+    memory = sample(
+        case, min(args.rows, args.memory_rows), memory=True, size=size, width=args.width
+    )
+    return {
+        "parameters": {"size": size, "width": args.width},
+        "samples": samples,
+        "timings": timings,
+        "memory_sample": memory,
+    }
 
 
 def positive_int(value: str) -> int:
@@ -142,26 +173,50 @@ def main() -> None:
     parser.add_argument("--rows", type=positive_int, default=20000)
     parser.add_argument("--repeats", type=positive_int, default=5)
     parser.add_argument("--memory-rows", type=positive_int, default=1000)
-    parser.add_argument("--cases", nargs="+", choices=CASES, default=list(CASES))
+    parser.add_argument("--cases", nargs="+", choices=CASES, default=list(DEFAULT_CASES))
+    parser.add_argument(
+        "--sizes",
+        type=positive_int,
+        nargs="+",
+        help="Sweep each case over these sizes (see docs/benchmarks.md).",
+    )
+    parser.add_argument(
+        "--width", type=positive_int, default=100000, help="Payload characters for trace_proof."
+    )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--worker", choices=CASES, help=argparse.SUPPRESS)
     parser.add_argument("--trace-memory", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.worker:
-        print(json.dumps(measure(args.worker, args.rows, args.trace_memory)))
+        print(
+            json.dumps(
+                measure(
+                    args.worker,
+                    args.rows,
+                    args.trace_memory,
+                    size=args.sizes[0] if args.sizes else None,
+                    width=args.width,
+                )
+            )
+        )
         return
+    sys.path.insert(0, str(ROOT))
+    from benchmarks.workloads import DEFAULT_SIZES
+
     results = {}
     for case in args.cases:
-        results[case] = benchmark(case, args)
-        timing = results[case]["timings"]
-        print(
-            f"{case}: setup={timing['setup_seconds']['median']:.6f}s "
-            f"run={timing['run_seconds']['median']:.6f}s",
-            file=sys.stderr,
-            flush=True,
-        )
+        for size in args.sizes or [DEFAULT_SIZES.get(case, 1)]:
+            key = f"{case}@{size}"
+            results[key] = benchmark(case, args, size)
+            timing = results[key]["timings"]
+            print(
+                f"{key}: setup={timing['setup_seconds']['median']:.6f}s "
+                f"run={timing['run_seconds']['median']:.6f}s",
+                file=sys.stderr,
+                flush=True,
+            )
     report = {
-        "schema": "ton.benchmark/v1",
+        "schema": "ton.benchmark/v2",
         "revision": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
         ).strip(),
@@ -172,7 +227,9 @@ def main() -> None:
         "rows": args.rows,
         "repeats": args.repeats,
         "memory_rows": min(args.rows, args.memory_rows),
-        "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "harness_sha256": hashlib.sha256(
+            Path(__file__).read_bytes() + (ROOT / "benchmarks/workloads.py").read_bytes()
+        ).hexdigest(),
         "results": results,
     }
     payload = json.dumps(report, indent=2) + "\n"

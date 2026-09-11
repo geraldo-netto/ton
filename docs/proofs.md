@@ -17,6 +17,10 @@ uses it for `--proof-report` UTF-8 JSON Lines output. Pipeline metadata is
 available through `Engine.provenance`, which reports the source type, transform
 chain, proof mode, sample rate, and failure count per field.
 
+Completed failure values, paired IDs and reasons are plain diagnostic strings;
+they do not retain child-draw traces. Standalone composite proofs use the live
+traced value returned by the generator, as described in [extensions](extensions.md).
+
 Structured proof-check logs include identifiers such as row, field, stage, and
 reference. They do not include raw generated values. Proof reports include
 values, paired ids, and field specs unless `--redact-proof-failures` is set.

@@ -28,12 +28,6 @@
 | PERF-051 | open | medium | medium | Performance: reduce transient continuation/interner work in `ton/generators/regex.py::_Continuations.push` and the frontier evaluator without losing SCALE-023's memory bound. Saved `benchmarks/results/proofs-comparison.md` shows N=60 regex proofs 76.1% slower despite 91.2% lower runtime allocation. A ten-proof profile of the generated `(?:a?){60}a{60}` value makes 158,150 interner pushes and 69,500 weak-reference insertions/removals. Reuse compact states or specialize suitable transitions; retain exhaustive/nullable/deep/count regressions and the frontier memory test, add structural allocation/work-count coverage, and rerun the saved size sweep with matching fingerprints. |
 | PERF-052 | open | medium | small | Performance/benchmark validity: capture the measured source state in `benchmarks/run.py`, not only `git rev-parse HEAD` after all samples. Uncommitted runtime edits are currently labeled as the unchanged commit, and a checkout/edit during the run can mix implementations while equal-output samples still pass. Record a source/worktree fingerprint at the start and verify it remains stable through completion; identify dirty measurements explicitly and retain dependency/environment provenance needed to reproduce them. Add fixture-repository regressions for clean, dirty and mid-run changes without rejecting legitimate dirty-tree benchmarking. |
 
-### Scalability
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| SCALE-027 | open | high | medium | Scalability: detach completed proof traces before retaining/exporting diagnostic values in `ton/_proofcheck.py::_make_failure`. A composite that draws a newly allocated 100,000-character child, then returns `x`, stores the entire child graph through each failure's `DrawnValue`; 10/100 audit failures retain approximately 1.01/10.10 MB despite one-character visible values. Store plain diagnostic strings once proof evaluation finishes, retaining exact value/id/reason/spec and redaction behavior. Add permanent weak-reference or retained-allocation regressions for composites and transformed children, including strict errors and streamed/retained audit records; do not reduce the sample boundary or cap child sizes. |
-
 ## Blocked / Deferred
 
 | id | status | severity | effort | description |

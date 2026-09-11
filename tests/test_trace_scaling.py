@@ -1,8 +1,10 @@
 """SCALE-024: nested proof metadata shares unchanged text payloads."""
 
 import copy
+import gc
 import pickle
 import tracemalloc
+import weakref
 from random import Random
 
 import pytest
@@ -124,3 +126,94 @@ def test_public_transform_result_drops_stale_trace_on_changed_text():
     changed = replace(as_result(value), value="changed")
     assert public_result(changed) is changed
     assert not field.generator.prove(field.source_prepared, public_result(changed)).ok
+
+
+@pytest.mark.parametrize("mode", ["all", "audit"])
+@pytest.mark.parametrize("transformed", [False, True])
+@pytest.mark.parametrize("redact", [False, True])
+def test_completed_failures_release_discarded_child_payloads(
+    monkeypatch, mode, transformed, redact
+):
+    """SCALE-027: diagnostic strings never own a completed composite draw graph."""
+    from ton._proofcheck import ProofChecker
+
+    payloads = []
+    diagnostics = []
+    streamed = []
+
+    class Payload(str):
+        pass
+
+    class Large(api.Generator):
+        def generate(self, prepared, rng):
+            value = Payload("z" * 100000)
+            payloads.append(weakref.ref(value))
+            return value
+
+        def prove(self, prepared, result):
+            return api.ProofResult(False, "child rejected")
+
+    class Discard(api.CompositeGenerator):
+        type_name = "discard"
+
+        def nested_specs(self, spec):
+            return ((("spec",), spec["spec"]),)
+
+        def prepare(self, spec, context=None):
+            return context.prepare_child(self.type_name, ("spec",), spec["spec"])
+
+        def generate_steps(self, prepared, rng):
+            yield api.ChildCall(*prepared)
+            return "x"
+
+    child = {"type": "large"}
+    if transformed:
+        child["transforms"] = [{"type": "identity"}]
+    config = {
+        "rows": 10,
+        "format": "$x$",
+        "types": {"x": {"type": "discard", "spec": child}},
+    }
+    monkeypatch.setattr(ProofChecker, "_log_failure", staticmethod(diagnostics.append))
+    engine = api.Engine(
+        config,
+        registry={"discard": Discard(), "large": Large()},
+        proof_mode=mode,
+        redact_proof_failures=redact,
+        proof_failure_sink=streamed.append if mode == "audit" else None,
+    )
+    if mode == "all":
+        with pytest.raises(api.ProofError, match="redacted" if redact else "child rejected"):
+            list(engine)
+    else:
+        assert list(engine) == ["x"] * 10
+        assert streamed == list(engine.proof_failures)
+    assert len(payloads) == len(diagnostics) == (1 if mode == "all" else 10)
+    assert all(type(failure.value) is str for failure in diagnostics)
+    assert {failure.value for failure in diagnostics} == ({"<redacted>"} if redact else {"x"})
+    gc.collect()
+    assert all(reference() is None for reference in payloads)
+
+
+def test_failure_text_fields_detach_subclass_state_without_changing_text():
+    """SCALE-027: paired IDs and plugin reasons cannot retain hidden payloads either."""
+    from ton._proofcheck import ProofChecker
+
+    class Text(str):
+        def __str__(self):
+            return "different"
+
+    text = Text("actual")
+    text.payload = bytearray(100000)
+    checker = ProofChecker(mode="audit", sample_rate=1, seed=42)
+    failure = checker._make_failure(
+        type_key="x",
+        stage="source",
+        reference="paired",
+        reason=text,
+        result=api.TransformResult(text, text),
+        row=1,
+        spec=None,
+    )
+    assert (failure.value, failure.id_value, failure.reason) == ("actual",) * 3
+    assert all(type(value) is str for value in (failure.value, failure.id_value, failure.reason))

@@ -110,8 +110,11 @@ def test_traced_draw_and_audit_roundtrips_preserve_proof_ownership(serialization
     failure = roundtrip(engine.proof_failures[0])
     assert failure.row == 1 and failure.type_key == "x" and reason in failure.reason
     assert failure.spec == engine.proof_failures[0].spec
-    proof = failure.value.owner.prove(TransformResult(failure.value))
-    assert not proof.ok and reason in proof.reason
+    # SCALE-027: completed diagnostics detach draws; live values above still
+    # preserve proof ownership through both supported serialization paths.
+    assert type(failure.value) is str
+    assert failure.value == "x"
+    assert failure == engine.proof_failures[0]
 
 
 @pytest.mark.parametrize("mode", ["all", "audit"])

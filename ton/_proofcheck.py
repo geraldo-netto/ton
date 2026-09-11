@@ -275,9 +275,11 @@ class ProofChecker:
             type_key=type_key,
             stage=stage,
             reference=reference,
-            reason=reason,
-            value=result.value,
-            id_value=result.id_value,
+            # Public string subclasses may own complete child traces. Proofs
+            # have finished; diagnostics retain only their exact text (SCALE-027).
+            reason=str.__str__(reason),
+            value=str.__str__(result.value),
+            id_value=str.__str__(result.id_value) if result.id_value is not None else None,
             seed=self.seed,
             spec=dict(spec) if spec is not None else None,
         )

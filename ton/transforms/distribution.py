@@ -8,6 +8,7 @@ from typing import Any, ClassVar, cast
 
 from .._contracts import PreparationContext
 from .._distribution import WeightedChoiceSet, prepare_distribution
+from .._pipeline import as_result, public_result
 from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
 from .._transforms import BaseTransform, TransformCapabilities, TransformProof, TransformResult
@@ -54,12 +55,12 @@ class DistributionTransform(BaseTransform):
         value: TransformResult,
         rng: Random,
     ) -> TransformResult:
-        return cast(TransformResult, run_steps(self, "apply", prepared, value, rng))
+        return public_result(run_steps(self, "apply", prepared, value, rng))
 
     def _apply_steps(
         self, prepared: WeightedChoiceSet, value: TransformResult, rng: Random
     ) -> Steps:
-        return TransformResult((yield Call(prepared, "choose", (rng,))))
+        return as_result((yield Call(prepared, "choose", (rng,))))
 
     @cooperative
     def prove(

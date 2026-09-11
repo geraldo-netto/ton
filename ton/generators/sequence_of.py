@@ -27,11 +27,12 @@ from typing import Any, cast
 
 from .._contracts import Generator, PreparationContext
 from .._partition import PartitionSpec
-from .._pipeline import ChildDraw, DrawnValue, prove_draws, proven_draws
+from .._pipeline import ChildDraw, DrawTrace, prove_draws, proven_draws, public_value
 from .._proof import ProofResult, _trace_enabled
 from .._scalars import coerce_int
 from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
+from .._tracetext import TraceText, plain_text
 from .._transforms import TransformResult
 
 
@@ -76,7 +77,7 @@ class SequenceOfGenerator(Generator):
 
     @cooperative
     def generate(self, prepared: SequenceOfSpec, rng: Random) -> str:
-        return cast(str, run_steps(self, "generate", prepared, rng))
+        return public_value(run_steps(self, "generate", prepared, rng))
 
     def _generate_steps(self, prepared: SequenceOfSpec, rng: Random) -> Steps:
         child_gen, child_prepared = prepared.child
@@ -87,10 +88,11 @@ class SequenceOfGenerator(Generator):
             return prepared.separator.join(parts)
         # Keep every element's own draw: joining into plain text dropped the
         # children's proof context, so a rejecting child passed (REL-023).
-        return DrawnValue(
-            prepared.separator.join(parts),
-            tuple(ChildDraw(child_gen, child_prepared, part) for part in parts),
-            prepared,
+        return TraceText(
+            prepared.separator.join(plain_text(part) for part in parts),
+            DrawTrace(
+                tuple(ChildDraw(child_gen, child_prepared, part) for part in parts), prepared
+            ),
         )
 
     @cooperative

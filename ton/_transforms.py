@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from random import Random
 from typing import Any, ClassVar, Protocol, runtime_checkable
 
 from ._specpath import SpecPath
+from ._tracetext import TraceText
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ class TransformResult:
 
     value: str
     id_value: str | None = None
+    _trace: TraceText | None = field(default=None, repr=False, compare=False)
 
     @property
     def is_paired(self) -> bool:

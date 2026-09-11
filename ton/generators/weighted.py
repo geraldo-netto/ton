@@ -36,6 +36,7 @@ from .._distribution import (
     WeightedChoiceSet,
     prepare_distribution,
 )
+from .._pipeline import public_value
 from .._proof import ProofResult
 from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
@@ -89,7 +90,7 @@ class WeightedGenerator(Generator):
 
     @cooperative
     def generate(self, prepared: WeightedSpec, rng: Random) -> str:
-        return cast(str, run_steps(self, "generate", prepared, rng))
+        return public_value(run_steps(self, "generate", prepared, rng))
 
     def _generate_steps(self, prepared: WeightedSpec, rng: Random) -> Steps:
         return (yield Call(prepared.distribution, "choose", (rng,)))

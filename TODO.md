@@ -2,16 +2,7 @@
 
 ## Open
 
-### Performance
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-
-### Scalability
-
-| id | status | severity | effort | description |
-|---|---|---|---|---|
-| SCALE-024 | open | high | large | Scalability: separate proof metadata from repeated copies of unchanged string payloads in `ton/_pipeline.py::DrawnValue`, `_GeneratedChildValue` and their composite callers. Each `str` subclass wrapper copies the entire child text and retains the prior wrapper through its trace. A single 100,000-character value wrapped in 10/40/80 one-choice `oneOf` levels peaks at 1.11/4.13/8.16 MB in proof-all mode versus about 0.10/0.11/0.11 MB with proofs off. Preserve shared text storage across passthrough traces while retaining exact child ownership and transformed before/after values. Add payload-sharing/allocation-growth regressions covering nested composites, child pipelines, sampling, rejected children and pickle/deepcopy behavior. |
+No open items.
 
 ## Blocked / Deferred
 

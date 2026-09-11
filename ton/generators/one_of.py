@@ -27,7 +27,7 @@ from random import Random
 from typing import Any, cast
 
 from .._contracts import Generator, PreparationContext
-from .._pipeline import drawn, prove_draws, proven_draws
+from .._pipeline import drawn, prove_draws, proven_draws, public_value
 from .._proof import ProofResult
 from .._specpath import SpecPath
 from .._steps import Call, Steps, cooperative, run_steps
@@ -74,7 +74,7 @@ class OneOfGenerator(Generator):
 
     @cooperative
     def generate(self, prepared: OneOfSpec, rng: Random) -> str:
-        return cast(str, run_steps(self, "generate", prepared, rng))
+        return public_value(run_steps(self, "generate", prepared, rng))
 
     def _generate_steps(self, prepared: OneOfSpec, rng: Random) -> Steps:
         child_gen, child_prepared = rng.choice(prepared.children)

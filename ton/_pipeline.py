@@ -9,6 +9,7 @@ from typing import Any, cast
 from ._contracts import Generator
 from ._proof import PreparedPipeline, PreparedTransform, ProofResult, TransformStep, _trace_enabled
 from ._steps import Call, Steps, _attribute_error, cooperative, run_steps
+from ._tracetext import TraceText, plain_text
 from ._transforms import TransformResult
 from ._validation import validate_pipeline
 
@@ -19,7 +20,20 @@ class ChildDraw:
 
     generator: Generator
     prepared: Any
-    value: str
+    value: str | TraceText
+
+
+@dataclass(frozen=True, slots=True)
+class DrawTrace:
+    draws: tuple[ChildDraw, ...]
+    owner: object
+
+
+@dataclass(frozen=True, slots=True)
+class PipelineTrace:
+    pipeline: PreparedPipeline
+    source: TransformResult
+    steps: tuple[TransformStep, ...]
 
 
 class DrawnValue(str):
@@ -48,11 +62,49 @@ class DrawnValue(str):
         return (str(self), self.draws, self.owner), {}
 
 
-def drawn(generator: Generator, prepared: Any, value: str, owner: object) -> str:
+def drawn(
+    generator: Generator, prepared: Any, value: str | TraceText, owner: object
+) -> str | TraceText:
     """Tag ``value`` with the single child draw that produced it."""
     if not _trace_enabled.get():
         return value
-    return DrawnValue(value, (ChildDraw(generator, prepared, value),), owner)
+    return TraceText(plain_text(value), DrawTrace((ChildDraw(generator, prepared, value),), owner))
+
+
+def as_result(value: str | TraceText) -> TransformResult:
+    if isinstance(value, TraceText):
+        return TransformResult(value.value, _trace=value)
+    return TransformResult(value)
+
+
+def public_value(value: str | TraceText) -> str:
+    """Materialize a string wrapper only at a public operation boundary."""
+    if not isinstance(value, TraceText):
+        return value
+    trace = value.trace
+    if isinstance(trace, DrawTrace):
+        return DrawnValue(value.value, trace.draws, trace.owner)
+    pipeline_trace = cast(PipelineTrace, trace)
+    return _GeneratedChildValue(
+        value.value, pipeline_trace.pipeline, pipeline_trace.source, pipeline_trace.steps
+    )
+
+
+def public_result(result: TransformResult) -> TransformResult:
+    if result._trace is None or result.value is not result._trace.value:
+        return result
+    return TransformResult(public_value(result._trace), result.id_value)
+
+
+def _result_trace(result: TransformResult) -> object | None:
+    if result._trace is not None and result.value is result._trace.value:
+        return result._trace.trace
+    value = result.value
+    if isinstance(value, DrawnValue):
+        return DrawTrace(value.draws, value.owner)
+    if isinstance(value, _GeneratedChildValue):
+        return PipelineTrace(value.pipeline, value.source, value.steps)
+    return None
 
 
 def proven_draws(result: TransformResult, owner: object) -> tuple[ChildDraw, ...] | None:
@@ -61,10 +113,10 @@ def proven_draws(result: TransformResult, owner: object) -> tuple[ChildDraw, ...
     External or re-derived values retain the composite's ordinary fallback.
     Ownership is carried by the value, so pickle/deepcopy preserve the relationship.
     """
-    value = result.value
-    if not isinstance(value, DrawnValue) or value.owner is not owner:
+    trace = _result_trace(result)
+    if not isinstance(trace, DrawTrace) or trace.owner is not owner:
         return None
-    return value.draws
+    return trace.draws
 
 
 def prove_draws(draws: tuple[ChildDraw, ...], label: str) -> Steps:
@@ -73,7 +125,7 @@ def prove_draws(draws: tuple[ChildDraw, ...], label: str) -> Steps:
         proof = yield Call(
             draw.generator,
             "prove",
-            (draw.prepared, TransformResult(draw.value)),
+            (draw.prepared, as_result(draw.value)),
             proof_stage="source",
         )
         if not proof.ok:
@@ -115,10 +167,11 @@ class TransformPipeline:
     def apply_chain(
         self, transforms: tuple[PreparedTransform, ...], result: TransformResult, rng: Random
     ) -> tuple[TransformResult, tuple[TransformStep, ...]]:
-        return cast(
+        final, steps = cast(
             tuple[TransformResult, tuple[TransformStep, ...]],
             run_steps(self, "apply_chain", transforms, result, rng),
         )
+        return public_result(final), steps
 
     def _apply_chain_steps(
         self, transforms: tuple[PreparedTransform, ...], result: TransformResult, rng: Random
@@ -154,10 +207,10 @@ class ChildPipelineGenerator(Generator):
 
     @cooperative
     def generate(self, prepared: PreparedPipeline, rng: Random) -> str:
-        return cast(str, run_steps(self, "generate", prepared, rng))
+        return public_value(run_steps(self, "generate", prepared, rng))
 
     def _generate_steps(self, prepared: PreparedPipeline, rng: Random) -> Steps:
-        source = TransformResult(
+        source = as_result(
             (yield Call(prepared.generator, "generate", (prepared.source_prepared, rng)))
             if prepared.uses_source
             else ""
@@ -168,15 +221,15 @@ class ChildPipelineGenerator(Generator):
         validate_pipeline(prepared.validators, result.value, "Nested value", defer=True)
         if not _trace_enabled.get():
             return result.value
-        return _GeneratedChildValue(result.value, prepared, source, steps)
+        return TraceText(result.value, PipelineTrace(prepared, source, steps))
 
     @cooperative
     def prove(self, prepared: PreparedPipeline, result: TransformResult) -> ProofResult:
         return cast(ProofResult, run_steps(self, "prove", prepared, result))
 
     def _prove_steps(self, prepared: PreparedPipeline, result: TransformResult) -> Steps:
-        value = result.value
-        if not isinstance(value, _GeneratedChildValue) or value.pipeline is not prepared:
+        value = _result_trace(result)
+        if not isinstance(value, PipelineTrace) or value.pipeline is not prepared:
             return ProofResult(ok=True)
         if prepared.uses_source:
             source_proof = yield Call(

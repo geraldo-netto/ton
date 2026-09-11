@@ -10,7 +10,7 @@ from unittest import mock
 import pytest
 
 from ton import api
-from ton._pipeline import ChildPipelineGenerator, _GeneratedChildValue
+from ton._pipeline import ChildPipelineGenerator, PipelineTrace, _GeneratedChildValue
 from ton._proof import TransformStep, _trace_enabled
 from ton._transforms import BaseTransform, TransformProof, TransformResult
 
@@ -86,7 +86,7 @@ def test_traces_follow_sampling_without_changing_draws_or_validators(
     with (
         mock.patch("ton._pipeline.TransformStep", wraps=TransformStep) as trace,
         mock.patch.object(
-            _GeneratedChildValue, "__new__", wraps=_GeneratedChildValue.__new__
+            PipelineTrace, "__init__", autospec=True, side_effect=PipelineTrace.__init__
         ) as child_value,
     ):
         generated = list(engine)

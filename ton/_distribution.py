@@ -13,18 +13,13 @@ from random import Random
 from typing import Any, cast
 
 from ._contracts import PreparationContext
-from ._pipeline import drawn, proven_draws
+from ._pipeline import as_result, drawn, proven_draws, public_value
 from ._proof import ProofResult
 from ._speckeys import require_known_keys
 from ._specpath import format_spec_path
 from ._steps import Call, Steps, cooperative, run_steps
-from ._transforms import TransformResult
 
 _CHOICE_KEYS = frozenset(("weight", "spec"))
-
-
-def _as_result(value: str) -> Any:
-    return TransformResult(value)
 
 
 @dataclass(frozen=True)
@@ -37,7 +32,7 @@ class WeightedChoiceSet:
 
     @cooperative
     def choose(self, rng: Random) -> str:
-        return cast(str, run_steps(self, "choose", rng))
+        return public_value(run_steps(self, "choose", rng))
 
     def _choose_steps(self, rng: Random) -> Steps:
         index = weighted_index(self.cum_weights, rng)
@@ -57,7 +52,7 @@ class WeightedChoiceSet:
                 proof = yield Call(
                     draw.generator,
                     "prove",
-                    (draw.prepared, _as_result(draw.value)),
+                    (draw.prepared, as_result(draw.value)),
                     proof_stage="source",
                 )
                 if not proof.ok:

@@ -9,9 +9,10 @@ from random import Random
 from typing import Any, cast
 
 from ._contracts import Generator
-from ._pipeline import ChildDraw, DrawnValue, prove_draws, proven_draws
+from ._pipeline import ChildDraw, DrawTrace, prove_draws, proven_draws, public_value
 from ._proof import ProofResult, _trace_enabled
 from ._steps import Call, Steps, cooperative, run_steps
+from ._tracetext import TraceText, plain_text
 from ._transforms import TransformResult
 from ._validation import validation_transaction
 
@@ -43,7 +44,7 @@ class CompositeGenerator(Generator):
 
     @cooperative
     def generate(self, prepared: Any, rng: Random) -> str:
-        return cast(str, run_steps(self, "generate", prepared, rng))
+        return public_value(run_steps(self, "generate", prepared, rng))
 
     def _generate_steps(self, prepared: Any, rng: Random) -> Steps:
         draws: list[ChildDraw] | None = [] if _trace_enabled.get() else None
@@ -54,7 +55,7 @@ class CompositeGenerator(Generator):
             steps.close()
         if not isinstance(value, str):
             raise TypeError("generate_steps must return a string")
-        return value if draws is None else DrawnValue(value, tuple(draws), prepared)
+        return value if draws is None else TraceText(value, DrawTrace(tuple(draws), prepared))
 
     @cooperative
     def prove(self, prepared: Any, result: TransformResult) -> ProofResult:
@@ -89,3 +90,4 @@ def _drive_children(steps: ChildSteps, rng: Random, draws: list[ChildDraw] | Non
             error = None
             if draws is not None:
                 draws.append(ChildDraw(child.generator, child.prepared, value))
+            value = plain_text(value)

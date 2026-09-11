@@ -1,5 +1,10 @@
 # Benchmarks
 
+[Documentation](README.md) · [Project overview](../README.md)
+
+The [benchmark runner](../benchmarks/run.py),
+[comparison script](../benchmarks/compare.py) and saved results live in `benchmarks/`.
+
 Run from the repository root with the same Python interpreter and idle machine:
 
 ```sh
@@ -30,11 +35,11 @@ and workload, not a universal performance guarantee.
 
 ## Recorded architecture comparison
 
-[The saved comparison](results/comparison.md) compares `e7d6569` with `57127f6`
+[The saved comparison](../benchmarks/results/comparison.md) compares `e7d6569` with `57127f6`
 using the unchanged harness, Python 3.12.3, 20,000 rows and five measured samples
 per case. All generated row counts, character counts and output checksums match.
-Raw timings and traced allocation peaks are in [before.json](results/before.json)
-and [after.json](results/after.json).
+Raw timings and traced allocation peaks are in [before.json](../benchmarks/results/before.json)
+and [after.json](../benchmarks/results/after.json).
 
 Representative median elapsed times:
 

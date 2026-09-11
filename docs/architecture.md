@@ -1,174 +1,185 @@
-# TON Architecture
+# TON architecture
 
-TON separates config parsing, type registration, row generation, transforms,
-and proof checking so each extension point has a narrow contract.
+[Documentation](README.md) · [Project overview](../README.md)
 
-## Public Surface
+TON separates configuration, compilation, extension ownership, row generation,
+and proof checking. Public contracts support plugins without exposing those
+implementation modules.
 
-`ton.api` is the stable library facade. Private modules such as
-`ton._engine`, `ton._registry`, and `ton._config` can change between releases.
-Applications should build registries and catalogs through `ton.api`.
+## Public surface
 
-Generator and preparation contracts live below the catalog and runtime layers
-in `ton._contracts`; namespace resolution lives in `ton._references`. Neither
-imports concrete generators or the compiler. `ton._pipeline` owns child execution
-and draw traces. Shared scalar parsing and formatting live in `ton._scalars`, so
-JSON decoding and CLI integer handling do not depend on generator implementations.
+`ton.api` is the stable library facade. It exports `Engine`, `EngineOptions`,
+generator and transform contracts, catalog builders, errors and output helpers.
+The worker helpers in `ton.concurrency` are also re-exported through `ton.api`.
+Modules with a leading underscore are private and may change between releases.
+See [library use](library.md) and [extension authoring](extensions.md).
 
-## Namespaced Registrations
+## Compilation and execution
 
-Built-in data types and transforms live in the `core` namespace. Legacy config
-references such as `"type": "integer"` remain valid aliases for
-`"type": "core.integer"`.
+### Entry points and worker setup
 
-Plugins register additional namespaced data types, transforms, and validators:
-
-```python
-from ton import api
-
-catalog = api.build_extension_catalog()
-catalog.register_data_type("acme", "customer_id", CustomerIdGenerator())
-catalog.register_transform("acme", "mask", MaskTransform())
+```mermaid
+flowchart TB
+  CLI["CLI: ton.cli"] --> API["Public facade: ton.api"]
+  LIB["Library callers"] --> API
+  API --> DIRECT["Engine: ton._engine<br/>direct construction"]
+  API --> WORK["Worker helpers: ton.concurrency"]
+  WORK --> WORKER["Engine: ton._engine<br/>worker construction"]
+  WORK --> OWN["Child ownership: ton._specgraph"]
 ```
 
-Plugin registrations are resolved by qualified name, such as
-`acme.customer_id`. Built-ins cannot be removed or replaced through
-`ExtensionCatalog`; if a plugin registers `plugin.string`, the bare
-`string` alias still resolves to `core.string`.
+Both Engine boxes refer to the same implementation. The separate branches show
+direct construction and construction through a worker helper.
 
-Entry-point loading is opt-in. When enabled, TON loads:
+### Compilation and row pipeline
 
-- `ton.generators`
-- `ton.transforms`
-- `ton.validators`
+```mermaid
+flowchart TB
+  ENG["Engine: ton._engine"] --> COMP["Compiler: ton._compiler"]
+  COMP --> TPL["Template parser: ton._template"]
+  COMP --> REG["Lazy catalog: ton._registry"]
+  COMP --> OWN["Child ownership: ton._specgraph"]
+  REG --> GEN["Generator implementations"]
+  COMP --> PLAN["Prepared plan and literal segments"]
+  PLAN --> ROW["Source → transforms → proofs → validators"]
+  ROW --> LOG["Structured events and audit sinks"]
+```
 
-Entry-point names may be qualified (`acme.customer_id`) or unqualified
-(`customer_id`, which is placed in the `plugin` namespace).
+The compiler and worker helpers use the same child-ownership service. The two
+views keep their connections local to each phase.
 
-Catalog registrations are prototypes. Each registry snapshot deep-copies
-generators, transforms, and validators, preserving qualified/bare aliases
-within that snapshot while isolating mutable extension state between Engines.
-Use `catalog.snapshot()` to obtain all three kinds under one lock with a shared
-copy memo, preserving dependencies between a generator, transform, and validator.
-Its `CatalogSnapshot` exposes `generators`, `transforms`, and `validators` mappings.
-Engine construction treats supplied mappings as prototypes too, normalizing their
-containers and copying all three extension kinds with one memo. Reusing mappings
-or `EngineOptions` therefore creates independent runtime state without breaking
-within-engine aliases or shared dependencies. Plugin attributes must support
-deep copying; runtime mutations do not change the caller's supplied prototypes.
+The diagrams show responsibilities and data flow. Construction validates the
+configuration, snapshots extension state, parses placeholders, discovers required
+types and prepares field pipelines. `EngineCompiler` builds a `CompiledPlan` with
+resolved fields and literal segments. Rendering joins those segments and drawn
+values without parsing the template again.
 
-## Generation Pipeline
+The default registry instantiates only the generator classes referenced by the
+template and their declared children. Built-ins come from an explicit class
+catalog. Generator classes declare their own supported configuration keys.
+Catalog-aware `validate_config` additionally prepares unused declared fields so
+validation covers the whole configuration.
 
-For each template field, `Engine` prepares an explicit pipeline:
+### Engine construction
 
-1. Source data type: `Generator.prepare(spec, preparation_context)`.
-2. Ordered transform chain: `Transform.prepare(spec, preparation_context)`.
-3. Per-row source generation, unless the first transform explicitly declares
-   that it replaces the source.
-4. Per-row transform application.
-5. Optional proof checking.
-6. Per-row validator checks.
+```mermaid
+sequenceDiagram
+  participant Caller
+  participant Engine
+  participant Compiler
+  participant Extension
+  Caller->>Engine: from_config(config, seed=...)
+  Engine->>Compiler: compile_plan(config, extensions)
+  Note over Compiler: Resolve required types<br/>through the registry
+  loop declared children before their parents
+    Compiler->>Extension: prepare(spec, context)
+    Extension-->>Compiler: prepared state
+  end
+  Compiler-->>Engine: CompiledPlan
+  Engine-->>Caller: prepared Engine
+```
 
-Prepared specs are cached during engine construction. Row generation only
-performs required draws, transform application, rendering, and optional proof
-checks.
+### Row generation
+
+The prepared Engine runs the row pipeline without involving the compiler or
+registry in each draw.
+
+```mermaid
+sequenceDiagram
+  participant Caller
+  participant Engine
+  participant Extension
+  Caller->>Engine: iter(engine)
+  loop per row
+    Engine->>Extension: generate and apply transforms
+    opt checked row
+      Engine->>Extension: prove recorded source and transform results
+    end
+    Engine->>Extension: validate final values
+    Engine-->>Caller: row string
+  end
+```
+
+An Engine is single-shot. It owns its RNG, prepared generator state, proof state
+and iteration lock. Paired sources are drawn once per field per row; repeated
+references reuse that pair. Simple fields retain a direct source-generation path
+when proof checking is off. [Configuration](configuration.md#row-width) documents
+the optional operator-controlled row-width guard.
+
+## Dependency boundaries
+
+| Module | Responsibility |
+|---|---|
+| `ton._contracts` | Generator, paired-generator and preparation contracts |
+| `ton._references` | Namespaced reference parsing and resolution |
+| `ton._scalars` | Scalar parsing and formatting without generator imports |
+| `ton._specgraph` | Shared child ownership for compilation and worker partitioning |
+| `ton._proof` | Prepared pipeline records, transform traces and proof result types |
+| `ton._pipeline` | Shared transform execution and exact child draw traces |
+| `ton._steps` | Explicit work-stack dispatch and originating-hook errors |
+| `ton._composite` | Public cooperative composite adapter |
+| `ton._validation` | Validator execution and deferred child checks |
+| `ton._proofcheck` | Proof sampling, failure collection, sinks and diagnostics |
+
+Contracts and reference resolution do not import catalogs, concrete generators
+or the compiler. Scalar helpers let JSON decoding and CLI integer handling work
+without loading generator implementations.
+
+## Ownership and preparation
+
+Built-ins use the `core` namespace; a bare name such as `integer` resolves to
+`core.integer`. Plugins use qualified references. Catalog prototypes and supplied
+extension mappings are copied for each Engine. A catalog snapshot copies all
+three extension kinds together, preserving aliases and shared dependencies within
+that snapshot. The [catalog ownership contract](extensions.md#catalogs-and-instance-ownership)
+explains how to share configuration while keeping runtime state independent.
 
 The compiler prepares declared children before their parents using an explicit
-work stack. Built-in composites use work stacks for generation and proof too;
-nesting has no estimated stack ceiling and does not change the process recursion
-limit. Cyclic generator ownership is rejected with its configuration path.
-Compilation and worker partitioning use the same ownership records from
-`ton._specgraph`: literal child locations, owning extensions, and owner specs.
-Preparation includes declared source children; workers traverse only children
-that execute when a transform replaces the source. Their traversal policies
-remain separate while resolution and ownership stay consistent.
+work stack. `nested_specs` declares literal child locations; arbitrary plugin
+metadata remains opaque. Cyclic ownership is rejected with its configuration
+path. Compilation and worker partitioning use the same ownership records from
+`ton._specgraph`, with different traversal policies: preparation includes declared
+source children, while workers traverse only children that actually execute when
+a transform replaces the source.
+
 Worker partitioning calls the optional `Partitionable.partition(spec, offset)`
-capability on sources and transforms. `PartitionSpec` carries owner-setting
-updates and child offsets keyed by declared locations. This replaces concrete
-generator checks, preserves opaque metadata, and supports custom multiplicities
-and stateful transforms without changes to the worker traversal.
-Both `fork_engine` and `write_shard` consume `EngineOptions`. Worker construction
-copies the extension graph for partition hooks and replaces only worker-owned
-seed/RNG settings; the full option bundle reaches Engine construction. The shard
-writer adds row partitioning and output management without duplicating plugin,
-proof, or observability options.
+capability on generators and transforms. `PartitionSpec` carries owner-setting
+updates and child offsets. This supports custom multiplicities and stateful
+extensions without concrete generator checks in the traversal. Both worker
+helpers consume `EngineOptions`; [worker options](concurrency.md#worker-options)
+and [partition hooks](extensions.md#worker-partitioning) define their ownership
+and serialization rules.
 
-## Transform Contract
+## Pipeline ordering and traces
 
-Transforms declare whether they accept paired inputs and whether they preserve
-pairing. This lets TON reject incompatible chains at preparation time. For
-example, a transform that does not preserve pairing cannot safely support both
-`$name$` and `$name[id]$` for the same field.
+For each field, generation runs in this order:
 
-Transforms implement `prepare(spec, context)`, `apply(prepared, value, rng)`,
-and `prove(prepared, before, after)`. Their `nested_specs(spec)` declaration
-identifies any owned generator children, resolved with `context.prepare_child`.
+1. Generate the source, unless the first transform replaces it.
+2. Apply transforms in order, recording before/after values on checked rows.
+3. Prove the source and transforms when the proof mode selects the row.
+4. Validate nested and root final values.
 
-A transform using the public API:
+Root and child pipelines share prepared stage records and transform execution.
+On checked rows, child validators are deferred until the enclosing field has
+been proved. Strict proof failure aborts before validation; audit mode records
+failures and continues to validators. Unchecked rows validate immediately.
+The row scope is restored on failure, interruption and reentrant Engine calls.
 
-```python
-from ton import api
+Built-in composites and public `CompositeGenerator` plugins use explicit work
+stacks for generation and proof, without changing Python's recursion limit.
+Traces retain only the child draws that actually ran, with their original values
+and prepared owners. Parent formatting does not change the values passed to
+child proof hooks. The executor preserves the originating hook on failures.
 
-class SuffixTransform:
-    type_name = "suffix"
-    config_keys = frozenset({"suffix"})
-    capabilities = api.TransformCapabilities()
-    requires_source = True
+Transforms declare whether they accept paired input, preserve pairing or replace
+the source; incompatible chains are rejected during preparation. The
+[transform authoring contract](extensions.md#transforms) and
+[proof guide](proofs.md) describe the public behavior and audit record format.
 
-    def nested_specs(self, spec):
-        return ()
+## Observability
 
-    def prepare(self, spec, context):
-        return spec["suffix"]
-
-    def apply(self, prepared, value, rng):
-        return api.TransformResult(value.value + prepared)
-
-    def prove(self, prepared, before, after):
-        return api.TransformProof(ok=after.value == before.value + prepared)
-
-config = {"rows": 2, "format": "$x$", "types": {
-    "x": {"type": "string", "values": ["x"],
-          "transforms": [{"type": "example.suffix", "suffix": "!"}]}
-}}
-rows = list(api.generate(config, transforms={"example.suffix": SuffixTransform()},
-                         proof_mode="all"))
-assert rows == ["x!", "x!"]
-```
-
-The built-in `distribution` transform chooses among two or more prepared
-candidate data-type specs. The `weighted` generator uses the same distribution
-implementation. Both accept a `choices` list of objects containing a generator
-`spec` and an optional `weight` (default `1.0`). Use string-generator children
-for literal choices; `values` and `weights` are not weighted-generator options.
-
-The built-in `identity` transform returns values unchanged and preserves
-paired values. It provides an explicit no-op transform for configs and tests
-that need a transform stage without changing generated output.
-
-## Proof Checking
-
-Generators and transforms can implement proof hooks that verify generated
-values satisfy their prepared spec. `Engine` supports:
-
-- `off`: no checks.
-- `sample`: check every Nth row.
-- `all`: check every row and fail on the first proof failure.
-- `audit`: check every row, collect proof failures, and keep generating.
-
-Audit failures are available through the bounded in-memory
-`Engine.proof_failures` sample. A configured proof-audit sink receives every
-failure as it is checked, independently of that retention boundary; the CLI
-uses it for `--proof-report` UTF-8 JSON Lines output. Pipeline metadata is
-available through `Engine.provenance`, which reports the source type, transform
-chain, proof mode, sample rate, and failure count per field.
-
-Structured proof-check logs include identifiers such as row, field, stage, and
-reference. They do not include raw generated values. Proof reports include
-values, paired ids, and field specs unless `--redact-proof-failures` is set.
-
-## Configuration references
-
-Built-in types can be named with either their bare name or `core.name`.
-Plugin types use qualified names. Entry-point loading is opt-in for both CLI
-and library callers. Weighted generation has one schema: `choices`.
+`LogEvent` is a typed enum exposed by `ton.api`; consumers can use
+`LogEvent(record.event)` to interpret structured events. Event definitions live
+in the [logging guide](observability.md). Provenance records describe each
+field's source, transform chain, proof settings and plugin provider. Audit sinks
+receive every proof failure; retained in-memory failures are a bounded sample.

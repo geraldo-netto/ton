@@ -197,12 +197,14 @@ def test_cli_audit_emits_one_canonical_summary(
     assert summaries[0].mode == "audit"  # type: ignore[attr-defined]
 
 
-def test_readme_documents_every_log_event() -> None:
-    # The README observability table is the public event catalog; keep it
+def test_logging_guide_documents_every_log_event() -> None:
+    # The logging guide event table is the public event catalog; keep it
     # complete so it cannot silently drift from the enum (DOC-001).
-    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
-    missing = [event.value for event in LogEvent if f"`{event.value}`" not in readme]
-    assert missing == [], f"README event table is missing: {missing}"
+    guide = (Path(__file__).resolve().parent.parent / "docs" / "observability.md").read_text(
+        encoding="utf-8"
+    )
+    missing = [event.value for event in LogEvent if f"`{event.value}`" not in guide]
+    assert missing == [], f"Logging guide event table is missing: {missing}"
 
 
 def test_catalog_validation_emits_summary(caplog: pytest.LogCaptureFixture) -> None:

@@ -70,20 +70,42 @@ def test_governance_scan_cannot_be_bypassed_with_nul_byte() -> None:
     assert _contains_private_or_secret(b"binary\x00/ho" + b"me/person/file")
 
 
-def test_tracked_text_files_do_not_contain_private_paths_or_secrets() -> None:
+@pytest.mark.parametrize("filename", ["new page.md", "new café.md"])
+def test_governance_file_discovery_handles_unstaged_renames(tmp_path, filename):
+    """DG-005: inspect new docs and handle removed paths before staging a move."""
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / ".gitignore").write_text("cache/\n", encoding="utf-8")
+    old = tmp_path / "old.md"
+    old.write_text("documentation", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    new = tmp_path / filename
+    old.rename(new)
+    (tmp_path / "cache").mkdir()
+    (tmp_path / "cache" / "ignored.md").write_text("cache", encoding="utf-8")
+    paths = _repository_files(tmp_path)
+    assert set(paths) == {tmp_path / ".gitignore", new}
+    assert all(path.read_bytes() for path in paths)
+
+
+def _repository_files(root: Path) -> tuple[Path, ...]:
     result = subprocess.run(
-        ["git", "ls-files"],
-        cwd=REPO_ROOT,
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        cwd=root,
         check=True,
-        text=True,
+        encoding="utf-8",
+        errors="surrogateescape",
         capture_output=True,
     )
+    paths = (root / name for name in result.stdout.split("\0") if name)
+    return tuple(path for path in paths if path.is_file())
+
+
+def test_repository_files_do_not_contain_private_paths_or_secrets() -> None:
     offenders: list[str] = []
-    for relative in result.stdout.splitlines():
-        path = REPO_ROOT / relative
+    for path in _repository_files(REPO_ROOT):
         data = path.read_bytes()
         if _contains_private_or_secret(data):
-            offenders.append(relative)
+            offenders.append(str(path.relative_to(REPO_ROOT)))
     assert offenders == []
 
 

@@ -166,3 +166,33 @@ def test_failed_proof_discards_pending_child_validation():
         )
     ) == ["ok"]
     assert _pending.get() is None
+
+
+@pytest.mark.parametrize("kind", ["root", "oneOf", "weighted", "sequence_of", "distribution"])
+@pytest.mark.parametrize("mode", ["off", "all"])
+def test_leaf_transform_chains_do_not_dispatch_each_stage(monkeypatch, kind, mode):
+    """PERF-043: shared leaf execution avoids a cooperative request per stage."""
+    from ton import _pipeline
+    from ton._transforms import BaseTransform
+
+    class Identity(BaseTransform):
+        type_name = "identity"
+
+    leaf = {"type": "string", "values": ["value"], "transforms": [{"type": "identity"}] * 4}
+    engine = api.Engine.from_config(
+        {"rows": 5, "format": "$x$", "types": {"x": wrap(leaf, kind)}},
+        transforms={**api.build_extension_catalog().snapshot().transforms, "identity": Identity()},
+        proof_mode=mode,
+        seed=42,
+    )
+    original = _pipeline.Call
+    requests = []
+
+    def counted(target, operation, args, **kwargs):
+        if operation == "apply" and target.type_name == "identity":
+            requests.append(operation)
+        return original(target, operation, args, **kwargs)
+
+    monkeypatch.setattr(_pipeline, "Call", counted)
+    assert list(engine) == ["value"] * 5
+    assert requests == []

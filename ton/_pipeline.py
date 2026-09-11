@@ -8,7 +8,7 @@ from typing import Any, cast
 
 from ._contracts import Generator
 from ._proof import PreparedPipeline, PreparedTransform, ProofResult, TransformStep, _trace_enabled
-from ._steps import Call, Steps, cooperative, run_steps
+from ._steps import Call, Steps, _attribute_error, cooperative, run_steps
 from ._transforms import TransformResult
 from ._validation import validate_pipeline
 
@@ -126,10 +126,22 @@ class TransformPipeline:
         steps: list[TransformStep] | None = [] if _trace_enabled.get() else None
         for transform in transforms:
             before = result
-            result = yield Call(transform.transform, "apply", (transform.prepared, before, rng))
+            if transform.cooperative_apply:
+                result = yield Call(transform.transform, "apply", (transform.prepared, before, rng))
+            else:
+                result = _apply_leaf(transform, before, rng)
             if steps is not None:
                 steps.append(TransformStep(transform, before, result))
         return result, tuple(steps) if steps is not None else ()
+
+
+def _apply_leaf(
+    transform: PreparedTransform, before: TransformResult, rng: Random
+) -> TransformResult:
+    try:
+        return transform.apply(transform.prepared, before, rng)
+    except Exception as exc:
+        raise _attribute_error(Call(transform.transform, "apply", ()), exc) from exc
 
 
 TRANSFORM_PIPELINE = TransformPipeline()

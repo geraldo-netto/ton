@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from functools import cached_property
-from typing import Any
+from typing import Any, cast
 
 from ._transforms import TransformResult
 
@@ -24,6 +24,14 @@ class PreparedTransform:
 
     transform: Any
     prepared: Any
+
+    @cached_property
+    def apply(self) -> Callable[..., TransformResult]:
+        return cast(Callable[..., TransformResult], self.transform.apply)
+
+    @cached_property
+    def cooperative_apply(self) -> bool:
+        return bool(getattr(self.apply, "_ton_cooperative", False))
 
 
 @dataclass(frozen=True)

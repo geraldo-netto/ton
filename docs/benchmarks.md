@@ -75,6 +75,61 @@ The harness hash includes both `run.py` and `workloads.py`. The archived v1
 architecture measurements below used combined import/workload allocation peaks
 and remain historical results; the current comparison script expects v2 reports.
 
+## Recorded performance and scalability comparison
+
+The September 11, 2026 run compares `1ccdea4` (the expanded harness, before
+runtime changes) with `f80de01` (all 17 performance/scalability items completed).
+Both use Python 3.12.3 on Linux x86-64, the same harness and dimensions, one
+warmup and five measured samples. All 52 case/size combinations passed comparison:
+row counts, character counts, row checksums and audit byte checksums match,
+including the separate allocation samples.
+
+| Suite and comparison | Timed rows | Allocation rows | Raw reports |
+|---|---:|---:|---|
+| [Default suite](../benchmarks/results/performance-comparison.md) | 20,000 | 1,000 | [Before](../benchmarks/results/performance-before.json), [after](../benchmarks/results/performance-after.json) |
+| [Pool sizes](../benchmarks/results/pools-comparison.md) | 1,000 | 100 | [Before](../benchmarks/results/pools-before.json), [after](../benchmarks/results/pools-after.json) |
+| [Compilation depth](../benchmarks/results/depth-comparison.md) | 1 | 1 | [Before](../benchmarks/results/depth-before.json), [after](../benchmarks/results/depth-after.json) |
+| [Proof sizes](../benchmarks/results/proofs-comparison.md) | 10 | 1 | [Before](../benchmarks/results/proofs-before.json), [after](../benchmarks/results/proofs-after.json) |
+| [Storage and numeric sizes](../benchmarks/results/storage-comparison.md) | 2 | 1 | [Before](../benchmarks/results/storage-before.json), [after](../benchmarks/results/storage-after.json) |
+| [Date intervals](../benchmarks/results/dates-comparison.md) | 100 | 10 | [Before](../benchmarks/results/dates-before.json), [after](../benchmarks/results/dates-after.json) |
+
+Rows above are runner settings; import and compilation cases emit no rows.
+The size-sweep commands above reproduce the targeted workloads.
+
+Representative median elapsed times (generation/proof unless marked setup):
+
+| Measurement | Before | After | Change |
+|---|---:|---:|---:|
+| Integer, 20,000 rows | 38.37 ms | 25.00 ms | -34.9% |
+| Four transforms with proof, 20,000 rows | 217.44 ms | 153.34 ms | -29.5% |
+| String proof, 10,000 pool entries, 1,000 rows | 31.20 ms | 3.17 ms | -89.9% |
+| Compilation setup, depth 1,000 | 98.19 ms | 15.31 ms | -84.4% |
+| Date proof, years 0001–9999, 100 rows | 374.14 ms | 1.86 ms | -99.5% |
+| Character proof, 60 draws, 10 rows | 2.63 ms | 0.46 ms | -82.6% |
+| Nested trace, depth 60, 100,000 characters, 10 rows | 22.24 ms | 2.96 ms | -86.7% |
+| Audit, 100,000 pool entries, 2 rows | 285.73 ms | 213.70 ms | -25.2% |
+
+Large-input allocation reductions are also substantial. At depth 1,000,
+compilation setup peak fell from 8.90 MB to 1.00 MB. For one checked row, the
+depth-60 string trace fell from 6.14 MB to 0.22 MB (-96.4%); the first audit record
+with 100,000 pool entries fell from 10.67 MB to 1.31 MB (-87.8%). MB here means
+1,000,000 bytes. Unused 100,000-entry pools no longer dominate construction:
+setup fell from 55.17 ms / 10.81 MB to 0.16 ms / 0.03 MB.
+
+There are measured tradeoffs. Regex proofs at N=60 used 91.2% less runtime
+allocation (2.77 MB to 0.24 MB), but ten rows took 233.53 ms versus 132.59 ms
+(+76.1%). The frontier matcher releases history while doing more work on this
+ambiguous pattern. Small nested integer proofs at depth 8 increased from
+671.50 ms to 717.85 ms (+6.9%) for 20,000 rows. Both increases exceed the observed
+sample ranges. These results record the combined implementation changes.
+
+Lazy membership indexes exchange retained memory for faster pool proofs. The
+10,000-entry string case's new runtime allocation peak rose from 5.2 KB to
+657.1 KB, while setup peak fell from 1.09 MB to 0.26 MB. Runtime measurement
+includes first-use index construction; proof-off jobs do not build the index.
+Cached transform calls and separate trace objects also increase some small-case
+allocation peaks. Phase peaks cannot be added to obtain a process-memory peak.
+
 ## Recorded architecture comparison
 
 [The saved comparison](../benchmarks/results/comparison.md) compares `e7d6569` with `57127f6`

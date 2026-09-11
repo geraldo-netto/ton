@@ -131,14 +131,19 @@ Built-ins use the `core` namespace; a bare name such as `integer` resolves to
 `core.integer`. Plugins use qualified references. Catalog prototypes and supplied
 extension mappings are copied for each Engine. A catalog snapshot copies all
 three extension kinds together, preserving aliases and shared dependencies within
-that snapshot. The [catalog ownership contract](extensions.md#catalogs-and-instance-ownership)
+that snapshot. Internal validation, CLI and worker builders transfer their private
+snapshot into compilation without copying it again; public inputs remain isolated
+prototypes. The [catalog ownership contract](extensions.md#catalogs-and-instance-ownership)
 explains how to share configuration while keeping runtime state independent.
 
 The compiler prepares declared children before their parents using an explicit
 work stack. `nested_specs` declares literal child locations; arbitrary plugin
 metadata remains opaque. Cyclic ownership is rejected with its configuration
-path. Compilation and worker partitioning use the same ownership records from
-`ton._specgraph`, with different traversal policies: preparation includes declared
+path. Traversal paths share their parent components and format complete diagnostic
+strings only when needed. Generation snapshots only referenced fields; full
+validation also visits unused fields. Compilation and worker partitioning use the
+same ownership records from `ton._specgraph`, with different traversal policies:
+preparation includes declared
 source children, while workers traverse only children that actually execute when
 a transform replaces the source.
 
@@ -170,6 +175,9 @@ stacks for generation and proof, without changing Python's recursion limit.
 Traces retain only the child draws that actually ran, with their original values
 and prepared owners. Parent formatting does not change the values passed to
 child proof hooks. The executor preserves the originating hook on failures.
+Internal traces share unchanged string payloads across nested operations. Public
+generator calls return strings carrying the trace needed for standalone proof.
+Leaf transform hooks run directly; composite transforms retain stack dispatch.
 
 Transforms declare whether they accept paired input, preserve pairing or replace
 the source; incompatible chains are rejected during preparation. The

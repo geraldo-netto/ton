@@ -160,10 +160,14 @@ def _step_bounds(min_value: Decimal, max_value: Decimal, decimals: int) -> tuple
 
 def _scaled_integral(value: Decimal, decimals: int, rounding: str) -> int:
     """Scale finite coefficients with integer arithmetic, independent of Decimal context."""
+    if value.is_zero():
+        return 0
     sign, digits, exponent = value.as_tuple()
     assert isinstance(exponent, int)
-    coefficient = int(Decimal((sign, digits, 0)))
     power = exponent + decimals
+    if power < 0 and -power >= len(digits):
+        return -int(rounding == ROUND_FLOOR) if sign else int(rounding == ROUND_CEILING)
+    coefficient = int(Decimal((sign, digits, 0)))
     factor: int = 10 ** abs(power)
     if power >= 0:
         return coefficient * factor

@@ -107,6 +107,43 @@ def test_compile_path_storage_grows_linearly_with_depth():
     assert peaks[1] < peaks[0] * 2.8, peaks
 
 
+@pytest.mark.parametrize(
+    "bounds", [(0, "1e-1000000"), ("-1e-1000000", 0), ("0e1000000", "0e1000000"), ("0e-1000000", 0)]
+)
+def test_small_decimal_results_do_not_allocate_exponent_sized_integers(bounds):
+    """SCALE-022: compact tiny/zero bounds keep constant-sized rounding work."""
+    import tracemalloc
+    from decimal import localcontext
+    from random import Random
+
+    from ton._transforms import TransformResult
+    from ton.generators.decimal import DecimalGenerator
+
+    generator = DecimalGenerator()
+    with localcontext() as context:
+        context.prec, context.Emax, context.Emin = 2, 2, -2
+        prepared = generator.prepare({"minValue": bounds[0], "maxValue": bounds[1], "decimals": 0})
+        rng = Random(42)
+        tracemalloc.start()
+        try:
+            value = generator.generate(prepared, rng)
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+        assert value == "0"
+        assert generator.prove(prepared, TransformResult(value)).ok
+        assert peak < 64000, peak
+
+
+@pytest.mark.parametrize("value", ["1e-1000000", "-1e-1000000"])
+def test_tiny_nonzero_singleton_has_no_integer_representation(value):
+    """SCALE-022: fast rounding cannot turn an empty interval into a valid job."""
+    from ton.generators.decimal import DecimalGenerator
+
+    with pytest.raises(ValueError, match="no value representable"):
+        DecimalGenerator().prepare({"minValue": value, "maxValue": value, "decimals": 0})
+
+
 def test_compact_paths_preserve_components_hash_collisions_and_serialization():
     """SCALE-019: tuple boundaries remain distinct and equality checks hash collisions."""
     import pickle

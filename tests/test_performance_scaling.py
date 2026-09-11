@@ -131,3 +131,30 @@ def test_compact_paths_preserve_components_hash_collisions_and_serialization():
     left, right = root + (Colliding("left"),), root + (Colliding("right"),)
     assert hash(left) == hash(right)
     assert left != right
+
+
+def test_worker_path_storage_grows_linearly_with_depth():
+    """SCALE-020: partition traversal does not retain every full diagnostic string."""
+    import gc
+    import tracemalloc
+
+    from ton._registry import default_transforms, make_registry
+    from ton.concurrency import _offset_sequence_spec
+
+    registry, transforms = make_registry(), default_transforms()
+    peaks = []
+    for depth in (500, 1000):
+        spec = {"type": "sequence"}
+        for _ in range(depth):
+            spec = {"type": "sequence_of", "count": 1, "spec": spec}
+        gc.collect()
+        tracemalloc.start()
+        try:
+            shifted = _offset_sequence_spec(spec, 7, registry, transforms, path="types.x")
+            peaks.append(tracemalloc.get_traced_memory()[1])
+        finally:
+            tracemalloc.stop()
+        for _ in range(depth):
+            shifted = shifted["spec"]
+        assert shifted["start"] == 7
+    assert peaks[1] < peaks[0] * 2.8, peaks

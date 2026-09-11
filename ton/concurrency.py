@@ -55,7 +55,7 @@ from ._output import open_output_path
 from ._partition import Partitionable, PartitionSpec
 from ._registry import default_transforms, make_registry, snapshot_inputs
 from ._specgraph import FieldOwnership, OwnedChild, field_ownership, resolve_generator
-from ._specpath import SpecPath, format_spec_path
+from ._specpath import SpecLocation, SpecPath
 from ._specsnapshot import snapshot_fields
 from ._template import parse
 from ._transforms import Transform
@@ -270,7 +270,7 @@ def _offset_sequence_spec(
 ) -> dict[str, Any]:
     """Visit only declared generator children, preserving opaque plugin metadata (CONC-018)."""
     root = dict(value)
-    pending = [(value, root, offset, path, False)]
+    pending = [(value, root, offset, SpecLocation() + (path,), False)]
     active: set[int] = set()
     while pending:
         original, spec, child_offset, child_path, ready = pending.pop()
@@ -288,9 +288,7 @@ def _offset_sequence_spec(
         for location, child, amount in children:
             child_copy = dict(child)
             _replace_owned_child(spec, location, child_copy, owned)
-            pending.append(
-                (child, child_copy, amount, f"{child_path}.{format_spec_path(location)}", False)
-            )
+            pending.append((child, child_copy, amount, child_path + location, False))
     return root
 
 

@@ -35,6 +35,7 @@ from random import Random
 from typing import Any
 
 from .._contracts import Generator
+from .._pool import StringPool
 from .._proof import ProofResult, proof_result
 from .._scalars import require_string_tuple
 from .._transforms import TransformResult
@@ -103,8 +104,8 @@ class EmailGenerator(Generator):
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> EmailSpec:
         if "domains" not in spec:
-            return EmailSpec(domains=tuple(EMAIL_DOMAINS))
-        domains = require_string_tuple(spec, key="domains")
+            return EmailSpec(domains=StringPool(EMAIL_DOMAINS))
+        domains = StringPool(require_string_tuple(spec, key="domains"))
         for domain in domains:
             _validate_email_domain(domain)
         return EmailSpec(domains=domains)

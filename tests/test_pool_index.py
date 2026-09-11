@@ -87,3 +87,43 @@ def test_hash_plaintext_membership_does_not_scan_the_pool(algorithm, cache):
     assert tuple(prepared.words) == tuple(values)
     if algorithm == "bcrypt":
         assert prepared.cache == ({plaintext: digest} if cache else None)
+
+
+def test_email_domain_membership_does_not_scan_the_pool():
+    """PERF-046: index domains while retaining exact configured spelling and draws."""
+    from ton.generators.identity import EmailGenerator
+
+    queries = []
+
+    class CountedEmail(str):
+        def rpartition(self, separator):
+            local, delimiter, domain = super().rpartition(separator)
+            query = CountedQuery(domain)
+            queries.append(query)
+            return local, delimiter, query
+
+    class LastRandom(Random):
+        def choice(self, values):
+            return values[-1]
+
+    domains = ["D0.example", *(f"D{i}.example" for i in range(1000))]
+    generator = EmailGenerator()
+    prepared = generator.prepare({"domains": domains})
+    value = generator.generate(prepared, LastRandom())
+    for _ in range(5):
+        assert generator.prove(prepared, TransformResult(CountedEmail(value))).ok
+    assert sum(query.comparisons for query in queries) <= 10
+    local = value.rpartition("@")[0]
+    assert not generator.prove(prepared, TransformResult(f"{local}@d999.example")).ok
+    assert not generator.prove(prepared, TransformResult(f"{local}@absent.example")).ok
+    assert tuple(prepared.domains) == tuple(domains)
+    rng = Random(42)
+    expected_rng = Random(42)
+    from ton.generators._identity_data import FAMILY_NAMES, GIVEN_NAMES
+
+    for _ in range(100):
+        given = expected_rng.choice(GIVEN_NAMES).lower()
+        family = expected_rng.choice(FAMILY_NAMES).lower()
+        assert (
+            generator.generate(prepared, rng) == f"{given}.{family}@{expected_rng.choice(domains)}"
+        )

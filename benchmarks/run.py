@@ -168,6 +168,79 @@ def positive_int(value: str) -> int:
     return result
 
 
+def source_state() -> dict:
+    """Identify tracked and nonignored source contents, including dirty changes (PERF-052)."""
+    names = subprocess.check_output(
+        [
+            "git",
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            "ton",
+            "benchmarks",
+            "pyproject.toml",
+            "uv.lock",
+        ],
+        cwd=ROOT,
+    ).split(b"\0")
+    files = {}
+    for name in sorted(set(filter(None, names))):
+        path = Path(os.fsdecode(name))
+        if _measured_source(path):
+            files[path.as_posix()] = _file_digest(ROOT / path)
+    return {
+        "revision": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        ).strip(),
+        "dirty": bool(subprocess.check_output(["git", "status", "--porcelain", "-z"], cwd=ROOT)),
+        "sha256": hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest(),
+        "files": files,
+    }
+
+
+def _measured_source(path: Path) -> bool:
+    if any(part in {"__pycache__", "build", "dist", ".cache"} for part in path.parts):
+        return False
+    if path.parts[0] == "benchmarks":
+        return path.suffix == ".py"
+    return path.suffix not in {".pyc", ".pyo"}
+
+
+def _file_digest(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def environment_state() -> dict:
+    """Record interpreter build and installed dependencies outside the measured phases."""
+    from importlib.metadata import distributions
+
+    packages = {
+        distribution.metadata["Name"]: distribution.version for distribution in distributions()
+    }
+    return {
+        "implementation": platform.python_implementation(),
+        "build": list(platform.python_build()),
+        "packages": dict(sorted(packages.items())),
+        "hash_seed": os.environ.get("PYTHONHASHSEED"),
+    }
+
+
+def verify_measurement_state(source: dict, environment: dict) -> None:
+    current = source_state()
+    if any(current[key] != source[key] for key in ("revision", "sha256")):
+        raise RuntimeError("source changed during benchmark; discard mixed measurements and rerun")
+    if environment_state() != environment:
+        raise RuntimeError(
+            "environment changed during benchmark; discard mixed measurements and rerun"
+        )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rows", type=positive_int, default=20000)
@@ -203,6 +276,8 @@ def main() -> None:
     sys.path.insert(0, str(ROOT))
     from benchmarks.workloads import DEFAULT_SIZES
 
+    source = source_state()
+    environment = environment_state()
     results = {}
     for case in args.cases:
         for size in args.sizes or [DEFAULT_SIZES.get(case, 1)]:
@@ -215,11 +290,12 @@ def main() -> None:
                 file=sys.stderr,
                 flush=True,
             )
+    verify_measurement_state(source, environment)
     report = {
         "schema": "ton.benchmark/v2",
-        "revision": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
-        ).strip(),
+        "revision": source["revision"],
+        "source": source,
+        "environment": environment,
         "python": platform.python_version(),
         "platform": platform.system(),
         "machine": platform.machine(),
@@ -228,7 +304,8 @@ def main() -> None:
         "repeats": args.repeats,
         "memory_rows": min(args.rows, args.memory_rows),
         "harness_sha256": hashlib.sha256(
-            Path(__file__).read_bytes() + (ROOT / "benchmarks/workloads.py").read_bytes()
+            (ROOT / "benchmarks/run.py").read_bytes()
+            + (ROOT / "benchmarks/workloads.py").read_bytes()
         ).hexdigest(),
         "results": results,
     }

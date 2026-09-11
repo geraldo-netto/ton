@@ -6,6 +6,8 @@ from pathlib import Path
 
 
 def compare(before: dict, after: dict) -> str:
+    if before.get("environment") != after.get("environment"):
+        raise ValueError("incomparable benchmark metadata: environment")
     for key in (
         "schema",
         "rows",

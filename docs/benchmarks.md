@@ -75,6 +75,20 @@ The harness hash includes both `run.py` and `workloads.py`. The archived v1
 architecture measurements below used combined import/workload allocation peaks
 and remain historical results; the current comparison script expects v2 reports.
 
+Reports record the starting revision and dirty-tree status, plus content hashes
+for tracked and nonignored files under `ton/`, Python benchmark scripts,
+`pyproject.toml` and `uv.lock`. Cache/build outputs are excluded. Interpreter build
+and installed distribution versions are recorded separately. Dirty source is
+allowed and identified by its own fingerprint; the revision alone does not
+identify an uncommitted implementation. Keep the corresponding changes to
+reproduce a dirty measurement.
+
+Source and environment are checked before and after the samples. If they differ,
+the run fails before publishing its report; an existing output remains intact.
+Keep source and dependencies stable throughout a run: boundary checks cannot
+detect a change that is reverted before verification. Comparisons also require
+matching recorded environments.
+
 ## Recorded performance and scalability comparison
 
 The September 11, 2026 run compares `1ccdea4` (the expanded harness, before

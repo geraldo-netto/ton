@@ -98,3 +98,16 @@ def _validate(validators: tuple[Validator, ...], value: str, label: str) -> None
     for validator in validators:
         if not validate_with_reference(validator, value):
             raise ValidationError(f"{label} failed validator {validator.type_name!r}")
+
+
+@contextmanager
+def validation_transaction() -> Iterator[None]:
+    """Discard validators belonging to an abandoned child when a plugin recovers."""
+    pending = _pending.get()
+    start = len(pending) if pending is not None else 0
+    try:
+        yield
+    except BaseException:
+        if pending is not None:
+            del pending[start:]
+        raise

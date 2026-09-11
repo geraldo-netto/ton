@@ -23,6 +23,10 @@ from ton._transforms import TransformResult
 
 EXPECTED_PUBLIC_API = {
     "CatalogSnapshot",
+    "ChildCall",
+    "ChildExecutionError",
+    "ChildSteps",
+    "CompositeGenerator",
     "ConfigError",
     "Engine",
     "EngineOptions",

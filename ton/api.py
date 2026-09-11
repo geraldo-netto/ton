@@ -48,6 +48,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
 
 from . import _config
+from ._composite import ChildCall, ChildSteps, CompositeGenerator
 from ._config import ConfigError
 from ._config import output_encoding as _output_encoding
 from ._contracts import Generator, PairedGenerator, PreparationContext
@@ -85,6 +86,7 @@ from ._registry import (
 from ._registry import (
     build_extension_catalog as _build_extension_catalog,
 )
+from ._steps import OperationError as ChildExecutionError
 from ._template import UndeclaredVariableError
 from ._transforms import (
     Transform,
@@ -97,6 +99,10 @@ from .concurrency import chunk_rows, derive_rng, derive_seed, fork_engine, write
 
 __all__ = [
     "CatalogSnapshot",
+    "ChildCall",
+    "ChildExecutionError",
+    "ChildSteps",
+    "CompositeGenerator",
     "ConfigError",
     "Engine",
     "EngineOptions",

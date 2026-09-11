@@ -320,7 +320,7 @@ A composite generator using the public API:
 ```python
 from ton import api
 
-class BracketGenerator(api.Generator):
+class BracketGenerator(api.CompositeGenerator):
     type_name = "bracket"
     config_keys = frozenset({"spec"})
 
@@ -330,9 +330,9 @@ class BracketGenerator(api.Generator):
     def prepare(self, spec, context=None):
         return context.prepare_child(self.type_name, ("spec",), spec["spec"])
 
-    def generate(self, prepared, rng):
-        child, child_spec = prepared
-        return f"[{child.generate(child_spec, rng)}]"
+    def generate_steps(self, prepared, rng):
+        value = yield api.ChildCall(*prepared)
+        return f"[{value}]"
 
 registry = api.build_extension_catalog().generators()
 registry["example.bracket"] = BracketGenerator()
@@ -342,6 +342,21 @@ config = {"rows": 2, "format": "$x$", "types": {
 rows = list(api.generate(config, registry=registry, seed=1))
 assert rows == ["[x]", "[x]"]
 ```
+
+`CompositeGenerator.generate_steps` returns an `api.ChildSteps` iterator: yield
+`api.ChildCall(generator, prepared)` for each child draw, receive its string,
+and return the formatted result. Execution and proof use an explicit stack,
+including children with transforms or validators. Proofs check only the children
+actually drawn, using their original values even when the composite reformats them.
+Override `prove_output(prepared, result)` for an additional formatting proof.
+A standalone proof requires the traced value returned by `generate`.
+
+Child exceptions reach the yield as `api.ChildExecutionError`, with `stage`,
+`reference`, and `cause` identifying the originating hook. Plugins can catch it
+and yield a fallback; abandoned child validators and traces are discarded.
+Validation rejections remain `api.ValidationError`. Iterators are closed on failure
+and interruption, so plugin `finally` cleanup runs. Proof checks precede validators
+for root and nested pipelines; unchecked rows validate immediately.
 
 ```toml
 [project.entry-points."ton.generators"]

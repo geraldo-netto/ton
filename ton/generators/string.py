@@ -8,6 +8,7 @@ from random import Random
 from typing import Any
 
 from .._contracts import Generator
+from .._pool import StringPool
 from .._proof import ProofResult, proof_result
 from .._scalars import require_string_tuple
 from .._transforms import TransformResult
@@ -25,7 +26,7 @@ class StringGenerator(Generator):
     config_keys = frozenset(("values",))
 
     def prepare(self, spec: Mapping[str, Any], context: Any = None) -> StringSpec:
-        return StringSpec(values=require_string_tuple(spec))
+        return StringSpec(values=StringPool(require_string_tuple(spec)))
 
     def generate(self, prepared: StringSpec, rng: Random) -> str:
         return rng.choice(prepared.values)

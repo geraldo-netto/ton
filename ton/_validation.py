@@ -68,15 +68,6 @@ type _Validation = tuple[tuple[Validator, ...], str, str]
 _pending: ContextVar[list[_Validation] | None] = ContextVar("ton_pending_validation", default=None)
 
 
-@contextmanager
-def validation_scope(checked: bool) -> Iterator[None]:
-    token = _pending.set([] if checked else None)
-    try:
-        yield
-    finally:
-        _pending.reset(token)
-
-
 def validate_pipeline(
     validators: tuple[Validator, ...], value: str, label: str, *, defer: bool = False
 ) -> None:

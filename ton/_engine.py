@@ -34,8 +34,8 @@ from ._validation import (
     ValidationError,
     Validator,
     ValidatorHookError,
+    _pending,
     validate_pipeline,
-    validation_scope,
 )
 
 TemplateError = _TemplateError
@@ -411,8 +411,11 @@ class Engine:
         checked = self._proof.should_check(self._rows_emitted)
         token = _trace_enabled.set(checked)
         try:
-            with validation_scope(checked):
+            validation_token = _pending.set([] if checked else None)
+            try:
                 return self._render_row()
+            finally:
+                _pending.reset(validation_token)
         finally:
             # Reset before yielding: callers may interleave or nest Engines.
             _trace_enabled.reset(token)

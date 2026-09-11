@@ -227,3 +227,56 @@ def test_interrupted_composite_unwinds_work_stack_and_trace_context() -> None:
     assert engine.rows_emitted == 0
     assert engine._iteration_lock.acquire(blocking=False)
     engine._iteration_lock.release()
+
+
+@pytest.mark.parametrize("mode", ["off", "sample", "all"])
+def test_scalar_rows_do_not_allocate_generator_context_managers(monkeypatch, mode):
+    """PERF-042: row isolation needs tokens, not an allocated context-manager generator."""
+    import contextlib
+
+    constructed = []
+    original = contextlib._GeneratorContextManager.__init__
+
+    def count(self, *args, **kwargs):
+        constructed.append(args[0].__name__)
+        original(self, *args, **kwargs)
+
+    config = {
+        "rows": 10,
+        "format": "$x$",
+        "types": {"x": {"type": "integer", "minValue": 1, "maxValue": 9}},
+    }
+    engine = api.Engine.from_config(config, seed=42, proof_mode=mode, proof_sample_rate=3)
+    monkeypatch.setattr(contextlib._GeneratorContextManager, "__init__", count)
+    assert len(list(engine)) == 10
+    assert constructed == []
+
+
+@pytest.mark.parametrize("mode", ["off", "all"])
+@pytest.mark.parametrize("interrupted", [False, True])
+def test_row_scope_restores_an_existing_parent_validation_queue(monkeypatch, mode, interrupted):
+    """PERF-042: successful and interrupted nested Engines leave the parent queue intact."""
+    from ton._validation import _pending
+
+    parent = [((), "parent value", "parent label")]
+    token = _pending.set(parent)
+    trace = _trace_enabled.set(False)
+    try:
+        config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "string", "values": ["x"]}}}
+        engine = api.Engine.from_config(config, proof_mode=mode)
+        if interrupted:
+
+            def stop():
+                raise KeyboardInterrupt
+
+            monkeypatch.setattr(engine, "_render_row", stop)
+            with pytest.raises(KeyboardInterrupt):
+                next(iter(engine))
+        else:
+            assert next(iter(engine)) == "x"
+        assert _pending.get() is parent
+        assert parent == [((), "parent value", "parent label")]
+        assert _trace_enabled.get() is False
+    finally:
+        _pending.reset(token)
+        _trace_enabled.reset(trace)

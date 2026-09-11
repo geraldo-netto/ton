@@ -14,8 +14,8 @@ TON's JSON encoder, preventing consumers from mutating retained content.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
-from typing import Any
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from typing import Any, cast
 
 
 class FrozenMapping(Mapping[str, Any]):
@@ -48,6 +48,14 @@ class FrozenSequence(Sequence[Any]):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Sequence) and list(self) == list(other)
+
+
+def snapshot_fields(types: Mapping[str, Any], field_keys: Iterable[str]) -> dict[str, Any]:
+    """Copy selected roots together, preserving their order and shared metadata."""
+    selected = set(field_keys)
+    return cast(
+        dict[str, Any], snapshot_spec({key: spec for key, spec in types.items() if key in selected})
+    )
 
 
 def snapshot_spec(value: Any, *, immutable: bool = False) -> Any:

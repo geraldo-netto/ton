@@ -22,7 +22,7 @@ from ._registry import (
 from ._specgraph import field_ownership, resolve_generator
 from ._speckeys import COMMON_FIELD_KEYS, extension_key_error
 from ._specpath import SpecPath, format_spec_path
-from ._specsnapshot import snapshot_spec
+from ._specsnapshot import snapshot_fields
 from ._template import Token, parse, split_segments
 from ._transforms import Transform, fold_paired_capabilities
 from ._validation import Validator
@@ -68,17 +68,17 @@ class EngineCompiler:
     ) -> None:
         registry, transforms, validators = snapshot_inputs(registry, transforms, validators)
         self.template = str(config["format"])
-        # One isolated snapshot per engine: the plan retained the caller's
-        # nested mappings, so mutating a values list after the first row
-        # changed an already-recorded audit failure (ARCH-006).
-        self.types: Mapping[str, Mapping[str, Any]] = snapshot_spec(config["types"])
         self.rows = int(config["rows"])
         self._child_prepared: dict[SpecPath, tuple[Generator, Any]] = {}
         self.tokens = tuple(parse(self.template))
         self.field_keys = (
-            tuple(self.types)
+            tuple(config["types"])
             if prepare_all_fields
             else tuple(dict.fromkeys(token.type_key for token in self.tokens))
+        )
+        # Inactive pools are not runtime state; full validation selects all roots.
+        self.types: Mapping[str, Mapping[str, Any]] = snapshot_fields(
+            config["types"], self.field_keys
         )
         built_in_transforms = default_transforms()
         built_in_validators = default_validators()

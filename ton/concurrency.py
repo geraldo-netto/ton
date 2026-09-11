@@ -56,7 +56,7 @@ from ._partition import Partitionable, PartitionSpec
 from ._registry import default_transforms, make_registry, snapshot_inputs
 from ._specgraph import FieldOwnership, OwnedChild, field_ownership, resolve_generator
 from ._specpath import SpecPath, format_spec_path
-from ._specsnapshot import snapshot_spec
+from ._specsnapshot import snapshot_fields
 from ._template import parse
 from ._transforms import Transform
 
@@ -224,12 +224,15 @@ def _offset_sequences(
     registry: Mapping[str, Generator] | None = None,
     transforms: Mapping[str, Transform] | None = None,
 ) -> dict[str, Any]:
-    copied: dict[str, Any] = snapshot_spec(config)
+    # Retain shallow declarations for structural checks and construction logging.
+    # Engine compilation drops inactive roots without traversing their contents.
+    copied: dict[str, Any] = {**config, "types": dict(config["types"])}
     generators = registry if registry is not None else make_registry()
     transform_registry = transforms if transforms is not None else default_transforms()
     occurrences: dict[str, int] = {}
     for token in parse(str(copied.get("format", ""))):
         occurrences[token.type_key] = occurrences.get(token.type_key, 0) + 1
+    copied["types"].update(snapshot_fields(config["types"], occurrences))
     for type_key, count in occurrences.items():
         count = _field_draws_per_row(
             copied["types"][type_key], count, generators, transform_registry

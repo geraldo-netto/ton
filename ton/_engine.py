@@ -175,12 +175,12 @@ class Engine:
         _logger.info(
             "engine_constructed rows=%d types=%d paired=%s",
             plan.rows,
-            len(plan.types),
+            len(config["types"]),
             plan.has_paired,
             extra={
                 "event": LogEvent.ENGINE_CONSTRUCTED.value,
                 "rows": plan.rows,
-                "types": len(plan.types),
+                "types": len(config["types"]),
                 "paired": plan.has_paired,
                 "milestone_rows": self._milestone_rows,
             },

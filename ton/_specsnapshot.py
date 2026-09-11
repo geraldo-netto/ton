@@ -68,6 +68,9 @@ def snapshot_spec(value: Any, *, immutable: bool = False) -> Any:
     root: list[Any] = [None]
     # Preserve aliases and cycles within the isolated graph (SCALE-012).
     memo: dict[int, Any] = {}
+    # Computed containers can release children as iteration advances. Keep
+    # memoized sources alive so their IDs cannot alias later children (REL-057).
+    sources: list[Any] = []
     # Keep one iterator per active container, not one queued task per entry.
     pending: list[tuple[Any, Iterator[tuple[Any, Any]]]] = [(root, iter(((0, value),)))]
     while pending:
@@ -80,12 +83,14 @@ def snapshot_spec(value: Any, *, immutable: bool = False) -> Any:
         if id(item) in memo:
             target[key] = memo[id(item)]
         elif isinstance(item, Mapping):
+            sources.append(item)
             copied: Any = {}
             view = FrozenMapping(copied) if immutable else copied
             memo[id(item)] = view
             target[key] = view
             pending.append((copied, iter(item.items())))
         elif isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)):
+            sources.append(item)
             copied = [None] * len(item)
             view = FrozenSequence(copied) if immutable else copied
             memo[id(item)] = view

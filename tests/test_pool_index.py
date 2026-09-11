@@ -57,3 +57,33 @@ def test_pool_index_is_lazy_reused_and_survives_serialization():
     for copy in (deepcopy(StringPool(pool)), pickle.loads(pickle.dumps(StringPool(pool)))):
         assert tuple(copy) == ("a", "a", "b")
         assert "a" in copy and "missing" not in copy
+
+
+@pytest.mark.parametrize(
+    "algorithm, cache", [("sha256", False), ("ntlm", False), ("bcrypt", False), ("bcrypt", True)]
+)
+def test_hash_plaintext_membership_does_not_scan_the_pool(algorithm, cache):
+    """PERF-045: pool indexing preserves digest checks and both bcrypt policies."""
+    from ton.generators.hash import HashGenerator
+
+    class LastRandom(Random):
+        def choice(self, values):
+            return values[-1]
+
+    values = ["value-0", *(f"value-{index}" for index in range(1000))]
+    spec = {"algorithm": algorithm, "values": values}
+    if algorithm == "bcrypt":
+        spec.update(rounds=4, cache=cache)
+    generator = HashGenerator()
+    prepared = generator.prepare(spec)
+    plaintext, digest = generator.generate_pair(prepared, LastRandom())
+    query = CountedQuery(plaintext)
+    for _ in range(5):
+        assert generator.prove(prepared, TransformResult(digest, query)).ok
+    assert query.comparisons <= 20
+    assert not generator.prove(prepared, TransformResult(digest, "absent")).ok
+    assert not generator.prove(prepared, TransformResult("wrong", plaintext)).ok
+    assert not generator.prove(prepared, TransformResult(digest)).ok
+    assert tuple(prepared.words) == tuple(values)
+    if algorithm == "bcrypt":
+        assert prepared.cache == ({plaintext: digest} if cache else None)

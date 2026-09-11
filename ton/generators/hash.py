@@ -18,6 +18,7 @@ from random import Random
 from typing import Any
 
 from .._contracts import PairedGenerator
+from .._pool import StringPool
 from .._proof import ProofResult, proof_result
 from .._scalars import coerce_bool, coerce_int, require_string_tuple
 from .._transforms import TransformResult
@@ -78,7 +79,7 @@ class HashGenerator(PairedGenerator):
     def prepare(
         self, spec: Mapping[str, Any], context: Any = None
     ) -> DigestPairSpec | BcryptPairSpec:
-        words = require_string_tuple(spec)
+        words = StringPool(require_string_tuple(spec))
         algorithm = str(spec.get("algorithm", "sha256")).lower()
         if algorithm not in _ALGORITHMS:
             raise ValueError(

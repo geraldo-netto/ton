@@ -195,3 +195,49 @@ def test_worker_path_storage_grows_linearly_with_depth():
             shifted = shifted["spec"]
         assert shifted["start"] == 7
     assert peaks[1] < peaks[0] * 2.8, peaks
+
+
+def test_explicit_date_proof_constrains_component_candidates(monkeypatch):
+    """PERF-047: an explicit endpoint must not scan the entire calendar."""
+    from ton._transforms import TransformResult
+    from ton.generators import date
+
+    generator = date.DateGenerator()
+    prepared = generator.prepare(
+        {
+            "minValue": "0001-01-01",
+            "maxValue": "9999-12-31T23:59:59",
+            "format": "%Y-%m-%d %H:%M:%S",
+        }
+    )
+    calls = 0
+    original = date._format_directive
+
+    def counted(moment, directive):
+        nonlocal calls
+        calls += 1
+        return original(moment, directive)
+
+    monkeypatch.setattr(date, "_format_directive", counted)
+    assert generator.prove(prepared, TransformResult("9999-12-31 23:59:59")).ok
+    assert calls < 30
+
+
+@pytest.mark.parametrize(
+    "format_string,value",
+    [("%Y %y-%m-%d", "9999 98-12-31"), ("%Y-%m %b-%d", "9999-12 Jan-31")],
+)
+def test_constrained_date_proof_rejects_conflicting_component_aliases(format_string, value):
+    """PERF-047: pruning must still check independent aliases for the same component."""
+    from ton._transforms import TransformResult
+    from ton.generators.date import DateGenerator
+
+    generator = DateGenerator()
+    prepared = generator.prepare(
+        {
+            "minValue": "0001-01-01",
+            "maxValue": "9999-12-31T23:59:59",
+            "format": format_string,
+        }
+    )
+    assert not generator.prove(prepared, TransformResult(value)).ok

@@ -211,19 +211,45 @@ def _components_match(moment: datetime, constraints: dict[str, str], keys: str) 
     )
 
 
+def _numeric_candidates(constraints: dict[str, str], key: str, start: int, stop: int) -> range:
+    if key not in constraints:
+        return range(start, stop)
+    value = int(constraints[key])
+    return range(max(start, value), min(stop, value + 1))
+
+
+def _years(constraints: dict[str, str], start: int, stop: int) -> range:
+    if "Y" in constraints or "y" not in constraints:
+        return _numeric_candidates(constraints, "Y", start, stop)
+    first = start + (int(constraints["y"]) - start) % 100
+    return range(first, stop, 100)
+
+
+def _months(constraints: dict[str, str]) -> range:
+    if "m" in constraints:
+        return _numeric_candidates(constraints, "m", 1, 13)
+    for key, names in (("b", _MONTH_ABBR), ("B", _MONTH_NAMES)):
+        if key in constraints:
+            month = names.index(constraints[key]) + 1
+            return range(month, month + 1)
+    return range(1, 13)
+
+
 def _matching_dates(prepared: DateSpec, constraints: dict[str, str]) -> Iterator[datetime]:
     lo, hi = prepared.lo, prepared.hi
     if lo.tzinfo is not None:
         hi = hi.astimezone(lo.tzinfo)
-    for year in range(lo.year, hi.year + 1):
+    for year in _years(constraints, lo.year, hi.year + 1):
         moment = datetime(year, 1, 1, tzinfo=lo.tzinfo)
         if not _components_match(moment, constraints, "Yy"):
             continue
-        for month in range(1, 13):
+        for month in _months(constraints):
             moment = moment.replace(month=month)
             if not _components_match(moment, constraints, "mbB"):
                 continue
-            for day in range(1, calendar.monthrange(year, month)[1] + 1):
+            for day in _numeric_candidates(
+                constraints, "d", 1, calendar.monthrange(year, month)[1] + 1
+            ):
                 candidate = moment.replace(day=day)
                 if lo.date() <= candidate.date() <= hi.date() and _components_match(
                     candidate, constraints, "daAjUwW"
@@ -236,17 +262,17 @@ def _matches_interval(prepared: DateSpec, constraints: dict[str, str]) -> bool:
         return False
     hours = [
         hour
-        for hour in range(24)
+        for hour in _numeric_candidates(constraints, "H", 0, 24)
         if _components_match(prepared.lo.replace(hour=hour), constraints, "HIp")
     ]
     minutes = [
         minute
-        for minute in range(60)
+        for minute in _numeric_candidates(constraints, "M", 0, 60)
         if _components_match(prepared.lo.replace(minute=minute), constraints, "M")
     ]
     seconds = [
         second
-        for second in range(60)
+        for second in _numeric_candidates(constraints, "S", 0, 60)
         if _components_match(prepared.lo.replace(second=second), constraints, "S")
     ]
     microsecond = int(constraints["f"]) if "f" in constraints else None

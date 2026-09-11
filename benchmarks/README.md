@@ -27,3 +27,27 @@ Keep the same values for comparisons. Negative changes mean less time or memory.
 Medians and raw min/max/sample data are saved; small differences within run-to-run
 spread are noise, not evidence of an improvement. Results describe this machine
 and workload, not a universal performance guarantee.
+
+## Recorded architecture comparison
+
+[The saved comparison](results/comparison.md) compares `e7d6569` with `57127f6`
+using the unchanged harness, Python 3.12.3, 20,000 rows and five measured samples
+per case. All generated row counts, character counts and output checksums match.
+Raw timings and traced allocation peaks are in [before.json](results/before.json)
+and [after.json](results/after.json).
+
+Representative median elapsed times:
+
+| Measurement | Before | After | Change |
+|---|---:|---:|---:|
+| JSON-only import | 28.23 ms | 6.99 ms | -75.2% |
+| Integer generation | 21.72 ms | 38.81 ms | +78.7% |
+| Mixed generation | 112.46 ms | 133.57 ms | +18.8% |
+| Four-transform generation with proof | 113.19 ms | 231.01 ms | +104.1% |
+
+The larger runtime increases exceed the observed sample ranges. The new row
+validation scope and shared transform dispatcher add work in these paths; this
+run measures their combined effect with the other architecture changes, without
+isolating individual contributions. The nested-proof median increased 4.6%, but
+its before/after sample ranges overlap. JSON-only traced peak allocations fell
+50.9%; the remaining cases increased roughly 2%.

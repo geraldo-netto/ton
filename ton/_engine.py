@@ -14,7 +14,7 @@ from random import Random
 from typing import Any, NoReturn, cast
 
 from . import _config
-from ._compiler import ResolvedToken, compile_plan
+from ._compiler import CompiledPlan, ResolvedToken, _compile_owned_plan, compile_plan
 from ._compiler import TemplateError as _TemplateError
 from ._contracts import Generator
 from ._logging import LogEvent
@@ -157,18 +157,35 @@ class Engine:
             transforms=transforms,
             validators=validators,
         )
+        self._initialize(
+            config,
+            plan,
+            EngineOptions(
+                rng=rng,
+                proof_mode=proof_mode,
+                proof_sample_rate=proof_sample_rate,
+                seed=seed,
+                milestone_rows=milestone_rows,
+                redact_proof_failures=redact_proof_failures,
+                proof_failure_sink=proof_failure_sink,
+            ),
+        )
+
+    def _initialize(
+        self, config: Mapping[str, Any], plan: CompiledPlan, options: EngineOptions
+    ) -> None:
         self._plan = plan
         self._max_row_width = _config.row_width_limit(config)
-        self._rng = rng if rng is not None else Random()
+        self._rng = options.rng if options.rng is not None else Random()
         self._proof = ProofChecker(
-            mode=proof_mode,
-            sample_rate=proof_sample_rate,
-            seed=seed,
-            redact=redact_proof_failures,
-            failure_sink=proof_failure_sink,
+            mode=options.proof_mode,
+            sample_rate=options.proof_sample_rate,
+            seed=options.seed,
+            redact=options.redact_proof_failures,
+            failure_sink=options.proof_failure_sink,
         )
-        self._seed = seed
-        self._milestone_rows = max(0, int(milestone_rows))
+        self._seed = options.seed
+        self._milestone_rows = max(0, int(options.milestone_rows))
         self._rows_emitted = 0
         self._iteration_lock = threading.Lock()
         self._iteration_started = False
@@ -185,6 +202,23 @@ class Engine:
                 "milestone_rows": self._milestone_rows,
             },
         )
+
+    @classmethod
+    def _from_owned_options(cls, config: Mapping[str, Any], options: EngineOptions) -> Engine:
+        """Consume options cloned by an internal builder, including partition mutations."""
+        from dataclasses import replace
+
+        _config.validate_structure(config)
+        plan = _compile_owned_plan(
+            config,
+            registry=options.registry,
+            transforms=options.transforms,
+            validators=options.validators,
+        )
+        engine = cls.__new__(cls)
+        rng = options.rng if options.rng is not None else _rng_for_seed(options.seed)
+        engine._initialize(config, plan, replace(options, rng=rng))
+        return engine
 
     @classmethod
     def from_options(cls, config: Mapping[str, Any], options: EngineOptions) -> Engine:

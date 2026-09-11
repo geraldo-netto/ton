@@ -14,7 +14,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
-from ._compiler import TemplateError, compile_plan
+from ._compiler import TemplateError, _compile_owned_plan
 from ._json import parse_json
 from ._logging import LogEvent
 from ._logging import logger as _logger
@@ -73,7 +73,7 @@ def validate_with_catalog(data: Mapping[str, Any], catalog: ExtensionCatalog) ->
     validate_structure(data)
     snapshot = catalog.snapshot()
     try:
-        compile_plan(
+        _compile_owned_plan(
             data,
             registry=snapshot.generators,
             transforms=snapshot.transforms,

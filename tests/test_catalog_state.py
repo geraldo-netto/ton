@@ -198,3 +198,36 @@ def test_engine_construction_owns_supplied_extension_state(mapping, worker):
     assert list(second) == ["0:0", "1:1"]
     assert list(build(2)) == ["0:0", "1:1"]
     assert generator.count == transform.count == validator.count == 0
+
+
+@pytest.mark.parametrize("builder", ["engine", "validation", "worker", "cli"])
+def test_internal_builders_copy_extension_graph_once(monkeypatch, builder):
+    """PERF-048: privately owned snapshots pass through without a second clone."""
+    from ton import cli
+
+    copies = []
+
+    class Counted(Counter):
+        def __deepcopy__(self, memo):
+            copies.append(self)
+            clone = Counted()
+            memo[id(self)] = clone
+            return clone
+
+    catalog = api.build_extension_catalog()
+    catalog.register_data_type("example", "counter", Counted())
+    config = {"rows": 1, "format": "$x$", "types": {"x": {"type": "example.counter"}}}
+    snapshot = catalog.snapshot()
+    options = api.EngineOptions(registry=snapshot.generators)
+    copies.clear()
+    if builder == "validation":
+        api.validate_config(config, catalog=catalog)
+    elif builder == "worker":
+        api.fork_engine(config, parent_seed=42, worker_id=0, options=options)
+    elif builder == "cli":
+        monkeypatch.setattr(cli, "_catalog_from_args", lambda args: catalog)
+        args = cli._build_parser().parse_args(["--entry-points"])
+        cli._build_engine(args, config)
+    else:
+        api.Engine.from_options(config, options)
+    assert len(copies) == 1

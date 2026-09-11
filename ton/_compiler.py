@@ -67,7 +67,6 @@ class EngineCompiler:
         validators: Mapping[str, Validator] | None,
         prepare_all_fields: bool = False,
     ) -> None:
-        registry, transforms, validators = snapshot_inputs(registry, transforms, validators)
         self.template = str(config["format"])
         self.rows = int(config["rows"])
         self._child_prepared: dict[SpecLocation, tuple[Generator, Any]] = {}
@@ -440,6 +439,25 @@ def compile_plan(
     prepare_all_fields: bool = False,
 ) -> CompiledPlan:
     """Compile one config through the canonical compiler boundary."""
+    registry, transforms, validators = snapshot_inputs(registry, transforms, validators)
+    return _compile_owned_plan(
+        config,
+        registry=registry,
+        transforms=transforms,
+        validators=validators,
+        prepare_all_fields=prepare_all_fields,
+    )
+
+
+def _compile_owned_plan(
+    config: Mapping[str, Any],
+    *,
+    registry: Mapping[str, Generator] | None = None,
+    transforms: Mapping[str, Transform] | None = None,
+    validators: Mapping[str, Validator] | None = None,
+    prepare_all_fields: bool = False,
+) -> CompiledPlan:
+    """Consume a private extension graph; callers must surrender its ownership."""
     return EngineCompiler(
         config,
         registry,

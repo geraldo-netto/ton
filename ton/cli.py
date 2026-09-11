@@ -540,7 +540,7 @@ def _build_engine(args: argparse.Namespace, config: dict[str, object]) -> Engine
         validators = snapshot.validators
     # Pass only --seed; from_config derives the RNG from it so the
     # Random(seed)-or-Random() idiom lives solely in the engine (DEC-002).
-    return Engine.from_options(
+    return Engine._from_owned_options(
         config,
         EngineOptions(
             registry=registry,

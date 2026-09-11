@@ -137,7 +137,7 @@ def fork_engine(
     config = _offset_sequences(config, offset, worker_options.registry, worker_options.transforms)
     if rows is not None:
         config = {**config, "rows": rows}
-    engine = Engine.from_options(config, worker_options)
+    engine = Engine._from_owned_options(config, worker_options)
     _logger.info(
         "engine_forked worker_id=%d parent_seed=%d rows=%d",
         worker_id,

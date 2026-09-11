@@ -6,7 +6,6 @@
 
 | id | status | severity | effort | description |
 |---|---|---|---|---|
-| REL-060 | open | low | small | Reliability/correctness: preserve proof support for string subclasses in `ton/_pool.py::StringPool.__contains__`. A `str` subclass overriding equality with `str.__eq__` and therefore having `__hash__ = None` previously worked with tuple membership; `StringGenerator.prove` now raises `TypeError` for an equal configured value. Keep the indexed fast path for ordinary strings and a correct fallback for valid unhashable string inputs. Add permanent accepting/rejecting source and paired-plaintext proof regressions without changing ordered sampling or duplicate weights. |
 | REL-061 | open | medium | medium | Reliability/correctness: avoid overflowing timezone conversion of date proof bounds in `ton/generators/date.py::_matching_dates/_time_in_bounds`. Bounds `2024-01-01T00:00:00+02:00` through `9999-12-31T23:59:59+00:00` prepare successfully and seed 42 generates `3063-09-28 23:11:25`, but its proof raises `OverflowError` when converting the upper bound to the lower bound's timezone. Compare interval endpoints without constructing an out-of-calendar datetime. Add permanent upper/lower calendar-edge offset cases for valid and rejected values, partial formats and Engine proof modes. |
 
 ### Robustness / recovery

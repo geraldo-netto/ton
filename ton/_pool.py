@@ -11,4 +11,10 @@ class StringPool(tuple[str, ...]):
         return frozenset(self)
 
     def __contains__(self, value: object) -> bool:
-        return isinstance(value, str) and value in self._members
+        if not isinstance(value, str):
+            return False
+        try:
+            return value in self._members
+        except TypeError:
+            # Equality-only string subclasses remain valid proof inputs (REL-060).
+            return super().__contains__(value)

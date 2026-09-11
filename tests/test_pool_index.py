@@ -16,6 +16,37 @@ class CountedQuery(str):
         return super().__eq__(other)
 
 
+class UnhashableText(str):
+    def __eq__(self, other):
+        return str.__eq__(self, other)
+
+
+@pytest.mark.parametrize("value,accepted", [("allowed", True), ("absent", False)])
+def test_unhashable_string_subclass_source_proofs(value, accepted):
+    """REL-060: equality-compatible strings remain valid membership queries."""
+    generator = StringGenerator()
+    prepared = generator.prepare({"values": ["allowed", "allowed", "other"]})
+    assert generator.prove(prepared, TransformResult(UnhashableText(value))).ok is accepted
+
+
+@pytest.mark.parametrize(
+    "algorithm,cache", [("sha256", False), ("ntlm", False), ("bcrypt", False), ("bcrypt", True)]
+)
+@pytest.mark.parametrize("value,accepted", [("allowed", True), ("absent", False)])
+def test_unhashable_string_subclass_paired_plaintext_proofs(algorithm, cache, value, accepted):
+    """REL-060: hash proofs accept unhashable plaintext without bypassing digest checks."""
+    from ton.generators.hash import HashGenerator
+
+    generator = HashGenerator()
+    spec = {"algorithm": algorithm, "values": ["allowed"]}
+    if algorithm == "bcrypt":
+        spec.update(rounds=4, cache=cache)
+    prepared = generator.prepare(spec)
+    _, digest = generator.generate_pair(prepared, Random(42))
+    assert generator.prove(prepared, TransformResult(digest, UnhashableText(value))).ok is accepted
+    assert not generator.prove(prepared, TransformResult("wrong", UnhashableText(value))).ok
+
+
 @pytest.mark.parametrize("size", [100, 1000, 10000])
 def test_string_proof_membership_work_is_independent_of_pool_size(size):
     """PERF-044: repeated proof lookups must not scan the ordered draw pool."""

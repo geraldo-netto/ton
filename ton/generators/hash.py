@@ -127,10 +127,12 @@ class HashGenerator(PairedGenerator):
 def _bcrypt_digest_cached(prepared: BcryptPairSpec, plaintext: str) -> str:
     if prepared.cache is None:
         return _bcrypt_digest(plaintext, prepared.rounds)
-    digest = prepared.cache.get(plaintext)
+    # Cache by string content even when proof input disables hashing (REL-060).
+    key = str.__str__(plaintext)
+    digest = prepared.cache.get(key)
     if digest is None:
         digest = _bcrypt_digest(plaintext, prepared.rounds)
-        prepared.cache[plaintext] = digest
+        prepared.cache[key] = digest
     return digest
 
 

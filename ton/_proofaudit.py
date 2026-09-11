@@ -15,6 +15,8 @@ provenance fields remain visible.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable
+from itertools import chain
 from typing import TextIO
 
 from ._json import iter_json
@@ -57,7 +59,7 @@ class ProofAuditWriter:
             "spec": failure.spec if emit_spec else None,
         }
         try:
-            self._stream.write("".join(iter_json(payload)) + "\n")
+            _write_chunks(self._stream, chain(iter_json(payload), ("\n",)))
         except OSError as exc:
             raise ProofAuditWriteError(str(exc)) from exc
         if spec_ref is not None:
@@ -72,6 +74,26 @@ class ProofAuditWriter:
         reference = _spec_reference(spec)
         self._spec_references[type_key] = (spec, reference)
         return reference
+
+
+def _write_chunks(stream: TextIO, tokens: Iterable[str]) -> None:
+    """Bound serialization buffers, including unusually large numeric tokens."""
+    limit = 65536
+    parts: list[str] = []
+    used = 0
+    for token in tokens:
+        offset = 0
+        while offset < len(token):
+            piece = token[offset : offset + limit - used]
+            parts.append(piece)
+            used += len(piece)
+            offset += len(piece)
+            if used == limit:
+                stream.write("".join(parts))
+                parts.clear()
+                used = 0
+    if parts:
+        stream.write("".join(parts))
 
 
 def _spec_reference(spec: object) -> str:

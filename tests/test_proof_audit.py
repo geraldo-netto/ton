@@ -534,3 +534,77 @@ def test_audit_specs_resist_sink_and_consumer_mutation() -> None:
     assert restored.spec == original
     with pytest.raises(TypeError):
         restored.spec["values"][0] = "changed"
+
+
+@pytest.mark.parametrize("kind", ["pool", "scalar", "key"])
+def test_audit_serialization_uses_bounded_writes_and_allocations(kind):
+    """SCALE-026: neither a large record nor one escaped string buffers the report."""
+    import tracemalloc
+    from dataclasses import replace
+
+    maximum = 0
+    total = 0
+
+    class Sink:
+        def write(self, value):
+            nonlocal maximum, total
+            maximum = max(maximum, len(value))
+            total += len(value)
+            return len(value)
+
+    value = '\U0001f600\\\n"' * 100000
+    spec = (
+        {"values": ["abc"] * 100000}
+        if kind == "pool"
+        else {value if kind == "key" else "value": value}
+    )
+    failure = replace(_failure(), spec=spec)
+    writer = ProofAuditWriter(Sink())
+    tracemalloc.start()
+    try:
+        writer(failure)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert total > 600000
+    assert maximum <= 65536
+    assert peak < 2_000_000
+
+
+def test_later_audit_chunk_failure_does_not_mark_spec_emitted():
+    """SCALE-026: metadata commits only after every chunk and the newline succeed."""
+    from dataclasses import replace
+
+    class FailingSink:
+        calls = 0
+
+        def write(self, value):
+            self.calls += 1
+            if self.calls == 2:
+                raise OSError("later chunk failed")
+            return len(value)
+
+    failure = replace(_failure(), spec={"values": ["abc"] * 20000})
+    writer = ProofAuditWriter(FailingSink())
+    with pytest.raises(ProofAuditWriteError, match="later chunk failed"):
+        writer(failure)
+    assert not writer._emitted_specs
+    writer._stream = io.StringIO()
+    writer(failure)
+    assert json.loads(writer._stream.getvalue())["spec"] == failure.spec
+
+
+def test_large_audit_string_chunks_preserve_exact_json_bytes():
+    from dataclasses import replace
+
+    from ton._json import iter_json
+
+    text = 'a\U0001f600\ud800\\\n"' * 3000
+    spec = {text: text, "pool": [text]}
+    assert "".join(iter_json(spec)) == json.dumps(spec, ensure_ascii=True, separators=(",", ":"))
+    stream = io.StringIO()
+    ProofAuditWriter(stream)(replace(_failure(), value=text, spec=spec))
+    record = json.loads(stream.getvalue())
+    assert record["value"] == text
+    assert record["spec"] == spec
+    assert stream.getvalue().endswith("\n")

@@ -109,6 +109,8 @@ def iter_json(value: Any, *, sort_keys: bool = False) -> Iterator[str]:
             active.add(id(item))
             containers.append(item)
             pending.append(_container_tokens(item, sort_keys))
+        elif isinstance(item, str):
+            yield from _string_tokens(item)
         else:
             yield _scalar(item)
 
@@ -121,7 +123,12 @@ def _container_tokens(value: Any, sort_keys: bool) -> Iterator[tuple[bool, Any]]
             if index:
                 yield True, ","
             # Delegate JSON's object-key conversion and validation to its public encoder.
-            yield True, json.dumps({key: None}, ensure_ascii=True).removesuffix(" null}")[1:]
+            if isinstance(key, str):
+                for token in _string_tokens(key):
+                    yield True, token
+                yield True, ":"
+            else:
+                yield True, json.dumps({key: None}, ensure_ascii=True).removesuffix(" null}")[1:]
             yield False, value[key]
         yield True, "}"
     else:
@@ -131,6 +138,17 @@ def _container_tokens(value: Any, sort_keys: bool) -> Iterator[tuple[bool, Any]]
                 yield True, ","
             yield False, item
         yield True, "]"
+
+
+def _string_tokens(value: str) -> Iterator[str]:
+    """Escape bounded pieces, keeping Unicode characters intact between pieces."""
+    if len(value) <= 4096:
+        yield json.dumps(value, ensure_ascii=True)
+        return
+    yield '"'
+    for offset in range(0, len(value), 4096):
+        yield json.dumps(value[offset : offset + 4096], ensure_ascii=True)[1:-1]
+    yield '"'
 
 
 def _scalar(value: Any) -> str:

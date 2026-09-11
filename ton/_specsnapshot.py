@@ -60,24 +60,29 @@ def snapshot_spec(value: Any, *, immutable: bool = False) -> Any:
     root: list[Any] = [None]
     # Preserve aliases and cycles within the isolated graph (SCALE-012).
     memo: dict[int, Any] = {}
-    pending: list[tuple[Any, Any, Any]] = [(root, 0, value)]
+    # Keep one iterator per active container, not one queued task per entry.
+    pending: list[tuple[Any, Iterator[tuple[Any, Any]]]] = [(root, iter(((0, value),)))]
     while pending:
-        target, key, item = pending.pop()
+        target, entries = pending[-1]
+        try:
+            key, item = next(entries)
+        except StopIteration:
+            pending.pop()
+            continue
         if id(item) in memo:
             target[key] = memo[id(item)]
         elif isinstance(item, Mapping):
-            # Reserve keys before the LIFO work stack fills their values (ARCH-022).
-            copied: Any = dict.fromkeys(item)
+            copied: Any = {}
             view = FrozenMapping(copied) if immutable else copied
             memo[id(item)] = view
             target[key] = view
-            pending.extend((copied, item_key, sub) for item_key, sub in item.items())
+            pending.append((copied, iter(item.items())))
         elif isinstance(item, Sequence) and not isinstance(item, (str, bytes, bytearray)):
             copied = [None] * len(item)
             view = FrozenSequence(copied) if immutable else copied
             memo[id(item)] = view
             target[key] = view
-            pending.extend((copied, index, sub) for index, sub in enumerate(item))
+            pending.append((copied, enumerate(item)))
         else:
             target[key] = item
     return root[0]

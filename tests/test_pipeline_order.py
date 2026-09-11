@@ -3,6 +3,7 @@
 import pytest
 
 from ton import api
+from ton._transforms import BaseTransform
 
 
 class RejectingSource(api.Generator):
@@ -166,6 +167,71 @@ def test_failed_proof_discards_pending_child_validation():
         )
     ) == ["ok"]
     assert _pending.get() is None
+
+
+@pytest.mark.parametrize("mode,rate", [("all", 1), ("sample", 2)])
+@pytest.mark.parametrize("first", ["source", "transform"])
+def test_strict_proofs_stop_before_later_hooks(mode, rate, first):
+    """REL-058: a later hook cannot mask the first strict proof rejection."""
+    calls = []
+
+    class Reject(BaseTransform):
+        type_name = "reject_transform"
+
+        def prove(self, prepared, before, after):
+            calls.append("reject")
+            return api.TransformProof(False, "transform rejection")
+
+    class Explode(BaseTransform):
+        type_name = "explode"
+
+        def prove(self, prepared, before, after):
+            calls.append("explode")
+            raise RuntimeError("later proof")
+
+    spec = {"type": "reject", "transforms": [{"type": "explode"}]}
+    if first == "transform":
+        spec = {
+            "type": "string",
+            "values": ["x"],
+            "transforms": [{"type": "reject_transform"}, {"type": "explode"}],
+        }
+    engine = api.Engine(
+        {"rows": rate, "format": "$x$", "types": {"x": spec}},
+        registry={**api.build_extension_catalog().generators(), "reject": RejectingSource()},
+        transforms={"reject_transform": Reject(), "explode": Explode()},
+        proof_mode=mode,
+        proof_sample_rate=rate,
+    )
+    with pytest.raises(api.ProofError, match=first + " rejection"):
+        list(engine)
+    assert calls == (["reject"] if first == "transform" else [])
+    assert engine.rows_emitted == rate - 1
+
+
+def test_root_audit_still_collects_source_and_all_transform_rejections():
+    """REL-058: audit remains exhaustive after strict proofs become fail-fast."""
+    engine = api.Engine(
+        {
+            "rows": 1,
+            "format": "$x$",
+            "types": {
+                "x": {
+                    "type": "reject",
+                    "transforms": [{"type": "reject_transform"}] * 2,
+                }
+            },
+        },
+        registry={"reject": RejectingSource()},
+        transforms={"reject_transform": RejectingTransform()},
+        proof_mode="audit",
+    )
+    assert list(engine) == [""]
+    assert [failure.stage for failure in engine.proof_failures] == [
+        "source",
+        "transform",
+        "transform",
+    ]
 
 
 @pytest.mark.parametrize("kind", ["root", "oneOf", "weighted", "sequence_of", "distribution"])

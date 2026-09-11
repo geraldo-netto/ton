@@ -132,6 +132,7 @@ class ProofChecker:
             steps,
             row=rows_emitted + 1,
             spec=spec if self.mode != "audit" else None,
+            stop_at_first=self.mode != "audit",
         )
         if not failures:
             return None
@@ -186,10 +187,13 @@ class ProofChecker:
         *,
         row: int = 0,
         spec: Mapping[str, Any] | None = None,
+        stop_at_first: bool = False,
     ) -> tuple[ProofFailure, ...]:
-        """Return every proof failure for a field's source + transform trace."""
+        """Collect ordered failures, stopping strict evaluation at its first rejection."""
         failures = list(self._source_failures(type_key, field, source_result, row, spec))
         for step in steps:
+            if stop_at_first and failures:
+                break
             try:
                 proof = step.prepared.transform.prove(
                     step.prepared.prepared,

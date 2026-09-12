@@ -23,6 +23,9 @@ File define expected behavior + usage model for AI agents in this repo.
   statements, their sources, the impact, and the correction or decision needed. This
   applies to instructions, requirements, code, tests, configuration, documentation,
   and any other source. Never silently omit a contradiction.
+  When intended behavior is established, an implementation that behaves differently
+  is a bug. This mismatch alone is not a contradiction and does not require `blocked`
+  status; classify the bug by readiness to fix it.
 - Classify TODO status by readiness to proceed:
   - `open`: the next required work can proceed under the established requirements.
     A known bug with clear expected behavior belongs here.

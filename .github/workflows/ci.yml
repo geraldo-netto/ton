@@ -1,10 +1,9 @@
 name: CI
 
+# Manual only: CI never runs on push or pull_request. Start a run from the
+# Actions tab or with `gh workflow run ci.yml --ref <branch>`.
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+  workflow_dispatch:
 
 permissions:
   contents: read

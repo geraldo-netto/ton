@@ -30,6 +30,10 @@ git config core.hooksPath .githooks
 
 Bypass in an emergency with `git commit --no-verify`.
 
+GitHub Actions CI ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) is manual
+only: it does not run on push or pull request. Start a run from the Actions tab or with
+`gh workflow run ci.yml --ref <branch>`.
+
 Behavior guidelines for AI agents live in [`AGENTS.md`](../AGENTS.md); open review findings are tracked in [`TODO.md`](../TODO.md).
 
 On Windows PowerShell, activate the environment with `.\.venv\Scripts\Activate.ps1`.
